@@ -2,3 +2,5 @@ hist.txt
 bin/
 build/
 .gradle/
+.ai_agent/
+rc.sh
