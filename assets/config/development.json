@@ -1,0 +1,13 @@
+{
+  "env": "development",
+  "api_base_url": "http://localhost:8080/api",
+  "ws_url": "ws://localhost:8080/ws",
+  "wss_url": "wss://localhost:8080/ws",
+  "log_level": "debug",
+  "enable_keepalive": true,
+  "enable_cheats": true,
+  "matchmaking_server": "dev.match.example.com",
+  "player_data_endpoint": "/player/data",
+  "matchmaking_endpoint": "/match/find",
+  "heartbeat_interval_sec": 10
+}

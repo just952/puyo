@@ -4,3 +4,6 @@ build/
 .gradle/
 .ai_agent/
 rc.sh
+full_conversation.log
+project_context_export.md
+proposal.md

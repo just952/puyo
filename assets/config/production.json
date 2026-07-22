@@ -1,0 +1,14 @@
+{
+  "env": "production",
+  "api_base_url": "https://api.puyo-clone.com/game",
+  "ws_url": "",
+  "wss_url": "wss://api.puyo-clone.com/ws",
+  "log_level": "info",
+  "enable_keepalive": true,
+  "enable_keeps_alive": false,
+  "enable_cheats": false,
+  "matchmaking_server": "match.puyo-clone.com",
+  "player_data_endpoint": "/player/data",
+  "matchmaking_endpoint": "/match/find",
+  "heartbeat_interval_sec": 15
+}
