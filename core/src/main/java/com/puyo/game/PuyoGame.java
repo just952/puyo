@@ -17,20 +17,22 @@ public class PuyoGame extends Game {
         
         switch (logLevel) {
             case "debug":
-            Gdx.app.setLogLevel(Application.LOG_DEBUG);
-            break;
-        case "info":
-            Gdx.app.setLogLevel(Application.LOG_INFO);
-            break;
-        case "error":
-            Gdx.app.setLogLevel(Application.LOG_ERROR);
-            break;
-        default:
-            Gdx.app.setLogLevel(Application.LOG_INFO);
-       }
+                Gdx.app.setLogLevel(Application.LOG_DEBUG);
+                break;
+            case "info":
+                Gdx.app.setLogLevel(Application.LOG_INFO);
+                break;
+            case "error":
+                Gdx.app.setLogLevel(Application.LOG_ERROR);
+                break;
+            default:
+                Gdx.app.setLogLevel(Application.LOG_INFO);
+        }
 
         Gdx.app.log("GameStart", "Environment: " + config.env);
         Gdx.app.log("PuyoGame", "Game Created!");
+
+        // TODO: Replace LoadingScreen with MenuScreen after LoadingScreen completes
         setScreen(new com.puyo.game.screens.LoadingScreen(this));
     }
 
