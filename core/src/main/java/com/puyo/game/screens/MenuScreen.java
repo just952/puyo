@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.puyo.game.PuyoGame;
+import com.puyo.game.GameMode;
 import com.puyo.game.menus.MenuItem;
 import com.puyo.game.menus.MenuLoader;
 import com.puyo.game.menus.MenuAction;
@@ -63,8 +64,7 @@ public class MenuScreen implements Screen {
                 case PUSH_SCREEN:
                     switch (item.target) {
                         case "story_mode_select":
-                            // TODO: Implement StoryModeSelectScreen
-                            // game.setScreen(new StoryModeSelectScreen(game));
+                            game.setScreen(new StoryModeSelectScreen(game));
                             break;
                         case "versus_mode_select":
                             // TODO: Implement VersusModeSelectScreen
@@ -78,18 +78,11 @@ public class MenuScreen implements Screen {
                     break;
                 case START_GAME:
                     if ("endless".equals(item.mode)) {
-                        // TODO: Pass actual game mode to PlayScreen
-                        // game.setScreen(new PlayScreen(game, GameMode.ENDLESS));
+                        game.setScreen(new PlayScreen(game, GameMode.ENDLESS));
                     }
                     break;
                 case EXIT_GAME:
                     Gdx.app.exit();
-                    break;
-                case POP_SCREEN:
-                    // TODO: Implement screen popping logic
-                    break;
-                case NONE:
-                    // No action
                     break;
             }
         } catch (IllegalArgumentException e) {
