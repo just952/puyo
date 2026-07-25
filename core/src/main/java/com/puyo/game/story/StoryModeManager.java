@@ -27,13 +27,13 @@ public class StoryModeManager {
     private void loadStages() {
         FileHandle file = Gdx.files.internal(STORY_DATA_PATH);
         if (!file.exists()) {
-            Gdx.error("StoryModeManager", "Story data file not found: " + STORY_DATA_PATH);
+            Gdx.app.error("StoryModeManager", "Story data file not found: " + STORY_DATA_PATH);
             stages = new StageData[0];
             return;
         }
         Json json = new Json();
         stages = json.fromJson(StageData[].class, file);
-        Gdx.log("StoryModeManager", "Loaded " + stages.length + " stages.");
+        Gdx.app.log("StoryModeManager", "Loaded " + stages.length + " stages.");
     }
 
     public StageData[] getStages() {
@@ -72,7 +72,7 @@ public class StoryModeManager {
         currentStageIndex++;
         if (currentStageIndex >= stages.length) {
             // all story completed
-            Gdx.log("StoryModeManager", "All stages completed!");
+            Gdx.app.log("StoryModeManager", "All stages completed!");
             // could loop or stay at last stage
             currentStageIndex = stages.length - 1;
         }
