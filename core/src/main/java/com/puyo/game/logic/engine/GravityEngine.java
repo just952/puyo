@@ -24,17 +24,17 @@ public class GravityEngine {
      */
     public boolean applyGravity() {
         boolean moved = false;
-        int width = board.getWidth();
-        int height = board.getHeight();
+        int width = Board.WIDTH;
+        int height = Board.HEIGHT;
 
         for (int x = 0; x < width; x++) {
             int writeY = 0; // 뿌요가 새로 위치할(쌓일) 아래쪽 인덱스
             for (int readY = 0; readY < height; readY++) {
-                Puyo current = board.getPuyo(x, readY);
+                Puyo current = board.getPuyoAt(x, readY);
                 if (current != null) {
                     if (readY != writeY) {
-                        board.setPuyo(x, writeY, current);
-                        board.clearPuyo(x, readY);
+                        board.setPuyoAt(x, writeY, current);
+                        board.setPuyoAt(x, readY, null);
                         moved = true;
                     }
                     writeY++;
@@ -50,11 +50,11 @@ public class GravityEngine {
      */
     public List<Position> findMatches() {
         List<Position> toClear = new ArrayList<>();
-        boolean[][] visited = new boolean[board.getWidth()][board.getHeight()];
+        boolean[][] visited = new boolean[Board.WIDTH][Board.HEIGHT];
 
-        for (int x = 0; x < board.getWidth(); x++) {
-            for (int y = 0; y < board.getHeight(); y++) {
-                Puyo puyo = board.getPuyo(x, y);
+        for (int x = 0; x < Board.WIDTH; x++) {
+            for (int y = 0; y < Board.HEIGHT; y++) {
+                Puyo puyo = board.getPuyoAt(x, y);
                 if (puyo != null && !visited[x][y]) {
                     List<Position> group = new ArrayList<>();
                     findGroup(x, y, puyo.getColor(), visited, group);
@@ -69,8 +69,8 @@ public class GravityEngine {
     }
 
     private void findGroup(int x, int y, PuyoColor color, boolean[][] visited, List<Position> group) {
-        if (x < 0 || x >= board.getWidth() || y < 0 || y >= board.getHeight() || 
-            visited[x][y] || board.getPuyo(x, y) == null || board.getPuyo(x, y).getColor() != color) {
+        if (x < 0 || x >= Board.WIDTH || y < 0 || y >= Board.HEIGHT || 
+            visited[x][y] || board.getPuyoAt(x, y) == null || board.getPuyoAt(x, y).getColor() != color) {
             return;
         }
 
@@ -89,7 +89,7 @@ public class GravityEngine {
      */
     public void clearPositions(List<Position> positions) {
         for (Position pos : positions) {
-            board.clearPuyo(pos.x, pos.y);
+            board.setPuyoAt(pos.x, pos.y, null);
         }
     }
 

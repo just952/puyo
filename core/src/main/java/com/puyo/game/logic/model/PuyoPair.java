@@ -1,82 +1,148 @@
 package com.puyo.game.logic.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * 플레이어가 조작하는 두 개의 뿌요 쌍을 관리하는 클래스입니다.
- * puyo1은 회전의 중심이 되는 축(Pivot)이며, puyo2는 축을 중심으로 회전하는 뿌요입니다.
+ * Represents a pair of puyos that fall together.
  */
 public class PuyoPair {
-    private final Puyo puyo1;
-    private final Puyo puyo2;
-    private int offsetX;  // 중심 축(puyo1)의 X 오프셋 (열 위치)
-    private int offsetY;  // 중심 축(puyo1)의 Y 오프셋 (행 위치)
-    private int rotation; // 0: UP, 1: RIGHT, 2: DOWN, 3: LEFT
+    private Puyo left;
+    private Puyo right;
+    private int rotation; // 0: up, 1: right, 2: down, 3: left
+    private static final int[][] OFFSETS = {
+            {0, 1},   // 0: up
+            {1, 0},   // 1: right
+            {0, -1},  // 2: down
+            {-1, 0}   // 3: left
+    };
 
-    public PuyoPair(Puyo p1, Puyo p2) {
-        this.puyo1 = p1;
-        this.puyo2 = p2;
-        this.offsetX = 2; // 보통 가로 6열 중 중앙 부근에서 생성
-        this.offsetY = 11; // 보드 상단(11행)에서 생성
-        this.rotation = 0; // 세로 배치(UP)
+    public PuyoPair(Puyo left, Puyo right) {
+        this.left = left;
+        this.right = right;
+        this.rotation = 0; // initial rotation: up (right is above left)
+        // Ensure the puyos are positioned correctly: left at (x,y), right at (x, y+1) for rotation 0.
+        // We'll adjust in setPosition.
     }
 
-    public Puyo getPuyo1() { return puyo1; }
-    public Puyo getPuyo2() { return puyo2; }
+    public Puyo getLeft() {
+        return left;
+    }
 
-    public int getX1(int boardX, int boardY) { return boardX + offsetX; }
-    public int getY1(int boardY) { return boardY + offsetY; }
-    
+    public Puyo getRight() {
+        return right;
+    }
+
+    public int getRotation() {
+        return rotation;
+    }
+
+    public void setRotation(int rotation) {
+        this.rotation = rotation;
+    }
+
     /**
-     * 회전 상태에 따라 동반 뿌요(puyo2)의 X 좌표를 반환합니다.
+     * Sets the position of the pair based on the grid coordinates of the "reference" point.
+     * We'll define the reference point as the position of the left puyo when rotation is 0.
+     * For other rotations, we compute the positions accordingly.
+     * @param x the x coordinate of the reference point
+     * @param y the y coordinate of the reference point
      */
-    public int getX2(int boardX, int boardY, int currentRotation) {
-        int x1 = getX1(boardX, boardY);
-        switch (currentRotation) {
-            case 1: return x1 + 1; // RIGHT
-            case 3: return x1 - 1; // LEFT
-            case 0: // UP
-            case 2: // DOWN
-            default: return x1;
-        }
+    public void setPosition(int x, int y) {
+        int[] offset = OFFSETS[rotation];
+        left.setX(x);
+        left.setY(y);
+        right.setX(x + offset[0]);
+        right.setY(y + offset[1]);
     }
-    
+
     /**
-     * 회전 상태에 따라 동반 뿌요(puyo2)의 Y 좌표를 반환합니다.
+     * Returns the positions of the two puyos as an array of [x,y] pairs.
+     * @return array where [0] is left puyo [x,y], [1] is right puyo [x,y]
      */
-    public int getY2(int boardY, int currentRotation) {
-        int y1 = boardY + offsetY;
-        switch (currentRotation) {
-            case 0: return y1 + 1; // UP
-            case 2: return y1 - 1; // DOWN
-            case 1: // RIGHT
-            case 3: // LEFT
-            default: return y1;
-        }
+    public int[][] getPositions() {
+        return new int[][]{
+                {left.getX(), left.getY()},
+                {right.getX(), right.getY()}
+        };
     }
 
-    public int getX2(int boardX, int boardY) {
-        return getX2(boardX, boardY, this.rotation);
+    /**
+     * Returns the x coordinate of the left puyo given the reference point (the position of the left puyo when rotation=0).
+     * @param refX the x coordinate of the reference point
+     * @param refY the y coordinate of the reference point (ignored for X)
+     * @return the x coordinate of the left puyo
+     */
+    public int getX1(int refX, int refY) {
+        return refX;
     }
 
-    public int getY2(int boardY) {
-        return getY2(boardY, this.rotation);
+    /**
+     * Returns the y coordinate of the left puyo given the reference point.
+     * @param refX the x coordinate of the reference point (ignored for Y)
+     * @param refY the y coordinate of the reference point
+     * @return the y coordinate of the left puyo
+     */
+    public int getY1(int refX, int refY) {
+        return refY;
     }
 
-    // 실제 게임 로직(Controller)에서 호출할 위치 업데이트용
-    public void setPosition(int offsetX, int offsetY, int rotation) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-        this.rotation = (rotation % 4 + 4) % 4; // 0 ~ 3 사이로 안전하게 정규화
+    /**
+     * Returns the x coordinate of the right puyo given the reference point.
+     * @param refX the x coordinate of the reference point
+     * @param refY the y coordinate of the reference point
+     * @return the x coordinate of the right puyo
+     */
+    public int getX2(int refX, int refY) {
+        return refX + OFFSETS[rotation][0];
     }
 
+    /**
+     * Returns the y coordinate of the right puyo given the reference point.
+     * @param refX the x coordinate of the reference point (ignored for Y)
+     * @param refY the y coordinate of the reference point
+     * @return the y coordinate of the right puyo
+     */
+    public int getY2(int refX, int refY) {
+        return refY + OFFSETS[rotation][1];
+    }
+
+    public List<Puyo> getPuyos() {
+        List<Puyo> list = new ArrayList<>();
+        list.add(left);
+        list.add(right);
+        return list;
+    }
+
+    public void moveLeft() {
+        left.setX(left.getX() - 1);
+        right.setX(right.getX() - 1);
+    }
+
+    public void moveRight() {
+        left.setX(left.getX() + 1);
+        right.setX(right.getX() + 1);
+    }
+
+    public void moveDown() {
+        left.setY(left.getY() - 1);
+        right.setY(right.getY() - 1);
+    }
+
+    /**
+     * Rotates the pair clockwise.
+     * Note: This does not change the position of the reference point (the left puyo's position for rotation 0).
+     * After rotation, the actual positions of the puyos change according to the new offset.
+     * The caller should ensure that the new position does not collide with the board.
+     */
     public void rotateClockwise() {
-        this.rotation = (this.rotation + 1) % 4;
+        rotation = (rotation + 1) % 4;
     }
 
+    /**
+     * Rotates the pair counter-clockwise.
+     */
     public void rotateCounterClockwise() {
-        this.rotation = (this.rotation + 3) % 4;
+        rotation = (rotation + 3) % 4;
     }
-
-    public int getOffsetX() { return offsetX; }
-    public int getOffsetY() { return offsetY; }
-    public int getRotation() { return rotation; }
 }

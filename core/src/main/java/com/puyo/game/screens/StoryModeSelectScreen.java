@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.story.StoryModeManager;
+import com.puyo.game.GameMode;
 import com.puyo.game.story.StageData;
 
 public class StoryModeSelectScreen implements Screen {
