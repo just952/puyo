@@ -21,6 +21,7 @@ public class GameWorld {
     private PuyoPair nextPair;
     private final Random random;
     private boolean gameOver = false;
+    private int score = 0;
     private float fallTimer = 0f;
     private float fallInterval = 0.5f; // seconds per cell fall (adjustable by level)
     private boolean lockDelayActive = false;
@@ -217,6 +218,7 @@ public class GameWorld {
         // Check for matches and resolve chains
         boolean chainOccurred = false;
         int chainCount = 0;
+        int totalRemoved = 0;
         do {
             List<List<Puyo>> groups = board.findAllMatchingGroups();
             if (groups.isEmpty()) {
@@ -224,16 +226,19 @@ public class GameWorld {
             }
             chainOccurred = true;
             chainCount++;
-            // Remove all matched puyos
+            int removedThis = 0;
             for (List<Puyo> group : groups) {
+                removedThis += group.size();
                 board.removePuyos(group);
             }
-            // Apply gravity to let puyos fall
+            totalRemoved += removedThis;
             board.applyGravity();
         } while (chainOccurred);
 
-        // If a chain occurred, we could add score, etc.
-        // For now, we just note it.
+        if (chainOccurred) {
+            int earned = totalRemoved * (chainCount + 1) * 10; // simple scoring
+            addScore(earned);
+        }
 
         // Check for game over (if any puyo is placed above the visible top)
         if (board.isTopOut()) {
@@ -263,6 +268,14 @@ public class GameWorld {
 
     public PuyoPair getNextPair() {
         return nextPair;
+    }
+
+    public int getScore() {
+        return score;
+    }
+
+    public void addScore(int points) {
+        this.score += points;
     }
 
     public void dispose() {

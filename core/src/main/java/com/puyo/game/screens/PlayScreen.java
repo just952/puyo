@@ -31,6 +31,8 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
     private boolean isInitialized = false;
     private float stateTime = 0f;
     private ShapeRenderer shapeRenderer;
+    private BitmapFont font;
+    private SpriteBatch batch;
 
     public PlayScreen(PuyoGame game, GameMode mode) {
         this(game, mode, -1);
@@ -67,6 +69,8 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         // But if we want to replay, we need a reset method. We'll skip for now.
         Gdx.input.setInputProcessor(this);
         shapeRenderer = new ShapeRenderer();
+        font = new BitmapFont();
+        batch = new SpriteBatch();
         // Compute board offsets based on current screen size
         boardOffsetX = (Gdx.graphics.getWidth() - Board.WIDTH * CELL_SIZE) / 2;
         boardOffsetY = (Gdx.graphics.getHeight() - Board.HEIGHT * CELL_SIZE) / 2;
@@ -99,6 +103,20 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
 
         // Draw next pair (optional)
         drawNextPair();
+// Draw score and stage info
+        batch.begin();
+        String scoreText = "Score: " + gameWorld.getScore();
+        font.draw(batch, scoreText, 20, Gdx.graphics.getHeight() - 20);
+        if (mode == GameMode.NORMAL && storyManager != null) {
+            String stageText = "Stage: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages();
+            font.draw(batch, stageText, 20, Gdx.graphics.getHeight() - 50);
+            StageData current = storyManager.getCurrentStage();
+            if (current != null) {
+                String oppText = "VS: " + current.opponent;
+                font.draw(batch, oppText, 20, Gdx.graphics.getHeight() - 80);
+            }
+        }
+        batch.end();
 
         // Log debug info
         stateTime += delta;
@@ -294,6 +312,12 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
     public void dispose() {
         if (shapeRenderer != null) {
             shapeRenderer.dispose();
+        }
+        if (font != null) {
+            font.dispose();
+        }
+        if (batch != null) {
+            batch.dispose();
         }
     }
 
