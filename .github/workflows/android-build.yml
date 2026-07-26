@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      JAVA_VERSION: '21'
+      JAVA_VERSION: '17'
       ANDROID_COMPILE_SDK: 33
       ANDROID_BUILD_TOOLS: '33.0.2'
 
