@@ -1,8 +1,11 @@
-apply plugin : 'com.android.application'
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android' version '1.8.0' apply false
+}
 
 android {
-    compileSdk 33
     namespace 'com.puyo.game'
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.puyo.game"
