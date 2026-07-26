@@ -1,0 +1,47 @@
+{
+  "total_stages": 3,
+  "stages": [
+    {
+      "stage_id": 1,
+      "opponent": "KIKIMORA",
+      "dialogue": [
+        "키키모라: 헤헤, 오늘은 내가 이길 거야!",
+        "아르르: 함부로 말해볼래?"
+      ],
+      "background": "bg_stage1_kikimora.png",
+      "music": "music_stage1.ogg",
+      "ai_difficulty": 0.2,
+      "ai_aggression": 0.3,
+      "fall_speed_base": 0.8,
+      "clear_to_advance": 2
+    },
+    {
+      "stage_id": 2,
+      "opponent": "DRACO",
+      "dialogue": [
+        "드라코: 감히 나를 상대할 줄이야!",
+        "아르르: 준비됐어!"
+      ],
+      "background": "bg_stage2_draco.png",
+      "music": "music_stage2.ogg",
+      "ai_difficulty": 0.4,
+      "ai_aggression": 0.5,
+      "fall_speed_base": 1.0,
+      "clear_to_advance": 2
+    },
+    {
+      "stage_id": 3,
+      "opponent": "SKELETON",
+      "dialogue": [
+        "스켈레톤: 헤헤... 뼈까지 얼려줄까?",
+        "아르르: !!!"
+      ],
+      "background": "bg_stage3_skeleton.png",
+      "music": "music_stage3.ogg",
+      "ai_difficulty": 0.6,
+      "ai_aggression": 0.7,
+      "fall_speed_base": 1.2,
+      "clear_to_advance": 3
+    }
+  ]
+}
