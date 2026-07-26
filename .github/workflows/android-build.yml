@@ -1,0 +1,56 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      JAVA_VERSION: '21'
+      ANDROID_COMPILE_SDK: 33
+      ANDROID_BUILD_TOOLS: '33.0.2'
+#      ANDROID_NDK_VERSION: '25.1.8937393'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: ${{ env.ANDROID_COMPILE_SDK }}
+          build-tools-version: ${{ env.ANDROID_BUILD_TOOLS }}
+#          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+          platforms: ${{ env.ANDROID_COMPILE_SDK }}
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Ensure no local.properties interferes
+        run: |
+          if [ -f local.properties ]; then
+            echo "local.properties found – removing it to avoid conflicts"
+            rm local.properties
+          fi
+
+      - name: Build Debug APK
+        run: ./gradlew :android:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: puyo-debug-apk
+          path: android/build/outputs/apk/debug/android-debug.apk
