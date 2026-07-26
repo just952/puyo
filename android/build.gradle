@@ -1,7 +1,4 @@
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android' version '1.8.0' apply false
-}
+apply plugin: 'com.android.application'
 
 android {
     namespace 'com.puyo.game'
