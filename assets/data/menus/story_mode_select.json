@@ -1,0 +1,30 @@
+[
+  {
+    "id": "story_stage_1",
+    "label": "Stage 1: KIKIMORA",
+    "action": "push_screen",
+    "target": "story_stage_1",
+    "mode": ""
+  },
+  {
+    "id": "story_stage_2",
+    "label": "Stage 2: TBD",
+    "action": "push_screen",
+    "target": "story_stage_2",
+    "mode": ""
+  },
+  {
+    "id": "story_stage_3",
+    "label": "Stage 3: TBD",
+    "action": "push_screen",
+    "target": "story_stage_3",
+    "mode": ""
+  },
+  {
+    "id": "back_to_main",
+    "label": "< Back",
+    "action": "push_screen",
+    "target": "main",
+    "mode": ""
+  }
+]

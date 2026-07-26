@@ -1,0 +1,16 @@
+[
+  {
+    "id": "versus_endless",
+    "label": "Endless VS",
+    "action": "start_game",
+    "target": "",
+    "mode": "endless"
+  },
+  {
+    "id": "back_to_main",
+    "label": "< Back",
+    "action": "push_screen",
+    "target": "main",
+    "mode": ""
+  }
+]

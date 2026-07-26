@@ -11,10 +11,27 @@ public class MenuLoader {
     public static MenuItem[] loadMenu(String menuId) {
         FileHandle file = Gdx.files.internal(MENU_DIR + menuId + ".json");
         if (!file.exists()) {
-            Gdx.app.error("MenuLoader", "Menu file not found: " + menuId + ".json");
-            return new MenuItem[0];
+            Gdx.app.error("MenuLoader", "Menu file not found: " + file.path());
+            MenuItem errorItem = new MenuItem();
+            errorItem.id = "error";
+            errorItem.label = "Error: missing menu";
+            errorItem.action = "";
+            errorItem.target = "";
+            errorItem.mode = "";
+            return new MenuItem[] { errorItem };
         }
         Json json = new Json();
-        return json.fromJson(MenuItem[].class, file);
+        try {
+            return json.fromJson(MenuItem[].class, file);
+        } catch (Exception e) {
+            Gdx.app.error("MenuLoader", "Failed to parse menu JSON", e);
+            MenuItem errorItem = new MenuItem();
+            errorItem.id = "error";
+            errorItem.label = "Error: invalid menu";
+            errorItem.action = "";
+            errorItem.target = "";
+            errorItem.mode = "";
+            return new MenuItem[] { errorItem };
+        }
     }
 }
