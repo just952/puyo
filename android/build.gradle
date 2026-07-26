@@ -32,10 +32,12 @@ android {
     }
 }
 
+
 dependencies {
     implementation project(':core')
-    api "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
-    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi"
-    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
-    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+
+    runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
 }
