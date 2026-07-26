@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android' version '1.8.0' apply false
+}
+
+android {
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "com.puyo.game"
+        minSdk 21
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        // LibGDX specific
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // Configure source sets to use core assets
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', '../assets']
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+    api "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi"
+    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+}
