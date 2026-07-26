@@ -56,6 +56,11 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x gradlew
+
+      # ── Test 단계 ──
+      - name: Run Headless Tests (core module)
+        run: ./gradlew :core:test --stacktrace
+      # ──────────────        
       
       - name: Build Debug APK        
         run: ./gradlew :android:assembleDebug --stacktrace
