@@ -1,0 +1,35 @@
+{
+  "menu_id": "main",
+  "title": "PUYO PUYO 2",
+  "options": [
+    {
+      "id": "normal_mode",
+      "label": "노말 모드",
+      "action": "push_screen",
+      "target": "story_mode_select"
+    },
+    {
+      "id": "endless_mode",
+      "label": "엔드리스 모드",
+      "action": "start_game",
+      "mode": "endless"
+    },
+    {
+      "id": "vs_mode",
+      "label": "2인 대전",
+      "action": "push_screen",
+      "target": "versus_mode_select"
+    },
+    {
+      "id": "options",
+      "label": "옵션",
+      "action": "push_screen",
+      "target": "options_menu"
+    },
+    {
+      "id": "exit",
+      "label": "종료",
+      "action": "exit_game"
+    }
+  ]
+}

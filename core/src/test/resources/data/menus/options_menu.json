@@ -1,0 +1,23 @@
+[
+  {
+    "id": "sound_on",
+    "label": "Sound On",
+    "action": "push_screen",
+    "target": "",
+    "mode": ""
+  },
+  {
+    "id": "sound_off",
+    "label": "Sound Off",
+    "action": "push_screen",
+    "target": "",
+    "mode": ""
+  },
+  {
+    "id": "back_to_main",
+    "label": "< Back",
+    "action": "push_screen",
+    "target": "main",
+    "mode": ""
+  }
+]
