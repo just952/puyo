@@ -48,10 +48,31 @@ public class StoryModeManager {
     private void loadStages() {
         // 1) classpath 리소스에서 먼저 시도 (테스트용)
         FileHandle file = Gdx.files.classpath(STORY_DATA_PATH);
-
+        
         // 2) 없으면 internal (애셋/데스크톱/안드로이드) 폴백
         if (file == null || !file.exists()) {
             file = Gdx.files.internal(STORY_DATA_PATH);
+        }
+        
+        // 3) 여전히 없으면 Java ClassLoader 직접 시도 (헤드리스 테스트 리소스용)
+        if (file == null || !file.exists()) {
+            try {
+                java.io.InputStream is = getClass().getClassLoader().getResourceAsStream(STORY_DATA_PATH);
+                if (is != null) {
+                    // FileHandle로 래핑할 수 없어서 직접 파싱
+                    Json json = new Json();
+                    try {
+                        StoryDataWrapper wrapper = json.fromJson(StoryDataWrapper.class, is);
+                        stages = wrapper != null ? wrapper.stages : new StageData[0];
+                        Gdx.app.log("StoryModeManager", "Loaded " + stages.length + " stages from ClassLoader.");
+                        return;
+                    } finally {
+                        is.close();
+                    }
+                }
+            } catch (Exception e) {
+                Gdx.app.error("StoryModeManager", "Failed to load from ClassLoader", e);
+            }
         }
 
         if (file == null || !file.exists()) {
@@ -60,7 +81,7 @@ public class StoryModeManager {
             stages = new StageData[0];
             return;
         }
-
+        
         Json json = new Json();
         try {
             // JSON은 {"stages": [...]} 래퍼 객체이므로 중간 클래스로 파싱
@@ -70,7 +91,7 @@ public class StoryModeManager {
             Gdx.app.error("StoryModeManager", "Failed to parse story JSON", e);
             stages = new StageData[0];
         }
-
+        
         // 로드 성공 로그 출력
         Gdx.app.log("StoryModeManager", "Loaded " + stages.length + " stages.");
     }
