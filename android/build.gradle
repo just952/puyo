@@ -45,7 +45,5 @@ task copyNativeLibs(type: Copy) {
     into "src/main/jniLibs"
 }
 
-// Ensure assembleDebug depends on copyNativeLibs
-tasks.named("assembleDebug") {
-    dependsOn(copyNativeLibs)
-}
+// Ensure native libs are packaged before any build by attaching to preBuild
+preBuild.dependsOn(copyNativeLibs)
