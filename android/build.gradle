@@ -34,16 +34,6 @@ android {
 dependencies {
     implementation project(':core')
     implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
-    runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
-    runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+    implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
 }
-
-// Copy native .so files from runtime dependencies to jniLibs for packaging
-task copyNativeLibs(type: Copy) {
-    from configurations.runtimeOnly
-    include "**/*.so"
-    into "src/main/jniLibs"
-}
-
-// Ensure native libs are packaged before any build by attaching to preBuild
-preBuild.dependsOn(copyNativeLibs)
