@@ -28,21 +28,14 @@ android {
     sourceSets {
         main {
             assets.srcDirs = ['src/main/assets', '../assets']
+            jniLibs.srcDirs = ['src/main/jniLibs']
         }
     }
 }
 
-
 dependencies {
     implementation project(':core')
-
     implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
-
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
-}
-sourceSets {
-    main {
-        jniLibs.srcDirs = ["src/main/jniLibs"]
-    }
 }
