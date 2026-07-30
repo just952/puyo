@@ -14,7 +14,7 @@ public class PuyoGame extends Game {
 
         // 로그 레벨 적용 (예시)
         String logLevel = config.log_level.toLowerCase();
-        
+
         switch (logLevel) {
             case "debug":
                 Gdx.app.setLogLevel(Application.LOG_DEBUG);
@@ -38,8 +38,11 @@ public class PuyoGame extends Game {
 
     @Override
     public void render() {
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        // Ensure GL is available before clearing the screen
+        if (Gdx.gl != null) {
+            Gdx.gl.glClearColor(0, 0, 0, 1);
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        }
         super.render(); // 현재 설정된 Screen의 render() 호출
     }
 
