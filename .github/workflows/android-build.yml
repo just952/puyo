@@ -27,18 +27,13 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          api-level: ${{ env.ANDROID_COMPILE_SDK }}
-          build-tools-version: ${{ env.ANDROID_BUILD_TOOLS }}
-          platforms: ${{ env.ANDROID_COMPILE_SDK }}
-
-      - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-${{ env.ANDROID_COMPILE_SDK }}" "build-tools;${{ env.ANDROID_BUILD_TOOLS }}"
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" \
+            "platforms;android-${{ env.ANDROID_COMPILE_SDK }}" \
+            "build-tools;${{ env.ANDROID_BUILD_TOOLS }}" \
+            "cmdline-tools;latest"
+          yes | sdkmanager --licenses
 
       - name: Ensure no local.properties interferes
         run: |
@@ -50,7 +45,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      # ── Test 단계 ──
+      # Test 단계
       - name: Run Headless Tests (core module)
         run: ./gradlew :core:test --stacktrace
       # ──────────────
