@@ -27,22 +27,15 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
 
-      #- name: Setup Android SDK
-      #  uses: android-actions/setup-android@v3
-      #  with:
-      #    api-level: ${{ env.ANDROID_COMPILE_SDK }}
-      #    build-tools-version: ${{ env.ANDROID_BUILD_TOOLS }}
-      #    platforms: ${{ env.ANDROID_COMPILE_SDK }}
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          api-level: ${{ env.ANDROID_COMPILE_SDK }}
+          build-tools-version: ${{ env.ANDROID_BUILD_TOOLS }}
+          platforms: ${{ env.ANDROID_COMPILE_SDK }}
 
       - name: Install SDK packages
-        run: |
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-${{ env.ANDROID_COMPILE_SDK }}" \
-            "build-tools;${{ env.ANDROID_BUILD_TOOLS }}"
+        run: sdkmanager "platform-tools" "platforms;android-${{ env.ANDROID_COMPILE_SDK }}" "build-tools;${{ env.ANDROID_BUILD_TOOLS }}"
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
@@ -60,7 +53,7 @@ jobs:
       # ── Test 단계 ──
       - name: Run Headless Tests (core module)
         run: ./gradlew :core:test --stacktrace
-      # ──────────────        
+      # ──────────────
 
       - name: Upload test report
         if: always()
@@ -68,13 +61,19 @@ jobs:
         with:
           name: test-report
           path: core/build/reports/tests/test/
-      
-      - name: Build Debug APK        
-        run: ./gradlew :android:assembleDebug --stacktrace
+
+      - name: Build Debug APK
+        run: ./gradlew :android:assembleDebug
+
+      - name: Verify native libs in APK
+        run: |
+          APK_PATH=$(find android/build/outputs/apk/debug -name "*.apk" | head -n1)
+          echo "APK_PATH=$APK_PATH"
+          echo ">>> Checking lib folders in APK:"
+          unzip -l "$APK_PATH" | grep -E 'lib/arm64-v8a|lib/armeabi-v7a' | head
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: puyo-debug-apk
-          #path: android/build/outputs/apk/debug/android-debug.apk
           path: android/build/outputs/apk/**/*.apk
