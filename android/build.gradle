@@ -41,3 +41,8 @@ dependencies {
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
     runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
 }
+sourceSets {
+    main {
+        jniLibs.srcDirs = ["src/main/jniLibs"]
+    }
+}
