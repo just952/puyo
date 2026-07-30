@@ -39,9 +39,9 @@ dependencies {
 }
 
 // Extract native .so files from gdx-platform dependencies into jniLibs
+// Use runtimeClasspath which is resolvable and includes implementation dependencies
 task extractNativeLibs(type: Copy) {
-    // Resolve the native artifacts from implementation configuration
-    from configurations.implementation
+    from configurations.runtimeClasspath
         .filter { it.name.contains('natives-armeabi-v7a') || it.name.contains('natives-arm64-v8a') }
     include "**/*.so"
     into "src/main/jniLibs"
@@ -51,7 +51,7 @@ task extractNativeLibs(type: Copy) {
         def abi = fileName.contains('armeabi-v7a') ? 'armeabi-v7a' :
                   fileName.contains('arm64-v8a') ? 'arm64-v8a' : 'unknown'
         if (abi != 'unknown') {
-            f.path = "$abi/${fileName.replace('libgdx', 'libgdx')}"
+            f.path = "$abi/${fileName}"
         }
     }
 }
