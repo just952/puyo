@@ -28,11 +28,21 @@ jobs:
           cache: 'gradle'
 
       - name: Install Android SDK packages
+        env:
+          ANDROID_HOME: $HOME/Android/Sdk
         run: |
+          echo "Adding Android SDK tools to PATH"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_PATH
+
+          echo "Installing cmdline-tools (latest)"
+          sdkmanager "cmdline-tools;latest" --install
+
+          echo "Installing platforms and build-tools"
           sdkmanager "platform-tools" \
             "platforms;android-${{ env.ANDROID_COMPILE_SDK }}" \
-            "build-tools;${{ env.ANDROID_BUILD_TOOLS }}" \
-            "cmdline-tools;latest"
+            "build-tools;${{ env.ANDROID_BUILD_TOOLS }}"
+
+          echo "Accepting Android SDK licenses"
           yes | sdkmanager --licenses
 
       - name: Ensure no local.properties interferes
