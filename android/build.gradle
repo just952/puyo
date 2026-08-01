@@ -14,6 +14,8 @@ android {
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
+        // 네이티브 라이브러리를 APK에서 추출하여 앱 데이터 디렉토리에 설치
+        extractNativeLibs = true
     }
 
     buildTypes {
@@ -27,6 +29,13 @@ android {
         main {
             assets.srcDirs = ['src/main/assets', '../assets']
             jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    packagingOptions {
+        // .so 파일 압축하지 않음 (메모리 매핑 로드 위해)
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
