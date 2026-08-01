@@ -63,6 +63,17 @@ task extractNativeLibs {
                         }
                     }
                     println "Extracted ${entry.name} -> $abi/ (${targetFile.length()} bytes)"
+                    
+                    // Also create libpenguin.so copy for libgdx-freetype (legacy name)
+                    if (entry.name == 'libgdx-freetype.so') {
+                        def penguinFile = new File(destDir, 'libpenguin.so')
+                        penguinFile.withOutputStream { out ->
+                            entry.newInputStream().withStream { inp ->
+                                out << inp
+                            }
+                        }
+                        println "Created libpenguin.so -> $abi/ (${penguinFile.length()} bytes)"
+                    }
                 }
             }
         }

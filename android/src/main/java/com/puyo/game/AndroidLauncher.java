@@ -6,10 +6,15 @@ import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 
 public class AndroidLauncher extends AndroidApplication {
     static {
-        // libgdx-freetype.so (libpenguin.so) depends on libgdx.so
-        // Load in correct order to avoid "libpenguin.so not found" error
+        // libgdx-freetype.so (internally called "penguin" in older libgdx versions)
+        // Load libgdx first, then load freetype with both possible names
         System.loadLibrary("gdx");
-        System.loadLibrary("gdx-freetype");
+        try {
+            System.loadLibrary("gdx-freetype");
+        } catch (UnsatisfiedLinkError e) {
+            // Fallback: some libgdx versions expect "penguin" as the library name
+            System.loadLibrary("penguin");
+        }
     }
 
     @Override
