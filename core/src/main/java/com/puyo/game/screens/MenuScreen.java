@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.GameMode;
@@ -12,11 +11,12 @@ import com.puyo.game.menus.MenuItem;
 import com.puyo.game.menus.MenuLoader;
 import com.puyo.game.menus.MenuAction;
 import com.puyo.game.config.GameViewport;
+import com.puyo.game.graphics.FontManager;
 
 public class MenuScreen extends BaseScreen {
     private final PuyoGame game;
     private final SpriteBatch batch;
-    private final BitmapFont font;
+    private final FontManager fontManager;
     private MenuItem[] menuItems;
     private int selectedIndex = 0;
 
@@ -24,7 +24,7 @@ public class MenuScreen extends BaseScreen {
         super(game);
         this.game = game;
         this.batch = new SpriteBatch();
-        this.font = new BitmapFont();
+        this.fontManager = FontManager.getInstance();
         this.menuItems = MenuLoader.loadMenu("main");
     }
 
@@ -44,31 +44,33 @@ public class MenuScreen extends BaseScreen {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        font.getData().setScale(3f);
         
+        // 타이틀 폰트 (48px)
+        com.badlogic.gdx.graphics.g2d.BitmapFont titleFont = fontManager.getTitleFont(48);
         String title = "PUYO PUYO 2";
-        float titleWidth = font.draw(batch, title, 0, 0).width;
-        font.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
+        float titleWidth = titleFont.draw(batch, title, 0, 0).width;
+        titleFont.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
 
-        font.getData().setScale(1.5f);
-        
+        // 메뉴 폰트 (32px)
+        com.badlogic.gdx.graphics.g2d.BitmapFont menuFont = fontManager.getMenuFont(32);
+
         float startY = GameViewport.VIRTUAL_HEIGHT / 2f + 100;
         float itemHeight = 80;
-        
+
         for (int i = 0; i < menuItems.length; i++) {
             String label = menuItems[i].label;
             if (i == selectedIndex) {
                 label = "> " + label + " <";
-                font.setColor(1, 1, 0, 1);
+                menuFont.setColor(1, 1, 0, 1);
             } else {
-                font.setColor(1, 1, 1, 1);
+                menuFont.setColor(1, 1, 1, 1);
             }
             
-            float labelWidth = font.draw(batch, label, 0, 0).width;
-            font.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * itemHeight);
+            float labelWidth = menuFont.draw(batch, label, 0, 0).width;
+            menuFont.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * itemHeight);
         }
         
-        font.setColor(1, 1, 1, 1);
+        menuFont.setColor(1, 1, 1, 1);
         batch.end();
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
@@ -130,6 +132,6 @@ public class MenuScreen extends BaseScreen {
     @Override
     public void dispose() {
         batch.dispose();
-        font.dispose();
+        // 폰트는 FontManager가 관리하므로 여기서 dispose 하지 않음
     }
 }

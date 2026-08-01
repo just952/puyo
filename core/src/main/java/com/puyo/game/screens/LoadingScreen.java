@@ -6,16 +6,17 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.config.GameViewport;
+import com.puyo.game.graphics.FontManager;
 
 public class LoadingScreen extends BaseScreen {
     private final SpriteBatch batch;
-    private final BitmapFont font;
+    private final FontManager fontManager;
     private float timer = 0f;
     
     public LoadingScreen(PuyoGame game) {
         super(game);
         this.batch = new SpriteBatch();
-        this.font = new BitmapFont();
+        this.fontManager = FontManager.getInstance();
     }
 
     @Override
@@ -23,6 +24,8 @@ public class LoadingScreen extends BaseScreen {
         initViewport();
         timer = 0f;
         Gdx.app.log("LoadingScreen", "Resources loading started...");
+        // 공통 폰트 미리 로드
+        fontManager.preloadCommonFonts();
     }
 
     @Override
@@ -36,15 +39,17 @@ public class LoadingScreen extends BaseScreen {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        font.getData().setScale(3f);
+        
+        // 타이틀 폰트 (48px)
+        BitmapFont titleFont = fontManager.getTitleFont(48);
         
         String text = "LOADING";
         // Animated dots
         int dots = (int)(timer * 2) % 4;
         text += ".".repeat(dots);
         
-        float textWidth = font.draw(batch, text, 0, 0).width;
-        font.draw(batch, text, (GameViewport.VIRTUAL_WIDTH - textWidth) / 2f, GameViewport.VIRTUAL_HEIGHT / 2f);
+        float textWidth = titleFont.draw(batch, text, 0, 0).width;
+        titleFont.draw(batch, text, (GameViewport.VIRTUAL_WIDTH - textWidth) / 2f, GameViewport.VIRTUAL_HEIGHT / 2f);
         
         batch.end();
 
@@ -62,6 +67,6 @@ public class LoadingScreen extends BaseScreen {
     @Override
     public void dispose() {
         batch.dispose();
-        font.dispose();
+        // 폰트는 FontManager가 관리하므로 여기서 dispose 하지 않음
     }
 }

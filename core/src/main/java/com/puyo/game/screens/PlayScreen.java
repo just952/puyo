@@ -19,6 +19,7 @@ import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.story.StageData;
 import com.puyo.game.config.GameViewport;
+import com.puyo.game.graphics.FontManager;
 
 public class PlayScreen extends BaseScreen implements InputProcessor {
     private final PuyoGame game;
@@ -27,8 +28,8 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
     private final GameWorld gameWorld;
     private float stateTime = 0f;
     private ShapeRenderer shapeRenderer;
-    private BitmapFont font;
     private SpriteBatch batch;
+    private final FontManager fontManager;
 
     public PlayScreen(PuyoGame game, GameMode mode) {
         this(game, mode, -1);
@@ -40,6 +41,7 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         this.mode = mode;
         this.storyManager = (mode == GameMode.NORMAL) ? new StoryModeManager(storyStageIndex) : null;
         this.gameWorld = new GameWorld();
+        this.fontManager = FontManager.getInstance();
     }
 
     @Override
@@ -59,7 +61,6 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         initViewport();
         
         shapeRenderer = new ShapeRenderer();
-        font = new BitmapFont();
         batch = new SpriteBatch();
     }
 
@@ -103,119 +104,123 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
             GameViewport.BOARD_WIDTH,
             GameViewport.BOARD_HEIGHT
         );
-
+        
         // Grid lines
         shapeRenderer.setColor(0.2f, 0.2f, 0.3f, 1);
-        for (int x = 0; x <= Board.WIDTH; x++) {
+        for (int x = 1; x < Board.WIDTH; x++) {
             float lineX = GameViewport.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE;
-            shapeRenderer.rectLine(lineX, GameViewport.BOARD_OFFSET_Y, 
-                lineX, GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT, 1f);
+            shapeRenderer.rectLine(lineX, GameViewport.BOARD_OFFSET_Y, lineX, GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT, 1f);
         }
-        for (int y = 0; y <= Board.HEIGHT; y++) {
+        for (int y = 1; y < Board.HEIGHT; y++) {
             float lineY = GameViewport.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE;
-            shapeRenderer.rectLine(GameViewport.BOARD_OFFSET_X, lineY, 
-                GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH, lineY, 1f);
+            shapeRenderer.rectLine(GameViewport.BOARD_OFFSET_X, lineY, GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH, lineY, 1f);
         }
+        
         shapeRenderer.end();
-
+        
         // Draw placed puyos
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         Board board = gameWorld.getBoard();
-        for (int x = 0; x < Board.WIDTH; x++) {
-            for (int y = 0; y < Board.HEIGHT; y++) {
-                Puyo puyo = board.getPuyoAt(x, y);
-                if (puyo != null && puyo.isAlive()) {
-                    drawPuyo(puyo.getX(), puyo.getY(), puyo.getColor());
+        batch.begin();
+        for (int y = 0; y < Board.HEIGHT; y++) {
+            for (int x = 0; x < Board.WIDTH; x++) {
+                Puyo puyo = board.getPuyo(x, y);
+                if (puyo != null) {
+                    drawPuyo(puyo, GameViewport.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE,
+                        GameViewport.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE);
                 }
             }
         }
-        shapeRenderer.end();
+        batch.end();
     }
 
     private void drawCurrentPair() {
         PuyoPair pair = gameWorld.getCurrentPair();
-        if (pair != null) {
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            for (Puyo puyo : pair.getPuyos()) {
-                if (puyo.isAlive()) {
-                    drawPuyo(puyo.getX(), puyo.getY(), puyo.getColor());
-                }
-            }
-            shapeRenderer.end();
-        }
+        if (pair == null) return;
+        
+        batch.begin();
+        drawPuyo(pair.getPuyo1(), pair.getX1() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_X,
+            pair.getY1() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_Y);
+        drawPuyo(pair.getPuyo2(), pair.getX2() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_X,
+            pair.getY2() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_Y);
+        batch.end();
     }
 
     private void drawNextPair() {
-        PuyoPair nextPair = gameWorld.getNextPair();
-        if (nextPair != null) {
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            // Next pair preview area (right side of board)
-            float previewX = GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH + 40;
-            float previewY = GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT - 200;
-            
-            shapeRenderer.setColor(0.3f, 0.3f, 0.4f, 1);
-            shapeRenderer.rect(previewX - 20, previewY - 20, GameViewport.CELL_SIZE * 2 + 40, GameViewport.CELL_SIZE * 2 + 40);
-            
-            for (Puyo puyo : nextPair.getPuyos()) {
-                drawPuyoAt(previewX + puyo.getX() * GameViewport.CELL_SIZE, 
-                          previewY + puyo.getY() * GameViewport.CELL_SIZE, 
-                          puyo.getColor());
-            }
-            shapeRenderer.end();
-
-            batch.begin();
-            font.draw(batch, "NEXT", previewX, previewY + GameViewport.CELL_SIZE * 2 + 40);
-            batch.end();
-        }
+        PuyoPair next = gameWorld.getNextPair();
+        if (next == null) return;
+        
+        batch.begin();
+        float nextX = GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH + 40;
+        float nextY = GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT - 100;
+        drawPuyo(next.getPuyo1(), nextX, nextY + GameViewport.CELL_SIZE);
+        drawPuyo(next.getPuyo2(), nextX, nextY);
+        batch.end();
     }
 
-    private void drawPuyo(int boardX, int boardY, PuyoColor color) {
-        float screenX = GameViewport.BOARD_OFFSET_X + boardX * GameViewport.CELL_SIZE;
-        float screenY = GameViewport.BOARD_OFFSET_Y + boardY * GameViewport.CELL_SIZE;
-        drawPuyoAt(screenX, screenY, color);
-    }
-
-    private void drawPuyoAt(float x, float y, PuyoColor color) {
-        float radius = GameViewport.CELL_SIZE / 2f - 2;
-        float centerX = x + GameViewport.CELL_SIZE / 2f;
-        float centerY = y + GameViewport.CELL_SIZE / 2f;
-
-        shapeRenderer.setColor(getColorForPuyo(color));
-        shapeRenderer.circle(centerX, centerY, radius);
-
-        // Highlight
-        shapeRenderer.setColor(1, 1, 1, 0.3f);
-        shapeRenderer.circle(centerX - radius * 0.3f, centerY + radius * 0.3f, radius * 0.4f);
+    private void drawPuyo(Puyo puyo, float x, float y) {
+        Color color = getColorForPuyo(puyo.getColor());
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(color);
+        shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f, GameViewport.CELL_SIZE / 2f - 2);
+        shapeRenderer.end();
+        
+        // Draw highlight
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(Color.WHITE);
+        shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f, GameViewport.CELL_SIZE / 2f - 2);
+        shapeRenderer.end();
     }
 
     private void drawUI() {
         batch.begin();
-        font.getData().setScale(2f);
+        
+        // UI 폰트 (24px)
+        BitmapFont uiFont = fontManager.getUIFont(24);
+        uiFont.getData().setScale(1f);
         
         // Score
-        font.draw(batch, "SCORE: " + gameWorld.getScore(), 
-            GameViewport.BOARD_OFFSET_X, GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT + 80);
+        uiFont.draw(batch, "SCORE: " + gameWorld.getScore(), 
+            GameViewport.BOARD_OFFSET_X, GameViewport.VIRTUAL_HEIGHT - 50);
         
         // Chain
         if (gameWorld.getCurrentChain() > 0) {
-            font.setColor(Color.YELLOW);
-            font.draw(batch, "CHAIN: " + gameWorld.getCurrentChain() + "x!", 
-                GameViewport.VIRTUAL_WIDTH / 2f - 100, GameViewport.VIRTUAL_HEIGHT - 100);
-            font.setColor(Color.WHITE);
+            uiFont.setColor(Color.YELLOW);
+            uiFont.draw(batch, "CHAIN: " + gameWorld.getCurrentChain(), 
+                GameViewport.BOARD_OFFSET_X, GameViewport.VIRTUAL_HEIGHT - 90);
+            uiFont.setColor(Color.WHITE);
+        }
+        
+        // Next label
+        uiFont.draw(batch, "NEXT", 
+            GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH + 20,
+            GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT - 120);
+        
+        // Game Over
+        if (gameWorld.isGameOver()) {
+            // 타이틀 폰트 (48px) 사용
+            BitmapFont titleFont = fontManager.getTitleFont(48);
+            titleFont.getData().setScale(1f);
+            String msg = "GAME OVER";
+            float w = titleFont.draw(batch, msg, 0, 0).width;
+            titleFont.draw(batch, msg, 
+                GameViewport.VIRTUAL_WIDTH / 2f - w / 2f, GameViewport.VIRTUAL_HEIGHT / 2f + 50);
+            
+            uiFont.draw(batch, "Press ENTER to restart", 
+                GameViewport.VIRTUAL_WIDTH / 2f - 100, GameViewport.VIRTUAL_HEIGHT / 2f - 20);
         }
 
         // Story mode info
         if (mode == GameMode.NORMAL && storyManager != null) {
             StageData current = storyManager.getCurrentStage();
             if (current != null) {
-                font.draw(batch, "STAGE: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages(), 
+                uiFont.draw(batch, "STAGE: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages(), 
                     GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 50);
-                font.draw(batch, "VS: " + current.opponent, 
+                uiFont.draw(batch, "VS: " + current.opponent, 
                     GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 90);
             }
         }
         
-        font.getData().setScale(1f);
+        uiFont.getData().setScale(1f);
         batch.end();
     }
 
@@ -256,6 +261,11 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
                 return true;
             case Input.Keys.SPACE:
                 gameWorld.hardDrop();
+                return true;
+            case Input.Keys.ENTER:
+                if (gameWorld.isGameOver()) {
+                    game.setScreen(new PlayScreen(game, mode));
+                }
                 return true;
             default:
                 return false;
@@ -298,7 +308,7 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
     @Override
     public void dispose() {
         if (shapeRenderer != null) shapeRenderer.dispose();
-        if (font != null) font.dispose();
         if (batch != null) batch.dispose();
+        // 폰트는 FontManager가 관리하므로 여기서 dispose 하지 않음
     }
 }
