@@ -47,20 +47,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      # Extract native libs and fix SONAME for libpenguin.so
-      - name: Extract native libraries and fix SONAME
-        run: |
-          ./gradlew :android:extractNativeLibs --no-daemon
-          # Fix SONAME of libpenguin.so copies
-          for abi in armeabi-v7a arm64-v8a; do
-            LIB_PATH="android/src/main/jniLibs/$abi/libpenguin.so"
-            if [ -f "$LIB_PATH" ]; then
-              echo "Patching SONAME for $LIB_PATH"
-              patchelf --set-soname libpenguin.so "$LIB_PATH"
-              echo "New SONAME: $(readelf -d "$LIB_PATH" | grep SONAME)"
-            fi
-          done
-
       # Test 단계
       - name: Run Headless Tests (core module)
         run: ./gradlew :core:test --stacktrace
@@ -75,6 +61,32 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew :android:assembleDebug
 
+      - name: Fix libpenguin.so SONAME in APK
+        run: |
+          APK_PATH=$(find android/build/outputs/apk/debug -name "*.apk" | head -n1)
+          echo "APK: $APK_PATH"
+          
+          # Create temp dir
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          
+          # Extract libpenguin.so for both ABIs
+          for abi in armeabi-v7a arm64-v8a; do
+            unzip -o "$APK_PATH" "lib/$abi/libpenguin.so" -d . 2>/dev/null
+            if [ -f "lib/$abi/libpenguin.so" ]; then
+              echo "Patching SONAME for $abi/libpenguin.so"
+              patchelf --set-soname libpenguin.so "lib/$abi/libpenguin.so"
+              echo "New SONAME: $(readelf -d "lib/$abi/libpenguin.so" | grep SONAME)"
+              # Update APK
+              zip -u "$APK_PATH" "lib/$abi/libpenguin.so"
+            else
+              echo "WARNING: lib/$abi/libpenguin.so not found in APK"
+            fi
+          done
+          
+          cd /
+          rm -rf "$TMPDIR"
+
       - name: Verify native libs in APK
         run: |
           APK_PATH=$(find android/build/outputs/apk/debug -name "*.apk" | head -n1)
@@ -82,10 +94,14 @@ jobs:
           echo ">>> Checking lib folders in APK:"
           unzip -l "$APK_PATH" | grep -E 'lib/arm64-v8a|lib/armeabi-v7a' | head
           echo ">>> Verifying SONAME in APK:"
-          unzip -o "$APK_PATH" "lib/arm64-v8a/libpenguin.so" -d /tmp/apk_check 2>/dev/null
-          if [ -f /tmp/apk_check/lib/arm64-v8a/libpenguin.so ]; then
-            readelf -d /tmp/apk_check/lib/arm64-v8a/libpenguin.so | grep SONAME
+          TMPDIR=$(mktemp -d)
+          cd "$TMPDIR"
+          unzip -o "$APK_PATH" "lib/arm64-v8a/libpenguin.so" -d . 2>/dev/null
+          if [ -f lib/arm64-v8a/libpenguin.so ]; then
+            readelf -d lib/arm64-v8a/libpenguin.so | grep SONAME
           fi
+          cd /
+          rm -rf "$TMPDIR"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
