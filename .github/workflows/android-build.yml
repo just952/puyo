@@ -63,8 +63,18 @@ jobs:
 
       - name: Fix libpenguin.so SONAME in APK
         run: |
+          set -x
           APK_PATH=$(find android/build/outputs/apk/debug -name "*.apk" | head -n1)
           echo "APK: $APK_PATH"
+          
+          if [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: APK not found"
+            exit 1
+          fi
+          
+          # List APK contents to verify
+          echo "=== APK lib contents ==="
+          unzip -l "$APK_PATH" | grep -E "lib/arm64-v8a|lib/armeabi-v7a" || true
           
           # Create temp dir
           TMPDIR=$(mktemp -d)
@@ -72,6 +82,7 @@ jobs:
           
           # Extract libpenguin.so for both ABIs
           for abi in armeabi-v7a arm64-v8a; do
+            echo "Processing $abi..."
             unzip -o "$APK_PATH" "lib/$abi/libpenguin.so" -d . 2>/dev/null
             if [ -f "lib/$abi/libpenguin.so" ]; then
               echo "Patching SONAME for $abi/libpenguin.so"
@@ -86,6 +97,7 @@ jobs:
           
           cd /
           rm -rf "$TMPDIR"
+          set +x
 
       - name: Verify native libs in APK
         run: |
@@ -99,6 +111,8 @@ jobs:
           unzip -o "$APK_PATH" "lib/arm64-v8a/libpenguin.so" -d . 2>/dev/null
           if [ -f lib/arm64-v8a/libpenguin.so ]; then
             readelf -d lib/arm64-v8a/libpenguin.so | grep SONAME
+          else
+            echo "libpenguin.so not found in APK for verification"
           fi
           cd /
           rm -rf "$TMPDIR"
