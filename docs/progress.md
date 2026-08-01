@@ -1,6 +1,6 @@
 # Puyo Puyo 2 - 개발 진행 현황
 
-## 📅 최종 업데이트: 2026-07-26
+## 📅 최종 업데이트: 2026-07-28
 
 ---
 
@@ -22,15 +22,19 @@
 | | `MenuScreen` (키보드/터치 입력) | ✅ | 위/아래/엔터/백스페이스 |
 | | `StoryModeSelectScreen` (스테이지 선택) | ✅ | 잠금/해금 표시 |
 | | `PlayScreen` (게임플레이 진입점) | ✅ | `GameMode`별 분기 |
+| **뷰포트/카메라** | **가상 해상도 960×1600 (3:5) 설정** | ✅ | `GameViewport` 설정 클래스 |
+| | **FitViewport + OrthographicCamera** | ✅ | 자동 비율 유지 스케일링 |
+| | **BaseScreen 공통 뷰포트 관리** | ✅ | `initViewport()`, `resize()` 자동 처리 |
+| | **PlayScreen/MenuScreen/StoryModeSelectScreen/LoadingScreen** 뷰포트 적용 | ✅ | 가상 좌표계 렌더링 완료 |
 | **스토리 모드** | `StoryModeManager` (JSON 기반) | ✅ | 3 스테이지, 언락/승리 조건 |
 | | `stages.json` (래퍼 객체 파싱) | ✅ | `StoryDataWrapper` |
 | | `clear_to_advance` 승리 조건 | ✅ | 2승/2승/3승 |
 | **안드로이드 모듈** | `AndroidLauncher`, `AndroidManifest.xml` | ✅ | AGP 8.1, compileSdk 33 |
 | | 리소스: strings, colors, styles | ✅ | 기본 리소스 완성 |
 | **데스크톱 런처** | LWJGL3 백엔드, 480×800 세로 화면 | ✅ | `DesktopLauncher` |
-| **헤드리스 테스트** | `gdx-backend-headless` + `natives-desktop` | ✅ | CI에서 통과 |
+| **헤드리스 테스트** | `gdx-backend-headless` + `natives-desktop` | ✅ | CI에서 통과 (로컬 네이티브 lib 미포함으로 불가) |
 | **GitHub Actions CI** | `android-build.yml` | ✅ | 테스트 → APK 빌드 → 아티팩트 업로드 |
-| **문서화** | `design.md`, `architecture.md`, `progress.md` | ✅ | docs/ 폴더 |
+| **문서화** | `design.md`, `architecture.md`, `progress.md`, `changeLog.md`, `todo.md` | ✅ | docs/ 폴더 |
 
 ---
 
@@ -38,9 +42,9 @@
 
 | 영역 | 작업 | 진행도 | 비고 |
 |------|------|--------|------|
-| **스토리 모드 JSON** | `stages.json` 클래스패스 로드 | 🔄 90% | `classpath()` 폴백 추가 완료, 테스트 통과 대기 |
-| **헤드리스 테스트** | CI에서 6개 테스트 모두 통과 | 🔄 80% | GitHub Actions 결과 확인 대기 |
-| **APK 빌드 검증** | GitHub Actions에서 APK 생성 | 🔄 대기 중 | 테스트 통과 후 자동 실행 |
+| **CI 파이프라인 검증** | GitHub Actions 헤드리스 테스트 통과 | 🔄 90% | 푸시 후 확인 대기 |
+| **APK 빌드 검증** | GitHub Actions에서 APK 생성 및 네이티브 lib 포함 확인 | 🔄 80% | 테스트 통과 후 자동 실행 |
+| **실기기 검증** | 갤럭시 S23 설치·실행 검증 | ⏳ 대기 중 | APK 다운로드 후 설치 |
 
 ---
 
@@ -48,19 +52,20 @@
 
 | 우선순위 | 영역 | 작업 | 난이도 |
 |----------|------|------|--------|
-| **P0** | 헤드리스 테스트 통과 | CI 그린 달성 | 🔴 높음 |
-| **P0** | APK 빌드 성공 & 아티팩트 업로드 | CI 그린 달성 | 🔴 높음 |
-| **P0** | 실기기(갤럭시 S23) 설치·실행 검증 | 검은 화면/크래시 없음 | 🔴 높음 |
-| **P1** | 메인 메뉴 → 노말 모드 → 1스테이지 진입 | E2E 플로우 | 🟠 중간 |
-| **P1** | `PlayScreen` 실제 게임플레이 로직 연결 | `GameWorld` 연동 | 🟠 중간 |
-| **P1** | Puyo 렌더링 (ShapeRenderer → SpriteBatch) | 시각화 | 🟠 중간 |
-| **P1** | 입력 처리 (터치/키보드) 완전 구현 | 드래그/탭/키보드 | 🟠 중간 |
-| **P2** | AssetManager + 텍스처 아틀라스 | 리소스 관리 | 🟢 낮음 |
-| **P2** | 사운드/이펙트 (AssetManager + Sound/Pool) | 🟢 낮음 |
-| **P2** | 파티클/연쇄 이펙트 (ParticleEffect) | 🟢 낮음 |
-| **P2** | AI 컨트롤러 (휴리스틱/몬테카를로) | 🟢 낮음 |
-| **P2** | 온라인 대전 (WebSocket + 매칭 서버) | 높음 |
-| **P2** | 안드로이드 APK 서명/배포 자동화 | 낮음 |
+| **P0** | CI 검증 | GitHub Actions 헤드리스 테스트 그린 달성 | 🔴 높음 |
+| **P0** | CI 검증 | APK 빌드 성공 & 아티팩트 업로드 (libgdx.so 포함 확인) | 🔴 높음 |
+| **P0** | 실기기 검증 | 실기기(갤럭시 S23) 설치·실행 검증 - 검은 화면/크래시 없음 | 🔴 높음 |
+| **P1** | 게임플레이 | 메인 메뉴 → 노말 모드 → 1스테이지 진입 E2E 플로우 | 🟠 중간 |
+| **P1** | 게임플레이 | `PlayScreen` 실제 게임플레이 로직 연결 (`GameWorld` 연동) | 🟠 중간 |
+| **P1** | 렌더링 | Puyo 렌더링 (ShapeRenderer → SpriteBatch + 텍스처 아틀라스) | 🟠 중간 |
+| **P1** | 입력 | 입력 처리 (터치 드래그/탭/키보드) 완전 구현 | 🟠 중간 |
+| **P1** | 모드 | 엔드리스 모드 구현 (무한 모드, 점수/레벨 시스템) | 🟠 중간 |
+| **P2** | 리소스 | AssetManager + 텍스처 아틀라스 통합 관리 | 🟢 낮음 |
+| **P2** | 사운드 | 사운드/이펙트 시스템 (AssetManager + Sound/Pool) | 🟢 낮음 |
+| **P2** | 이펙트 | 파티클/연쇄 이펙트 (ParticleEffect) | 🟢 낮음 |
+| **P2** | AI | AI 컨트롤러 (휴리스틱/몬테카를로) | 🟢 중간 |
+| **P2** | 온라인 | 온라인 대전 (WebSocket + 매칭 서버) | 🔴 높음 |
+| **P2** | 배포 | 안드로이드 APK 서명/배포 자동화 (Keystore, Play Store) | 🟢 낮음 |
 
 ---
 
@@ -68,23 +73,26 @@
 
 | ID | 현상 | 원인 추정 | 상태 |
 |------|------|-----------|------|
-| #1 | 헤드리스에서 `Gdx.gl` null → `PuyoGame.render()` NPE | Headless GL 컨텍스트 없음 | 🟡 테스트 우회로 해결 |
-| #2 | `StoryModeManager` 테스트에서 `getUnlockedStageCount()` 기대값 1 vs 실제 0 | 초기 `currentStageIndex=0` vs `getUnlockedStageCount()` 로직 차이 | 🟡 수정 필요 |
-| #3 | `MenuLoader` classpath 리소스 미발견 (헤드리스) | `Gdx.files.classpath()` 미작동 | 🔄 ClassLoader 폴백 추가함 |
-| #4 | APK 설치 후 즉시 종료 | Native lib 미포함/매니페스트 오류 추정 | 🔍 APK 분석 필요 |
+| #1 | 헤드리스에서 `Gdx.gl` null → `PuyoGame.render()` NPE | Headless GL 컨텍스트 없음 | 🟡 테스트 우회로 해결 (HeadlessGame 사용) |
+| #2 | `StoryModeManager` 테스트 `getUnlockedStageCount()` 기대값 1 vs 실제 0 | 초기 `currentStageIndex=0` vs `getUnlockedStageCount()` 로직 차이 | 🟡 수정 필요 |
+| #3 | `MenuLoader` classpath 리소스 미발견 (헤드리스) | `Gdx.files.classpath()` 미작동 | ✅ ClassLoader 폴백 추가로 해결 |
+| #4 | APK 설치 후 즉시 종료 (과거 이슈) | Native lib 미포함/매니페스트 오류 추정 | 🔍 CI 빌드 후 재검증 필요 |
+| #5 | 로컬 Termux에서 aapt2 작동 안함 | Android SDK 빌드 툴 미설치/호환성 | ✅ GitHub Actions 사용으로 우회 |
+| #6 | 로컬에서 단위 테스트 실행 불가 | gdx-platform natives-desktop 네이티브 lib 없음 | ✅ GitHub Actions에서만 실행 |
 
 ---
 
 ## 📈 진행률 요약
 
 ```
-전체 진행률: ████████░░ 80%
+전체 진행률: █████████░ 85%
 ├── 코어 로직: ██████████ 100%
-├── 메뉴/스크린: █████████░ 90%
+├── 메뉴/스크린: ██████████ 95%
+├── 뷰포트/카메라: ██████████ 100%  ← NEW: 완료
 ├── 스토리 모드: ████████░░ 80%
 ├── 안드로이드 빌드: ████████░░ 80%
-├── 헤드리스 테스트: ████████░░ 80%
-└── CI/CD 파이프라인: ████████░░ 80%
+├── 헤드리스 테스트: ████████░░ 85%
+└── CI/CD 파이프라인: ████████░░ 85%
 ```
 
 ---
@@ -105,10 +113,11 @@
 
 | 날짜 | 버전 | 주요 변경 |
 |------|------|-----------|
-| 2026-07-26 | 0.1.0 | 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성 |
-| 2026-07-26 | 0.1.1 | JSON 플랫 배열 변경, MenuLoader classpath 폴백, 헤드리스 테스트 6종 추가 |
+| 2026-07-28 | 0.1.3 | 뷰포트/카메라 시스템 구현, 가상 해상도 960×1600, FitViewport 적용 |
 | 2026-07-26 | 0.1.2 | StoryModeManager classpath 로딩, stages.json 테스트 리소스 복사 |
+| 2026-07-26 | 0.1.1 | JSON 플랫 배열 변경, MenuLoader classpath 폴백, 헤드리스 테스트 6종 추가 |
+| 2026-07-26 | 0.1.0 | 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성 |
 
 ---
 
-> **다음 액션**: GitHub Actions 실행 결과 확인 → 테스트 통과 시 APK 다운로드 → 실기기 설치 검증 → `PlayScreen` 실제 게임플레이 구현 착수
+> **다음 액션**: GitHub에 푸시 → GitHub Actions 실행 결과 확인 → 테스트 통과 시 APK 다운로드 → 실기기 설치 검증 → `PlayScreen` 실제 게임플레이 구현 착수 (P1-1, P1-2, P1-3)

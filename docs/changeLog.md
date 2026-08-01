@@ -4,6 +4,41 @@
 
 ---
 
+## v0.1.3 (2026-07-28) - 뷰포트/카메라 시스템 구현 & 가상 해상도 960×1600 적용
+### ✨ 추가
+- **GameViewport 설정 클래스** - 가상 해상도 `VIRTUAL_WIDTH=960`, `VIRTUAL_HEIGHT=1600` (3:5 세로 비율)
+- **FitViewport 팩토리 메서드** - `GameViewport.createViewport()` 자동 카메라/뷰포트 생성
+- **BaseScreen 공통 뷰포트 관리** - `initViewport()`, `resize()` 자동 처리, 카메라 프로젝션 적용
+
+### 🔧 수정
+- **PlayScreen 전체 리팩토링** - 고정 픽셀 좌표 → 가상 좌표계 변경
+  - `CELL_SIZE: 32px` → `80f` (가상 해상도 기준)
+  - 보드 영역: `480×960` 가상 픽셀, 오프셋 `(240, 320)`로 중앙 정렬
+  - `ShapeRenderer.setProjectionMatrix(camera.combined)` 적용
+  - UI 텍스트 위치 가상 해상도 기준 중앙 정렬로 변경
+- **MenuScreen 전체 리팩토링** - 뷰포트 적용, 메뉴 항목 중앙 정렬 좌표로 변경
+- **StoryModeSelectScreen 전체 리팩토링** - 뷰포트 적용, 가상 해상도 기준 렌더링
+- **LoadingScreen 전체 리팩토링** - 뷰포트 적용, 중앙 정렬 로딩 텍스트
+- **GameWorld** - `getCurrentChain()` 메서드 추가 (UI 연쇄 표시용)
+- **architecture.md** - 새로운 렌더링 아키텍처(FitViewport + 가상 해상도) 문서화
+
+### 📁 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|------|----------|------|
+| `core/src/main/java/com/puyo/game/config/GameViewport.java` | **신규** | 가상 해상도/뷰포트 설정 클래스 |
+| `core/src/main/java/com/puyo/game/screens/BaseScreen.java` | **전체 수정** | 카메라/뷰포트 공통 관리 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | **전체 리팩토링** | 가상 좌표계 적용 |
+| `core/src/main/java/com/puyo/game/screens/MenuScreen.java` | **전체 리팩토링** | 뷰포트 적용, 중앙 정렬 |
+| `core/src/main/java/com/puyo/game/screens/StoryModeSelectScreen.java` | **전체 리팩토링** | 뷰포트 적용 |
+| `core/src/main/java/com/puyo/game/screens/LoadingScreen.java` | **전체 리팩토링** | 뷰포트 적용 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | **수정** | `getCurrentChain()` 추가 |
+| `docs/architecture.md` | **수정** | 렌더링 아키텍처 문서화 |
+
+### 커밋
+- `HEAD` - feat: Implement FitViewport with 960x1600 virtual resolution
+
+---
+
 ## v0.1.2 (2026-07-27) - 헤드리스 테스트 안정화 & 리소스 로딩 개선
 ### 🔧 수정
 - **StoryModeManager.loadStages()** - Java ClassLoader 폴백 추가로 헤드리스 테스트 리소스 로딩 가능
@@ -113,21 +148,6 @@
 
 ---
 
-## 📋 파일별 변경 이력 요약
-
-| 파일 | 생성/수정 횟수 | 주요 변경 사유 |
-|------|----------------|----------------|
-| `StoryModeManager.java` | 3회 | ClassLoader 폴백, JSON 래퍼 파싱, 테스트 리소스 지원 |
-| `MenuLoader.java` | 2회 | 클래스패스 폴백, 플랫 JSON 배열 지원 |
-| `GameTest.java` | 3회 | GL 제거, 순수 로직 테스트, 리소스 로드 검증 |
-| `assets/data/menus/*.json` | 2회 | 래퍼 제거, 플랫 배열, 파일명 통일 |
-| `build.gradle` (root) | 3회 | AGP 업그레이드, headless natives 추가, gradlePluginPortal 수정 |
-| `android-build.yml` | 2회 | 테스트 단계 추가, SDK 설치 단순화 |
-| `core/build.gradle` | 2회 | headless natives 테스트 의존성 추가 |
-
----
-
-
 ## v0.0.9 (2026-07-12) - 초기 개발
 - fd716e6 로직 구현
 - e21a50b StoryModeManager 에 주석추가
@@ -143,3 +163,23 @@
 - fd716e6 로직 구현 (2026-07-25) – 게임 로직 초기 구현: Board, PuyoPair, GameWorld 등 핵심 클래스 추가
 
 > **참고**: 이 문서는 주요 작업 단위(커밋 단위) 기준으로 작성되었습니다. 세부 라인 단위 변경은 `git log -p` 또는 GitHub 커밋 히스토리 참조 바랍니다.
+
+## 📋 파일별 변경 이력 요약
+
+| 파일 | 생성/수정 횟수 | 주요 변경 사유 |
+|------|----------------|----------------|
+| `StoryModeManager.java` | 3회 | ClassLoader 폴백, JSON 래퍼 파싱, 테스트 리소스 지원 |
+| `MenuLoader.java` | 2회 | 클래스패스 폴백, 플랫 JSON 배열 지원 |
+| `GameTest.java` | 3회 | GL 제거, 순수 로직 테스트, 리소스 로드 검증 |
+| `assets/data/menus/*.json` | 2회 | 래퍼 제거, 플랫 배열, 파일명 통일 |
+| `build.gradle` (root) | 3회 | AGP 업그레이드, headless natives 추가, gradlePluginPortal 수정 |
+| `android-build.yml` | 2회 | 테스트 단계 추가, SDK 설치 단순화 |
+| `core/build.gradle` | 2회 | headless natives 테스트 의존성 추가 |
+| `GameViewport.java` | 1회 (신규) | 가상 해상도 960×1600, FitViewport 팩토리 |
+| `BaseScreen.java` | 2회 | 카메라/뷰포트 공통 관리 |
+| `PlayScreen.java` | 2회 | 가상 좌표계 리팩토링 |
+| `MenuScreen.java` | 2회 | 뷰포트 적용 |
+| `StoryModeSelectScreen.java` | 2회 | 뷰포트 적용 |
+| `LoadingScreen.java` | 2회 | 뷰포트 적용 |
+| `GameWorld.java` | 2회 | `getCurrentChain()` 추가 |
+| `architecture.md` | 2회 | 렌더링 아키텍처 문서화 |
