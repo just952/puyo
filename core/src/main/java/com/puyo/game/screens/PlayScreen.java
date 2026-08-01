@@ -123,7 +123,7 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         batch.begin();
         for (int y = 0; y < Board.HEIGHT; y++) {
             for (int x = 0; x < Board.WIDTH; x++) {
-                Puyo puyo = board.getPuyo(x, y);
+                Puyo puyo = board.getPuyoAt(x, y);
                 if (puyo != null) {
                     drawPuyo(puyo, GameViewport.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE,
                         GameViewport.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE);
@@ -138,10 +138,16 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         if (pair == null) return;
         
         batch.begin();
-        drawPuyo(pair.getPuyo1(), pair.getX1() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_X,
-            pair.getY1() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_Y);
-        drawPuyo(pair.getPuyo2(), pair.getX2() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_X,
-            pair.getY2() * GameViewport.CELL_SIZE + GameViewport.BOARD_OFFSET_Y);
+        // PuyoPair의 left/right puyo는 이미 board 좌표를 가지고 있음
+        Puyo left = pair.getLeft();
+        Puyo right = pair.getRight();
+        
+        drawPuyo(left, 
+            GameViewport.BOARD_OFFSET_X + left.getX() * GameViewport.CELL_SIZE,
+            GameViewport.BOARD_OFFSET_Y + left.getY() * GameViewport.CELL_SIZE);
+        drawPuyo(right,
+            GameViewport.BOARD_OFFSET_X + right.getX() * GameViewport.CELL_SIZE,
+            GameViewport.BOARD_OFFSET_Y + right.getY() * GameViewport.CELL_SIZE);
         batch.end();
     }
 
@@ -152,8 +158,13 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         batch.begin();
         float nextX = GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH + 40;
         float nextY = GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT - 100;
-        drawPuyo(next.getPuyo1(), nextX, nextY + GameViewport.CELL_SIZE);
-        drawPuyo(next.getPuyo2(), nextX, nextY);
+        
+        // Next pair is shown in preview area (not on board)
+        Puyo left = next.getLeft();
+        Puyo right = next.getRight();
+        
+        drawPuyo(left, nextX, nextY + GameViewport.CELL_SIZE);
+        drawPuyo(right, nextX, nextY);
         batch.end();
     }
 

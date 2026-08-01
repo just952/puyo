@@ -89,11 +89,10 @@ public class FontManager implements Disposable {
         param.borderWidth = 0;
         param.borderColor = com.badlogic.gdx.graphics.Color.BLACK;
         param.borderStraight = true;
-        param.mipmap = true;
-        param.minFilter = Texture.TextureFilter.MipMapLinearLinear;
+        // mipmap과 hinting은 해당 libGDX 버전에서 사용 불가하므로 제거
+        param.minFilter = Texture.TextureFilter.Linear;
         param.magFilter = Texture.TextureFilter.Linear;
         param.gamma = 1.8f; // 감마 보정으로 한글 가독성 향상
-        param.hinting = FreeTypeFontParameter.Hinting.AutoFull;
 
         // Bold가 필요하면 크기를 약간 키우고 테두리로 시뮬레이션 (FreeType에서 직접 bold 지원 안 함)
         if (bold) {
