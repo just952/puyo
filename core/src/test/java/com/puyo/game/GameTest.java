@@ -18,7 +18,7 @@ public class GameTest {
     @Before
     public void setUp() {
         HeadlessApplicationConfiguration cfg = new HeadlessApplicationConfiguration();
-        app = new HeadlessApplication(new PuyoGame(), cfg);
+        app = new HeadlessApplication(new HeadlessGame(), cfg);
     }
 
     @After
@@ -26,9 +26,16 @@ public class GameTest {
         if (app != null) app.exit();
     }
 
+    // Minimal game for headless testing
+    public static class HeadlessGame extends com.badlogic.gdx.Game {
+        @Override
+        public void create() {}
+        @Override
+        public void render() {}
+    }
+
     @Test
     public void mainMenuLoadsCorrectItems() {
-        // MenuLoader 직접 테스트 (헤드리스에서도 파일 읽기 가능)
         MenuItem[] items = MenuLoader.loadMenu("main");
         assertEquals("main.json 에 정의된 5개 항목", 5, items.length);
         assertEquals("normal_mode", items[0].id);
@@ -64,12 +71,9 @@ public class GameTest {
         StoryModeManager mgr = new StoryModeManager();
         assertEquals("초기 언락 스테이지 수", 1, mgr.getUnlockedStageCount());
         
-        // 첫 번째 스테이지 정보 확인
         StageData stage1 = mgr.getStageAt(0);
         assertNotNull("Stage 1 데이터 존재", stage1);
         assertEquals("KIKIMORA", stage1.opponent);
-        
-        // 총 스테이지 수
         assertEquals("총 3개 스테이지", 3, mgr.getTotalStages());
     }
 

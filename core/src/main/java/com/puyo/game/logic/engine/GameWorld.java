@@ -27,6 +27,7 @@ public class GameWorld {
     private boolean lockDelayActive = false;
     private float lockDelayTimer = 0f;
     private static final float LOCK_DELAY_TIME = 0.5f; // seconds to lock after touching bottom
+    private int currentChain = 0;
 
     public GameWorld() {
         board = new Board();
@@ -40,11 +41,8 @@ public class GameWorld {
         PuyoColor c1 = randomColor();
         PuyoColor c2 = randomColor();
         currentPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
-        // Position the pair so that it appears at the top center.
-        // The reference point (left puyo for rotation 0) should be at x = (WIDTH/2) - 1, y = HEIGHT - 1 (or higher to be invisible)
-        // We'll set it to be just above the visible area so it falls in.
-        int startX = (FIELD_WIDTH / 2) - 1; // left puyo x
-        int startY = FIELD_HEIGHT; // start above the visible top (so it falls in)
+        int startX = (FIELD_WIDTH / 2) - 1;
+        int startY = FIELD_HEIGHT;
         currentPair.setPosition(startX, startY);
     }
 
@@ -53,33 +51,24 @@ public class GameWorld {
         PuyoColor c1 = randomColor();
         PuyoColor c2 = randomColor();
         nextPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
-        // Position for preview: we don't need to set it here; the UI can decide where to show it.
     }
 
     private PuyoColor randomColor() {
-        // Exclude ojama and hard for normal drops; they come from garbage.
-        int r = random.nextInt(5); // 0-4 for the 5 normal colors
+        int r = random.nextInt(5);
         switch (r) {
             case 0: return PuyoColor.RED;
             case 1: return PuyoColor.GREEN;
             case 2: return PuyoColor.BLUE;
             case 3: return PuyoColor.YELLOW;
             case 4: return PuyoColor.PURPLE;
-            default: return PuyoColor.RED; // fallback
+            default: return PuyoColor.RED;
         }
     }
 
-    /**
-     * Returns true if the current pair can move down by one cell.
-     */
     public boolean canFall() {
         return board.canMoveDown(currentPair);
     }
 
-    /**
-     * Moves the current pair left if possible.
-     * @return true if moved
-     */
     public boolean moveLeft() {
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
@@ -89,10 +78,6 @@ public class GameWorld {
         return false;
     }
 
-    /**
-     * Moves the current pair right if possible.
-     * @return true if moved
-     */
     public boolean moveRight() {
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
@@ -102,74 +87,32 @@ public class GameWorld {
         return false;
     }
 
-    /**
-     * Rotates the current pair clockwise if possible.
-     * @return true if rotated
-     */
-    public boolean rotateClockwise() {
-        // Try to rotate
-        int originalRotation = currentPair.getRotation();
+    public void rotateClockwise() {
         currentPair.rotateClockwise();
-        // Check if the new position is valid
-        if (board.canPlace(currentPair)) {
-            resetLockDelay();
-            return true;
-        } else {
-            // Try wall kicks: simple attempt to move left/right if rotation causes collision
-            // For simplicity, we just revert the rotation.
-            currentPair.setRotation(originalRotation);
-            return false;
+        if (!board.canPlace(currentPair)) {
+            if (board.canMoveLeft(currentPair)) {
+                currentPair.moveLeft();
+            } else if (board.canMoveRight(currentPair)) {
+                currentPair.moveRight();
+            } else {
+                currentPair.rotateCounterClockwise();
+            }
         }
+        resetLockDelay();
     }
 
-    /**
-     * Rotates the current pair counter-clockwise if possible.
-     * @return true if rotated
-     */
-
-    public boolean rotateCounterClockwise() {
-        int originalRotation = currentPair.getRotation();
-        currentPair.rotateCounterClockwise();
-        if (board.canPlace(currentPair)) {
-            resetLockDelay();
-            return true;
-        } else {
-            currentPair.setRotation(originalRotation);
-            return false;
-        }
-    }
-    /**
-     * Drops the current pair to the bottom as far as it can go.
-     */
     public void hardDrop() {
-        int dropDistance = 0;
         while (canFall()) {
             currentPair.moveDown();
-            dropDistance++;
         }
         lockPiece();
     }
 
-    /**
-     * Called when the player presses down for soft drop.
-     * We'll just move down one step if possible.
-     */
-    public void softDrop() {
-        if (canFall()) {
-            currentPair.moveDown();
-        }
-    }
-
-    /**
-     * Updates the game state by the given delta time.
-     * @param delta time in seconds since last update
-     */
     public void update(float delta) {
         if (gameOver) {
             return;
         }
 
-        // Handle falling
         fallTimer += delta;
         if (fallTimer >= fallInterval) {
             fallTimer = 0f;
@@ -177,7 +120,6 @@ public class GameWorld {
                 currentPair.moveDown();
                 resetLockDelay();
             } else {
-                // Cannot fall further
                 if (!lockDelayActive) {
                     lockDelayActive = true;
                     lockDelayTimer = 0f;
@@ -190,7 +132,6 @@ public class GameWorld {
             }
         }
 
-        // Optional: handle lock delay timing
         if (lockDelayActive) {
             lockDelayTimer += delta;
             if (lockDelayTimer >= LOCK_DELAY_TIME) {
@@ -204,18 +145,13 @@ public class GameWorld {
         lockDelayTimer = 0f;
     }
 
-    /**
-     * Locks the current pair into the board, checks for clears, and spawns a new pair.
-     */
     private void lockPiece() {
-        // Place the two puyos into the board
         for (Puyo p : currentPair.getPuyos()) {
             if (p.isAlive()) {
                 board.placePuyo(p);
             }
         }
 
-        // Check for matches and resolve chains
         boolean chainOccurred = false;
         int chainCount = 0;
         int totalRemoved = 0;
@@ -236,20 +172,20 @@ public class GameWorld {
         } while (chainOccurred);
 
         if (chainOccurred) {
-            int earned = totalRemoved * (chainCount + 1) * 10; // simple scoring
+            currentChain = chainCount;
+            int earned = totalRemoved * (chainCount + 1) * 10;
             addScore(earned);
+        } else {
+            currentChain = 0;
         }
 
-        // Check for game over (if any puyo is placed above the visible top)
         if (board.isTopOut()) {
             gameOver = true;
         }
 
-        // Spawn the next pair as current, and generate a new next pair
         currentPair = nextPair;
         spawnNextPair();
 
-        // Reset fall timer and lock delay for the new pair
         fallTimer = 0f;
         resetLockDelay();
     }
@@ -278,7 +214,10 @@ public class GameWorld {
         this.score += points;
     }
 
+    public int getCurrentChain() {
+        return currentChain;
+    }
+
     public void dispose() {
-        // Nothing to dispose
     }
 }

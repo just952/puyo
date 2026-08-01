@@ -18,17 +18,13 @@ import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.story.StageData;
+import com.puyo.game.config.GameViewport;
 
 public class PlayScreen extends BaseScreen implements InputProcessor {
     private final PuyoGame game;
-    private static final int CELL_SIZE = 32;
-    private int boardOffsetX;
-    private int boardOffsetY;
-
     private final GameMode mode;
     private final StoryModeManager storyManager;
     private final GameWorld gameWorld;
-    private boolean isInitialized = false;
     private float stateTime = 0f;
     private ShapeRenderer shapeRenderer;
     private BitmapFont font;
@@ -44,9 +40,6 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         this.mode = mode;
         this.storyManager = (mode == GameMode.NORMAL) ? new StoryModeManager(storyStageIndex) : null;
         this.gameWorld = new GameWorld();
-
-        // If we are in story mode and a specific stage index was given, set the storyMode.currentStageIndex to that
-        // The StoryModeManager constructor with startIndex already set it.
     }
 
     @Override
@@ -58,22 +51,16 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
                 Gdx.app.log("PlayScreen", "Starting Stage " + storyManager.getCurrentStageNumber()
                         + "/" + storyManager.getTotalStages()
                         + " vs " + current.opponent);
-                // Apply story mode settings to game world (e.g., adjust drop speed based on AI difficulty?)
-                // For now, we just note it.
             }
         }
-        // Reset game world for a fresh game
-        // Note: GameWorld constructor already creates a new board and spawnNew ㅈ we want to keep the same gameWorld instance, but we need to reset it.
-        // We'll create a new one each time? Or reset the existing one.
-        // For simplicity, we'll create a new GameWorld in the constructor and not reset.
-        // But if we want to replay, we need a reset method. We'll skip for now.
         Gdx.input.setInputProcessor(this);
+        
+        // 뷰포트/카메라 초기화
+        initViewport();
+        
         shapeRenderer = new ShapeRenderer();
         font = new BitmapFont();
         batch = new SpriteBatch();
-        // Compute board offsets based on current screen size
-        boardOffsetX = (Gdx.graphics.getWidth() - Board.WIDTH * CELL_SIZE) / 2;
-        boardOffsetY = (Gdx.graphics.getHeight() - Board.HEIGHT * CELL_SIZE) / 2;
     }
 
     @Override
@@ -82,170 +69,154 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
         update(delta);
 
         // Clear screen
-        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Render the game world
-        if (mode == GameMode.NORMAL) {
-            Gdx.gl.glClearColor(0.2f, 0.2f, 0.4f, 1); // bluish for story
-        } else if (mode == GameMode.ENDLESS) {
-            Gdx.gl.glClearColor(0.1f, 0.3f, 0.1f, 1); // greenish for endless
-        } else {
-            Gdx.gl.glClearColor(0.3f, 0.1f, 0.1f, 1); // reddish for vs
-        }
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        // 카메라 업데이트 및 프로젝션 매트릭스 적용
+        camera.update();
+        batch.setProjectionMatrix(camera.combined);
+        shapeRenderer.setProjectionMatrix(camera.combined);
 
-        // Draw board grid
+        // Draw game board
         drawBoard();
-
-        // Draw current pair
         drawCurrentPair();
-
-        // Draw next pair (optional)
         drawNextPair();
-// Draw score and stage info
-        batch.begin();
-        String scoreText = "Score: " + gameWorld.getScore();
-        font.draw(batch, scoreText, 20, Gdx.graphics.getHeight() - 20);
-        if (mode == GameMode.NORMAL && storyManager != null) {
-            String stageText = "Stage: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages();
-            font.draw(batch, stageText, 20, Gdx.graphics.getHeight() - 50);
-            StageData current = storyManager.getCurrentStage();
-            if (current != null) {
-                String oppText = "VS: " + current.opponent;
-                font.draw(batch, oppText, 20, Gdx.graphics.getHeight() - 80);
-            }
-        }
-        batch.end();
+        drawUI();
+    }
 
-        // Log debug info
-        stateTime += delta;
-        if (stateTime > 1f) {
-            stateTime = 0f;
-            if (gameWorld.getCurrentPair() != null) {
-                Gdx.app.log("PlayScreen", "Pair at: (" + gameWorld.getCurrentPair().getLeft().getX() + "," + gameWorld.getCurrentPair().getLeft().getY() + ") and ("
-                        + gameWorld.getCurrentPair().getRight().getX() + "," + gameWorld.getCurrentPair().getRight().getY() + ")");
-            }
+    private void update(float delta) {
+        if (gameWorld.isGameOver()) {
+            return;
         }
+        stateTime += delta;
+        gameWorld.update(delta);
     }
 
     private void drawBoard() {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0.1f, 0.1f, 0.1f, 1f); // dark background
+        
+        // Board background
+        shapeRenderer.setColor(0.1f, 0.1f, 0.15f, 1);
+        shapeRenderer.rect(
+            GameViewport.BOARD_OFFSET_X,
+            GameViewport.BOARD_OFFSET_Y,
+            GameViewport.BOARD_WIDTH,
+            GameViewport.BOARD_HEIGHT
+        );
 
-        // Draw filled cells for occupied positions
-        for (int x = 0; x < Board.WIDTH; x++) {
-            for (int y = 0; y < Board.HEIGHT; y++) {
-                Puyo puyo = gameWorld.getBoard().getPuyoAt(x, y);
-                if (puyo != null) {
-                    float screenX = boardOffsetX + x * CELL_SIZE;
-                    float screenY = boardOffsetY + y * CELL_SIZE;
-                    shapeRenderer.rect(screenX, screenY, CELL_SIZE, CELL_SIZE);
-                }
-            }
+        // Grid lines
+        shapeRenderer.setColor(0.2f, 0.2f, 0.3f, 1);
+        for (int x = 0; x <= Board.WIDTH; x++) {
+            float lineX = GameViewport.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE;
+            shapeRenderer.rectLine(lineX, GameViewport.BOARD_OFFSET_Y, 
+                lineX, GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT, 1f);
+        }
+        for (int y = 0; y <= Board.HEIGHT; y++) {
+            float lineY = GameViewport.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE;
+            shapeRenderer.rectLine(GameViewport.BOARD_OFFSET_X, lineY, 
+                GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH, lineY, 1f);
         }
         shapeRenderer.end();
 
-        // Draw grid lines
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 1f);
-
-        // Vertical lines
-        for (int x = 0; x <= Board.WIDTH; x++) {
-            float screenX = boardOffsetX + x * CELL_SIZE;
-            shapeRenderer.line(screenX, boardOffsetY, screenX, boardOffsetY + Board.HEIGHT * CELL_SIZE);
+        // Draw placed puyos
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        Board board = gameWorld.getBoard();
+        for (int x = 0; x < Board.WIDTH; x++) {
+            for (int y = 0; y < Board.HEIGHT; y++) {
+                Puyo puyo = board.getPuyoAt(x, y);
+                if (puyo != null && puyo.isAlive()) {
+                    drawPuyo(puyo.getX(), puyo.getY(), puyo.getColor());
+                }
+            }
         }
-
-        // Horizontal lines
-        for (int y = 0; y <= Board.HEIGHT; y++) {
-            float screenY = boardOffsetY + y * CELL_SIZE;
-            shapeRenderer.line(boardOffsetX, screenY, boardOffsetX + Board.WIDTH * CELL_SIZE, screenY);
-        }
-
         shapeRenderer.end();
     }
 
     private void drawCurrentPair() {
         PuyoPair pair = gameWorld.getCurrentPair();
-        if (pair == null) return;
-
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-
-        // Draw left puyo
-        Puyo left = pair.getLeft();
-        if (left != null && left.isAlive()) {
-            float screenX = boardOffsetX + left.getX() * CELL_SIZE + CELL_SIZE / 2f;
-            float screenY = boardOffsetY + left.getY() * CELL_SIZE + CELL_SIZE / 2f;
-            shapeRenderer.setColor(getColorForPuyo(left.getColor()));
-            shapeRenderer.circle(screenX, screenY, CELL_SIZE / 2f - 1);
+        if (pair != null) {
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            for (Puyo puyo : pair.getPuyos()) {
+                if (puyo.isAlive()) {
+                    drawPuyo(puyo.getX(), puyo.getY(), puyo.getColor());
+                }
+            }
+            shapeRenderer.end();
         }
-
-        // Draw right puyo
-        Puyo right = pair.getRight();
-        if (right != null && right.isAlive()) {
-            float screenX = boardOffsetX + right.getX() * CELL_SIZE + CELL_SIZE / 2f;
-            float screenY = boardOffsetY + right.getY() * CELL_SIZE + CELL_SIZE / 2f;
-            shapeRenderer.setColor(getColorForPuyo(right.getColor()));
-            shapeRenderer.circle(screenX, screenY, CELL_SIZE / 2f - 1);
-        }
-
-        shapeRenderer.end();
-
-        // Draw outline for visibility
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(1f, 1f, 1f, 0.8f);
-
-        if (left != null && left.isAlive()) {
-            float screenX = boardOffsetX + left.getX() * CELL_SIZE + CELL_SIZE / 2f;
-            float screenY = boardOffsetY + left.getY() * CELL_SIZE + CELL_SIZE / 2f;
-            shapeRenderer.circle(screenX, screenY, CELL_SIZE / 2f - 1);
-        }
-
-        if (right != null && right.isAlive()) {
-            float screenX = boardOffsetX + right.getX() * CELL_SIZE + CELL_SIZE / 2f;
-            float screenY = boardOffsetY + right.getY() * CELL_SIZE + CELL_SIZE / 2f;
-            shapeRenderer.circle(screenX, screenY, CELL_SIZE / 2f - 1);
-        }
-
-        shapeRenderer.end();
     }
 
     private void drawNextPair() {
         PuyoPair nextPair = gameWorld.getNextPair();
-        if (nextPair == null) return;
+        if (nextPair != null) {
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            // Next pair preview area (right side of board)
+            float previewX = GameViewport.BOARD_OFFSET_X + GameViewport.BOARD_WIDTH + 40;
+            float previewY = GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT - 200;
+            
+            shapeRenderer.setColor(0.3f, 0.3f, 0.4f, 1);
+            shapeRenderer.rect(previewX - 20, previewY - 20, GameViewport.CELL_SIZE * 2 + 40, GameViewport.CELL_SIZE * 2 + 40);
+            
+            for (Puyo puyo : nextPair.getPuyos()) {
+                drawPuyoAt(previewX + puyo.getX() * GameViewport.CELL_SIZE, 
+                          previewY + puyo.getY() * GameViewport.CELL_SIZE, 
+                          puyo.getColor());
+            }
+            shapeRenderer.end();
 
-        float offsetX = boardOffsetX - 100;
-        float offsetY = boardOffsetY + 50;
-        float size = CELL_SIZE / 2f;
+            batch.begin();
+            font.draw(batch, "NEXT", previewX, previewY + GameViewport.CELL_SIZE * 2 + 40);
+            batch.end();
+        }
+    }
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+    private void drawPuyo(int boardX, int boardY, PuyoColor color) {
+        float screenX = GameViewport.BOARD_OFFSET_X + boardX * GameViewport.CELL_SIZE;
+        float screenY = GameViewport.BOARD_OFFSET_Y + boardY * GameViewport.CELL_SIZE;
+        drawPuyoAt(screenX, screenY, color);
+    }
 
-        Puyo left = nextPair.getLeft();
-        if (left != null && left.isAlive()) {
-            shapeRenderer.setColor(getColorForPuyo(left.getColor()));
-            shapeRenderer.circle(offsetX, offsetY, size);
+    private void drawPuyoAt(float x, float y, PuyoColor color) {
+        float radius = GameViewport.CELL_SIZE / 2f - 2;
+        float centerX = x + GameViewport.CELL_SIZE / 2f;
+        float centerY = y + GameViewport.CELL_SIZE / 2f;
+
+        shapeRenderer.setColor(getColorForPuyo(color));
+        shapeRenderer.circle(centerX, centerY, radius);
+
+        // Highlight
+        shapeRenderer.setColor(1, 1, 1, 0.3f);
+        shapeRenderer.circle(centerX - radius * 0.3f, centerY + radius * 0.3f, radius * 0.4f);
+    }
+
+    private void drawUI() {
+        batch.begin();
+        font.getData().setScale(2f);
+        
+        // Score
+        font.draw(batch, "SCORE: " + gameWorld.getScore(), 
+            GameViewport.BOARD_OFFSET_X, GameViewport.BOARD_OFFSET_Y + GameViewport.BOARD_HEIGHT + 80);
+        
+        // Chain
+        if (gameWorld.getCurrentChain() > 0) {
+            font.setColor(Color.YELLOW);
+            font.draw(batch, "CHAIN: " + gameWorld.getCurrentChain() + "x!", 
+                GameViewport.VIRTUAL_WIDTH / 2f - 100, GameViewport.VIRTUAL_HEIGHT - 100);
+            font.setColor(Color.WHITE);
         }
 
-        Puyo right = nextPair.getRight();
-        if (right != null && right.isAlive()) {
-            shapeRenderer.setColor(getColorForPuyo(right.getColor()));
-            shapeRenderer.circle(offsetX + size * 1.5f, offsetY, size);
+        // Story mode info
+        if (mode == GameMode.NORMAL && storyManager != null) {
+            StageData current = storyManager.getCurrentStage();
+            if (current != null) {
+                font.draw(batch, "STAGE: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages(), 
+                    GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 50);
+                font.draw(batch, "VS: " + current.opponent, 
+                    GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 90);
+            }
         }
-
-        shapeRenderer.end();
-
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(1f, 1f, 1f, 0.8f);
-
-        if (left != null && left.isAlive()) {
-            shapeRenderer.circle(offsetX, offsetY, size);
-        }
-
-        if (right != null && right.isAlive()) {
-            shapeRenderer.circle(offsetX + size * 1.5f, offsetY, size);
-        }
-
-        shapeRenderer.end();
+        
+        font.getData().setScale(1f);
+        batch.end();
     }
 
     private Color getColorForPuyo(PuyoColor color) {
@@ -254,70 +225,11 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
             case GREEN: return Color.GREEN;
             case BLUE: return Color.BLUE;
             case YELLOW: return Color.YELLOW;
-            case PURPLE: return Color.PURPLE;
+            case PURPLE: return Color.MAGENTA;
             case CYAN: return Color.CYAN;
-            case OJAMA: return Color.DARK_GRAY;
+            case OJAMA: return Color.GRAY;
             case HARD: return Color.BLACK;
             default: return Color.WHITE;
-        }
-    }
-
-    private Vector2 worldToScreen(int col, int row) {
-        return new Vector2(boardOffsetX + col * CELL_SIZE, boardOffsetY + row * CELL_SIZE);
-    }
-
-    private void update(float delta) {
-        if (gameWorld.isGameOver()) {
-            // Handle game over: maybe show a screen
-            return;
-        }
-
-        // Update game world logic (auto-fall, locking, clearing)
-        gameWorld.update(delta);
-    }
-
-    // Helper methods to delegate to gameWorld
-    public boolean canFall() {
-        return gameWorld.canFall();
-    }
-
-    public void softDrop() {
-        if (canFall()) {
-            gameWorld.getCurrentPair().moveDown();
-        }
-    }
-
-    public void hardDrop() {
-        gameWorld.hardDrop();
-    }
-
-    @Override
-    public void resize(int width, int height) {
-    }
-
-    @Override
-    public void pause() {
-    }
-
-    @Override
-    public void resume() {
-    }
-
-    @Override
-    public void hide() {
-        Gdx.input.setInputProcessor(null);
-    }
-
-    @Override
-    public void dispose() {
-        if (shapeRenderer != null) {
-            shapeRenderer.dispose();
-        }
-        if (font != null) {
-            font.dispose();
-        }
-        if (batch != null) {
-            batch.dispose();
         }
     }
 
@@ -335,17 +247,14 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
                 gameWorld.moveRight();
                 return true;
             case Input.Keys.UP:
-                // Rotate clockwise
                 gameWorld.getCurrentPair().rotateClockwise();
                 return true;
             case Input.Keys.DOWN:
-                // Soft drop
                 if (gameWorld.canFall()) {
                     gameWorld.getCurrentPair().moveDown();
                 }
                 return true;
             case Input.Keys.SPACE:
-                // Hard drop
                 gameWorld.hardDrop();
                 return true;
             default:
@@ -354,42 +263,42 @@ public class PlayScreen extends BaseScreen implements InputProcessor {
     }
 
     @Override
-    public boolean keyUp(int keycode) {
-        return false;
+    public boolean keyUp(int keycode) { return false; }
+    @Override
+    public boolean keyTyped(char character) { return false; }
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) { return false; }
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) { return false; }
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) { return false; }
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) { return false; }
+    @Override
+    public boolean scrolled(float amountX, float amountY) { return false; }
+    @Override
+    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) { return false; }
+
+    @Override
+    public void resize(int width, int height) {
+        super.resize(width, height);
     }
 
     @Override
-    public boolean keyTyped(char character) {
-        return false;
+    public void pause() {}
+
+    @Override
+    public void resume() {}
+
+    @Override
+    public void hide() {
+        Gdx.input.setInputProcessor(null);
     }
 
     @Override
-    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-        return false;
-    }
-
-    @Override
-    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-        return false;
-    }
-
-    @Override
-    public boolean touchDragged(int screenX, int screenY, int pointer) {
-        return false;
-    }
-
-    @Override
-    public boolean mouseMoved(int screenX, int screenY) {
-        return false;
-    }
-
-    @Override
-    public boolean scrolled(float amountX, float amountY) {
-        return false;
-    }
-
-    @Override
-    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) {
-        return false;
+    public void dispose() {
+        if (shapeRenderer != null) shapeRenderer.dispose();
+        if (font != null) font.dispose();
+        if (batch != null) batch.dispose();
     }
 }

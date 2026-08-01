@@ -10,8 +10,9 @@ import com.puyo.game.PuyoGame;
 import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.GameMode;
 import com.puyo.game.story.StageData;
+import com.puyo.game.config.GameViewport;
 
-public class StoryModeSelectScreen implements Screen {
+public class StoryModeSelectScreen extends BaseScreen {
     private final PuyoGame game;
     private final SpriteBatch batch;
     private final BitmapFont font;
@@ -19,6 +20,7 @@ public class StoryModeSelectScreen implements Screen {
     private int selectedIndex = 0;
 
     public StoryModeSelectScreen(PuyoGame game) {
+        super(game);
         this.game = game;
         this.batch = new SpriteBatch();
         this.font = new BitmapFont(); // later replace with TTF
@@ -27,38 +29,68 @@ public class StoryModeSelectScreen implements Screen {
     }
 
     @Override
+    public void show() {
+        initViewport();
+        selectedIndex = 0;
+    }
+
+    @Override
     public void render(float delta) {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        batch.begin();
-        font.draw(batch, "스토리 모드 선택", 200, 450);
+        camera.update();
+        batch.setProjectionMatrix(camera.combined);
 
+        batch.begin();
+        font.getData().setScale(2f);
+        
+        // Title
+        String title = "STORY MODE";
+        float titleWidth = font.draw(batch, title, 0, 0).width;
+        font.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
+
+        font.getData().setScale(1.2f);
+        
         int unlocked = storyManager.getUnlockedStageCount();
         int total = storyManager.getTotalStages();
 
-        // Show each stage
-        float startY = 380;
-        float lineHeight = 30;
+        float startY = GameViewport.VIRTUAL_HEIGHT / 2f + 200;
+        float lineHeight = 60;
+        
         for (int i = 0; i < total; i++) {
             StageData stage = storyManager.getStageAt(i);
             if (stage == null) continue;
-            String status = (i < unlocked) ? "선택 가능" : "잠금";
+            
+            boolean isUnlocked = i < unlocked;
+            String status = isUnlocked ? "UNLOCKED" : "LOCKED";
             String label = (i + 1) + ". " + stage.opponent + " (" + status + ")";
+            
             if (i == selectedIndex) {
-                label = "> " + label + " <"; // highlight selected
+                label = "> " + label + " <";
+                font.setColor(1, 1, 0, 1);
+            } else {
+                font.setColor(isUnlocked ? 1 : 0.5f, isUnlocked ? 1 : 0.5f, isUnlocked ? 1 : 0.5f, 1);
             }
-            // Optionally show a snippet of dialogue
+            
             if (stage.dialogue != null && stage.dialogue.length > 0) {
-                label += "\n   \"" + stage.dialogue[0] + "\"";
+                String dialogueText = "   \"" + stage.dialogue[0] + "\"";
+                float labelWidth = font.draw(batch, label, 0, 0).width;
+                font.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * lineHeight);
+                float dialogueWidth = font.draw(batch, dialogueText, 0, 0).width;
+                font.draw(batch, dialogueText, (GameViewport.VIRTUAL_WIDTH - dialogueWidth) / 2f, startY - i * lineHeight - 30);
+            } else {
+                float labelWidth = font.draw(batch, label, 0, 0).width;
+                font.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * lineHeight);
             }
-            float y = startY - i * lineHeight * 1.5f; // each entry takes two lines if dialogue present
-            font.draw(batch, label, 200, y);
+            font.setColor(1, 1, 1, 1);
         }
 
         // Instructions
-        float instrY = 50;
-        font.draw(batch, "(위/아래로 이동, 엔터로 선택, 백스페이스로 뒤로)", 200, instrY);
+        String instructions = "UP/DOWN: Select  ENTER: Start  BACK: Return";
+        float instrWidth = font.draw(batch, instructions, 0, 0).width;
+        font.draw(batch, instructions, (GameViewport.VIRTUAL_WIDTH - instrWidth) / 2f, 100);
+        
         batch.end();
 
         // input
@@ -81,23 +113,17 @@ public class StoryModeSelectScreen implements Screen {
 
     @Override
     public void resize(int width, int height) {
+        super.resize(width, height);
     }
 
     @Override
-    public void show() {
-    }
+    public void pause() {}
 
     @Override
-    public void pause() {
-    }
+    public void resume() {}
 
     @Override
-    public void resume() {
-    }
-
-    @Override
-    public void hide() {
-    }
+    public void hide() {}
 
     @Override
     public void dispose() {

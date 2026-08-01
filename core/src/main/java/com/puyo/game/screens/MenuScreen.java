@@ -11,8 +11,9 @@ import com.puyo.game.GameMode;
 import com.puyo.game.menus.MenuItem;
 import com.puyo.game.menus.MenuLoader;
 import com.puyo.game.menus.MenuAction;
+import com.puyo.game.config.GameViewport;
 
-public class MenuScreen implements Screen {
+public class MenuScreen extends BaseScreen {
     private final PuyoGame game;
     private final SpriteBatch batch;
     private final BitmapFont font;
@@ -20,10 +21,18 @@ public class MenuScreen implements Screen {
     private int selectedIndex = 0;
 
     public MenuScreen(PuyoGame game) {
+        super(game);
         this.game = game;
         this.batch = new SpriteBatch();
-        this.font = new BitmapFont(); // Will be replaced with custom TTF font later
+        this.font = new BitmapFont();
         this.menuItems = MenuLoader.loadMenu("main");
+    }
+
+    @Override
+    public void show() {
+        initViewport();
+        this.menuItems = MenuLoader.loadMenu("main");
+        selectedIndex = 0;
     }
 
     @Override
@@ -31,19 +40,37 @@ public class MenuScreen implements Screen {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        batch.begin();
-        font.draw(batch, "PUYO PUYO 2", 200, 400);
+        camera.update();
+        batch.setProjectionMatrix(camera.combined);
 
+        batch.begin();
+        font.getData().setScale(3f);
+        
+        String title = "PUYO PUYO 2";
+        float titleWidth = font.draw(batch, title, 0, 0).width;
+        font.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
+
+        font.getData().setScale(1.5f);
+        
+        float startY = GameViewport.VIRTUAL_HEIGHT / 2f + 100;
+        float itemHeight = 80;
+        
         for (int i = 0; i < menuItems.length; i++) {
             String label = menuItems[i].label;
             if (i == selectedIndex) {
-                label = "> " + label + " <"; // Indicator for selected item
+                label = "> " + label + " <";
+                font.setColor(1, 1, 0, 1);
+            } else {
+                font.setColor(1, 1, 1, 1);
             }
-            font.draw(batch, label, 250, 300 - i * 40);
+            
+            float labelWidth = font.draw(batch, label, 0, 0).width;
+            font.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * itemHeight);
         }
+        
+        font.setColor(1, 1, 1, 1);
         batch.end();
 
-        // Input handling
         if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)) {
             selectedIndex = (selectedIndex + 1) % menuItems.length;
         }
@@ -67,12 +94,8 @@ public class MenuScreen implements Screen {
                             game.setScreen(new StoryModeSelectScreen(game));
                             break;
                         case "versus_mode_select":
-                            // TODO: Implement VersusModeSelectScreen
-                            // game.setScreen(new VersusModeSelectScreen(game));
                             break;
                         case "options_menu":
-                            // TODO: Implement OptionsScreen
-                            // game.setScreen(new OptionsScreen(game));
                             break;
                     }
                     break;
@@ -92,23 +115,17 @@ public class MenuScreen implements Screen {
 
     @Override
     public void resize(int width, int height) {
+        super.resize(width, height);
     }
 
     @Override
-    public void show() {
-    }
+    public void pause() {}
 
     @Override
-    public void pause() {
-    }
+    public void resume() {}
 
     @Override
-    public void resume() {
-    }
-
-    @Override
-    public void hide() {
-    }
+    public void hide() {}
 
     @Override
     public void dispose() {
