@@ -31,7 +31,6 @@ android {
     }
 
     packagingOptions {
-        // 네이티브 라이브러리를 APK에서 추출하여 앱 데이터 디렉토리에 설치
         jniLibs {
             useLegacyPackaging = true
         }
@@ -51,11 +50,9 @@ dependencies {
 // Extract native .so files from the resolved dependencies into jniLibs
 task extractNativeLibs {
     doLast {
-        // Use debugRuntimeClasspath which includes all runtime dependencies for debug variant
         def artifacts = configurations.debugRuntimeClasspath.resolve()
         artifacts.each { file ->
             if (file.name.endsWith('.jar') && (file.name.contains('natives-armeabi-v7a') || file.name.contains('natives-arm64-v8a'))) {
-                // Extract .so files from the JAR
                 def abi = file.name.contains('armeabi-v7a') ? 'armeabi-v7a' : 'arm64-v8a'
                 def destDir = new File(projectDir, "src/main/jniLibs/$abi")
                 destDir.mkdirs()
@@ -63,34 +60,33 @@ task extractNativeLibs {
                 def zipTree = zipTree(file)
                 zipTree.matching { include '**/*.so' }.each { entry ->
                     def targetFile = new File(destDir, entry.name)
-                    // Use InputStream/OutputStream to copy
                     targetFile.withOutputStream { out ->
                         entry.newInputStream().withStream { inp ->
                             out << inp
                         }
                     }
                     println "Extracted ${entry.name} -> $abi/ (${targetFile.length()} bytes)"
-                    
-                    // Also create libpenguin.so copy for libgdx-freetype (legacy name)
-                    if (entry.name == 'libgdx-freetype.so') {
-                        def penguinFile = new File(destDir, 'libpenguin.so')
-                        penguinFile.withOutputStream { out ->
-                            entry.newInputStream().withStream { inp ->
-                                out << inp
-                            }
-                        }
-                        println "Created libpenguin.so -> $abi/ (${penguinFile.length()} bytes)"
-                    }
                 }
+            }
+        }
+        
+        // Rename libgdx-freetype.so to libpenguin.so for each ABI
+        ['armeabi-v7a', 'arm64-v8a'].each { abi ->
+            def freetypeFile = new File(projectDir, "src/main/jniLibs/$abi/libgdx-freetype.so")
+            def penguinFile = new File(projectDir, "src/main/jniLibs/$abi/libpenguin.so")
+            if (freetypeFile.exists()) {
+                if (penguinFile.exists()) {
+                    penguinFile.delete()
+                }
+                freetypeFile.renameTo(penguinFile)
+                println "Renamed libgdx-freetype.so -> libpenguin.so for $abi"
             }
         }
     }
 }
 
-// Ensure native libs are extracted before building
 preBuild.dependsOn(extractNativeLibs)
 
-// Also ensure the jniLibs directory exists for clean builds
 task ensureJniLibsDirs {
     doLast {
         ['armeabi-v7a', 'arm64-v8a'].each { abi ->
