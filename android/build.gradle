@@ -41,10 +41,10 @@ dependencies {
     implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a"
 }
 
-// Extract native .so files from the resolved debugRuntimeClasspath into jniLibs
+// Extract native .so files from the resolved dependencies into jniLibs
 task extractNativeLibs {
     doLast {
-        // Resolve the debugRuntimeClasspath configuration at execution time
+        // Use debugRuntimeClasspath which includes all runtime dependencies for debug variant
         def artifacts = configurations.debugRuntimeClasspath.resolve()
         artifacts.each { file ->
             if (file.name.endsWith('.jar') && (file.name.contains('natives-armeabi-v7a') || file.name.contains('natives-arm64-v8a'))) {
@@ -69,4 +69,15 @@ task extractNativeLibs {
     }
 }
 
+// Ensure native libs are extracted before building
 preBuild.dependsOn(extractNativeLibs)
+
+// Also ensure the jniLibs directory exists for clean builds
+task ensureJniLibsDirs {
+    doLast {
+        ['armeabi-v7a', 'arm64-v8a'].each { abi ->
+            new File(projectDir, "src/main/jniLibs/$abi").mkdirs()
+        }
+    }
+}
+preBuild.dependsOn(ensureJniLibsDirs)
