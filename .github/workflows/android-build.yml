@@ -27,6 +27,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'gradle'
 
+      - name: Install patchelf (for fixing SONAME)
+        run: sudo apt-get update && sudo apt-get install -y patchelf
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -44,10 +47,23 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      # Extract native libs and fix SONAME for libpenguin.so
+      - name: Extract native libraries and fix SONAME
+        run: |
+          ./gradlew :android:extractNativeLibs --no-daemon
+          # Fix SONAME of libpenguin.so copies
+          for abi in armeabi-v7a arm64-v8a; do
+            LIB_PATH="android/src/main/jniLibs/$abi/libpenguin.so"
+            if [ -f "$LIB_PATH" ]; then
+              echo "Patching SONAME for $LIB_PATH"
+              patchelf --set-soname libpenguin.so "$LIB_PATH"
+              echo "New SONAME: $(readelf -d "$LIB_PATH" | grep SONAME)"
+            fi
+          done
+
       # Test 단계
       - name: Run Headless Tests (core module)
         run: ./gradlew :core:test --stacktrace
-      # ──────────────
 
       - name: Upload test report
         if: always()
@@ -65,6 +81,11 @@ jobs:
           echo "APK_PATH=$APK_PATH"
           echo ">>> Checking lib folders in APK:"
           unzip -l "$APK_PATH" | grep -E 'lib/arm64-v8a|lib/armeabi-v7a' | head
+          echo ">>> Verifying SONAME in APK:"
+          unzip -o "$APK_PATH" "lib/arm64-v8a/libpenguin.so" -d /tmp/apk_check 2>/dev/null
+          if [ -f /tmp/apk_check/lib/arm64-v8a/libpenguin.so ]; then
+            readelf -d /tmp/apk_check/lib/arm64-v8a/libpenguin.so | grep SONAME
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
