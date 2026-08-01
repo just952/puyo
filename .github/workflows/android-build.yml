@@ -104,8 +104,21 @@ jobs:
           fi
           echo "Using apksigner: $BUILD_TOOLS_PATH"
           
-          # Debug keystore (default)
-          "$BUILD_TOOLS_PATH" sign --ks ~/.android/debug.keystore \
+          # Create debug keystore if not exists
+          KEYSTORE_PATH=~/.android/debug.keystore
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Creating debug keystore..."
+            mkdir -p ~/.android
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass android -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias androiddebugkey \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          
+          # Sign APK
+          "$BUILD_TOOLS_PATH" sign --ks "$KEYSTORE_PATH" \
             --ks-pass pass:android \
             --key-pass pass:android \
             --ks-key-alias androiddebugkey \
