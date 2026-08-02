@@ -7,7 +7,7 @@ rc.sh
 full_conversation.log
 project_context_export.md
 proposal.md
-#.clinerules
+.clinerules/
 com.puyo.game.GameTest.html
 error/scr.png
 .vscode/
