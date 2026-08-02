@@ -1,33 +1,34 @@
 # Puyo Puyo 2 - 남은 작업 목록 (TODO)
 
-## 🚨 즉시 처리 필요 (Critical - P0)
+## 즉시 처리 필요 (Critical - P0)
 
 | ID | 작업 | 상세 내용 | 상태 |
 |------|------|----------|------|
-| P0-1 | GitHub Actions 헤드리스 테스트 통과 | `./gradlew :core:test` 통과 (6/6 테스트) | 🔴 진행중 (푸시 후 확인) |
-| P0-2 | GitHub Actions APK 빌드 성공 | `:android:assembleDebug` 성공 및 아티팩트 업로드 | ⏳ 대기중 |
-| P0-3 | 실기기(갤럭시 S23) 설치·실행 검증 | APK 설치 후 검은 화면 없이 메인 메뉴 진입, 보드 정상 표시 | ⏳ 대기중 |
+| P0-1 | GitHub Actions 헤드리스 테스트 통과 | ./gradlew :core:test 통과 (6/6 테스트) | 진행중 (푸시 후 확인) |
+| P0-2 | GitHub Actions APK 빌드 성공 | :android:assembleDebug 성공 및 아티팩트 업로드 | 대기중 |
+| P0-3 | 실기기(갤럭시 S23) 설치/실행 검증 | APK 설치 후 검은 화면 없이 메인 메뉴 진입, 보드 정상 표시 | 대기중 |
+| P0-4 | PC 로컬 개발 환경 구축 | JDK 17, Android SDK, NDK 설치 및 로컬 빌드/테스트 성공 | 계획됨 |
 
 ---
 
-## 🟠 높은 우선순위 (P1 - 핵심 기능)
+## 높은 우선순위 (P1 - 핵심 기능)
 
 | ID | 작업 | 상세 내용 | 난이도 | 예상일 |
 |------|------|----------|--------|--------|
-| P1-1 | PlayScreen 실제 게임플레이 로직 연결 | `GameWorld` 연동, 뿌요 낙하/회전/충돌/매칭/연쇄 렌더링 | 🟠 높음 | 3일 |
-| P1-2 | 터치/키보드 입력 완전 구현 | 드래그 이동, 탭 회전, 하드 드롭, 터치 드래그 | 🟠 높음 | 2일 |
-| P1-3 | 뿌요 렌더링 (ShapeRenderer → SpriteBatch) | 텍스처 아틀라스 + SpriteBatch 교체 | 🟠 높음 | 2일 |
-| P1-4 | 엔드리스 모드 구현 | 무한 모드, 점수/레벨 시스템 | 🟠 중간 | 2일 |
-| P1-5 | 연쇄/콤보 UI 표시 개선 | 연쇄 카운트, 팝업 이펙트, 점수 애니메이션 | 🟠 중간 | 1일 |
-| P1-6 | 게임 오버/리트라이 플로우 | 게임 오버 감지, 리트라이/메뉴 버튼 | 🟠 중간 | 1일 |
+| P1-1 | PlayScreen 실제 게임플레이 로직 연결 | GameWorld 연동, 뿌요 낙하/회전/충돌/매칭/연쇄 렌더링 | 높음 | 3일 |
+| P1-2 | 터치/키보드 입력 완전 구현 | 드래그 이동, 탭 회전, 하드 드롭, 터치 드래그 | 높음 | 2일 |
+| P1-3 | 뿌요 렌더링 (ShapeRenderer -> SpriteBatch) | 텍스처 아틀라스 + SpriteBatch 교체 | 높음 | 2일 |
+| P1-4 | 엔드리스 모드 구현 | 무한 모드, 점수/레벨 시스템 | 중간 | 2일 |
+| P1-5 | 연쇄/콤보 UI 표시 개선 | 연쇄 카운트, 팝업 이펙트, 점수 애니메이션 | 중간 | 1일 |
+| P1-6 | 게임 오버/리트라이 플로우 | 게임 오버 감지, 리트라이/메뉴 버튼 | 중간 | 1일 |
 
 ---
 
-## 🟡 중간 우선순위 (P2 - 확장 기능)
+## 중간 우선순위 (P2 - 확장 기능)
 
 | ID | 작업 | 상세 내용 | 난이도 | 예상일 |
 |------|------|----------|--------|--------|
-| P2-1 | AssetManager + 텍스처 아틀라스 | 리소스 통합 관리, 메모리 최적화 | 🟢 낮음 | 2일 |
+| P2-1 | AssetManager + 텍스처 아틀라스 | 리소스 통합 관리, 메모리 최적화 | 낮음 | 2일 |
 | P2-2 | 사운드/이펙트 시스템 | AssetManager + Sound/Pool, 연쇄/폭발 효과음 | 낮음 | 2일 |
 | P2-3 | 파티클/연쇄 이펙트 | ParticleEffect 연쇄/폭발 연출 | 낮음 | 2일 |
 | P2-4 | AI 컨트롤러 | 휴리스틱/몬테카를로 AI 대전 | 중간 | 3일 |
@@ -36,7 +37,7 @@
 
 ---
 
-## 🟢 낮음 우선순위 (P3 - 편의/폴리싱)
+## 낮음 우선순위 (P3 - 편의/폴리싱)
 
 | ID | 작업 | 상세 내용 |
 |------|------|----------|
@@ -49,45 +50,42 @@
 
 ---
 
-## 🔍 버그/기술부채 (Bugs & Tech Debt)
+## 버그/기술부채 (Bugs & Tech Debt)
 
 | ID | 현상 | 원인 추정 | 우선순위 |
 |------|------|-----------|--------|
-| #1 | 헤드리스에서 `Gdx.gl` null → NPE | Headless GL 컨텍스트 없음 | 🟡 테스트 우회로 해결 |
-| #2 | `StoryModeManager` 테스트 `getUnlockedStageCount()` 기대값 1 vs 실제 0 | 초기 `currentStageIndex=0` vs 로직 차이 | 🟡 수정 필요 |
-| #3 | `MenuLoader` classpath 리소스 미발견 (헤드리스) | `Gdx.files.classpath()` 미작동 | ✅ ClassLoader 폴백 추가로 해결 |
-| #4 | APK 설치 후 즉시 종료 (과거) | Native lib 미포함/매니페스트 오류 추정 | 🔍 CI 빌드 후 재검증 필요 |
-| #5 | 로컬 Termux에서 aapt2 작동 안함 | Android SDK 빌드 툴 미설치/호환성 | ✅ GitHub Actions 사용으로 우회 |
-| #6 | 로컬에서 단위 테스트 실행 불가 | gdx-platform natives-desktop 네이티브 lib 없음 | ✅ GitHub Actions에서만 실행 |
+| #1 | 헤드리스에서 Gdx.gl null -> NPE | Headless GL 컨텍스트 없음 | 테스트 우회로 해결 |
+| #2 | StoryModeManager 테스트 getUnlockedStageCount() 기대값 1 vs 실제 0 | 초기 currentStageIndex=0 vs 로직 차이 | 수정 필요 |
+| #3 | MenuLoader classpath 리소스 미발견 (헤드리스) | Gdx.files.classpath() 미작동 | ClassLoader 폴백 추가로 해결 |
+| #4 | APK 설치 후 즉시 종료 (과거) | Native lib 미포함/매니페스트 오류 추정 | CI 빌드 후 재검증 필요 |
+| #5 | libgdx-freetype.so -> libpenguin.so 이름 변경 필요 | 네이티브 코드 내부 dlopen("libpenguin.so") 호출로 중복 로드 실패 | 해결됨 (커밋 0961e9c) |
+| #6 | 로컬 Termux에서 aapt2 작동 안함 | Android SDK 빌드 툴 미설치/호환성 | GitHub Actions 사용으로 우회 / PC 이전 예정 |
+| #7 | 로컬에서 단위 테스트 실행 불가 | gdx-platform natives-desktop 네이티브 lib 없음 | GitHub Actions에서만 실행 / PC 이전 시 해결 |
 
 ---
 
-## 📋 완료 기준 (Definition of Done)
+## 완료 기준 (Definition of Done)
 
 | 마일스톤 | 완료 조건 |
 |----------|-----------|
-| **v0.1.0** (현재) | CI 그린 + APK 빌드 + 기본 메뉴/스토리 진입 |
-| **v0.2.0** | 실제 게임플레이 (낙하/회전/매칭/연쇄 렌더링) |
-| **v0.3.0** | AI 대전 + 사운드/이펙트 + 세이브/로드 |
-| **v0.4.0** | 온라인 대전 베타 + 랭킹/업적 |
-| **v1.0.0** | Play Store 출시 빌드 |
+| v0.1.0 (현재) | CI 그린 + APK 빌드 + 기본 메뉴/스토리 진입 |
+| v0.1.1 | 로컬 PC 개발 환경 구축 완료 (로컬 빌드/테스트/디버그) |
+| v0.2.0 | 실제 게임플레이 (낙하/회전/매칭/연쇄 렌더링) |
+| v0.3.0 | AI 대전 + 사운드/이펙트 + 세이브/로드 |
+| v0.4.0 | 온라인 대전 베타 + 랭킹/업적 |
+| v1.0.0 | Play Store 출시 빌드 |
 
 ---
 
-## ✅ 완료된 작업 (이번 세션 - v0.1.3)
+## 완료된 작업 (이번 세션 - v0.1.4)
 
 | ID | 작업 | 완료일 | 비고 |
 |------|------|--------|------|
-| V013-1 | GameViewport 설정 클래스 생성 (960×1600) | 2026-07-28 | 가상 해상도, CELL_SIZE, 오프셋 상수 정의 |
-| V013-2 | BaseScreen 카메라/뷰포트 공통 관리 | 2026-07-28 | `initViewport()`, `resize()` 자동 처리 |
-| V013-3 | PlayScreen 가상 좌표계 리팩토링 | 2026-07-28 | 고정 픽셀 → 가상 좌표, 카메라 프로젝션 적용 |
-| V013-4 | MenuScreen 뷰포트 적용 및 중앙 정렬 | 2026-07-28 | 메뉴 항목 가상 해상도 기준 렌더링 |
-| V013-5 | StoryModeSelectScreen 뷰포트 적용 | 2026-07-28 | 스테이지 목록 중앙 정렬 |
-| V013-6 | LoadingScreen 뷰포트 적용 | 2026-07-28 | 로딩 텍스트 중앙 정렬 |
-| V013-7 | GameWorld `getCurrentChain()` 추가 | 2026-07-28 | UI 연쇄 표시용 |
-| V013-8 | architecture.md 렌더링 아키텍처 문서화 | 2026-07-28 | FitViewport + 가상 해상도 설계 |
-| V013-9 | changeLog.md, progress.md, todo.md 현행화 | 2026-07-28 | 문서 동기화 |
+| V014-1 | libgdx-freetype.so -> libpenguin.so 이름 변경 (android/build.gradle) | 2026-08-01 | 네이티브 내부 dlopen 중복 로드 문제 해결 |
+| V014-2 | AndroidLauncher에서 penguin만 로드 (gdx-freetype 제거) | 2026-08-01 | 단일 파일 단일 이름 로드 |
+| V014-3 | architecture.md에 네이티브 라이브러리 처리 및 PC 이전 계획 추가 | 2026-08-01 | 문서 현행화 |
+| V014-4 | progress.md, todo.md, changeLog.md 현행화 | 2026-08-01 | 문서 동기화 |
 
 ---
 
-> **다음 액션**: `git add -A && git commit -m "feat: Implement FitViewport with 960x1600 virtual resolution" && git push` → GitHub Actions 실행 결과 확인 → 테스트 통과 시 APK 다운로드 → 실기기 설치 검증 → `PlayScreen` 실제 게임플레이 구현 착수 (P1-1, P1-2, P1-3)
+> 다음 액션: GitHub Actions 완료 확인 -> APK 다운로드 -> 실기기 설치 검증 -> PC 개발 환경 구축 착수 -> PlayScreen 실제 게임플레이 구현 착수 (P1-1, P1-2, P1-3)

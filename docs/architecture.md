@@ -158,13 +158,36 @@ public void render(float delta) {
 - **root/build.gradle**: 공통 의존성 버전 관리 (LibGDX 1.12.1)
 - **core/build.gradle**: `java-library` 플러그인, JUnit 5 테스트
 - **desktop/build.gradle**: `application` 플러그인, LWJGL3 네이티브 포함
-- **android/build.gradle**: AGP 8.1, `com.android.application`, 네이티브 라이브러리 패키징 (`gdx-platform`에서 `.so` 추출)
+- **android/build.gradle**: AGP 8.1, `com.android.application`, 네이티브 라이브러리 패키징 (`gdx-platform`에서 `.so` 추출 + `libgdx-freetype.so` → `libpenguin.so` 이름 변경)
+
+### 네이티브 라이브러리 처리 (중요)
+```gradle
+// android/build.gradle - libgdx-freetype.so를 libpenguin.so로 이름 변경
+['armeabi-v7a', 'arm64-v8a'].each { abi ->
+    def freetypeFile = new File(projectDir, "src/main/jniLibs/$abi/libgdx-freetype.so")
+    def penguinFile = new File(projectDir, "src/main/jniLibs/$abi/libpenguin.so")
+    if (freetypeFile.exists()) {
+        if (penguinFile.exists()) penguinFile.delete()
+        freetypeFile.renameTo(penguinFile)  // 이동(이름 변경)
+    }
+}
+```
+
+**이유**: `gdx-freetype` 네이티브 코드 내부에서 `dlopen("libpenguin.so")`를 호출함. 별도 파일로 존재하면 동적 링커가 중복 로드로 인식해 실패. 단일 파일(`libpenguin.so`) 단일 이름(`penguin`)로만 로드해야 함.
+
+**AndroidLauncher.java**:
+```java
+static {
+    System.loadLibrary("gdx");
+    System.loadLibrary("penguin");  // gdx-freetype 로드 시도 제거
+}
+```
 
 ### CI/CD 파이프라인 (`.github/workflows/android-build.yml`)
 1. **JDK 17 + Android SDK** 설정 (공식 `android-actions/setup-android` 액션)
 2. **헤드리스 테스트** - `./gradlew :core:test` (GL 없이 순수 로직 검증)
 3. **디버그 APK 빌드** - `./gradlew :android:assembleDebug`
-4. **네이티브 라이브러리 검증** - APK 내 `lib/arm64-v8a/libgdx.so`, `lib/armeabi-v7a/libgdx.so` 크기 확인 (0 byte가 아닌지)
+4. **네이티브 라이브러리 검증** - APK 내 `lib/arm64-v8a/libgdx.so`, `lib/armeabi-v7a/libgdx.so`, `libpenguin.so` 크기 확인 (0 byte가 아닌지)
 5. **아티팩트 업로드** - APK + 테스트 리포트
 
 ## 🧪 테스트 전략
@@ -175,7 +198,38 @@ public void render(float delta) {
 | 통합 테스트 | `GameWorld` 게임 루프, 연쇄 판정 | JVM (헤드리스) |
 | UI 테스트 | 미구현 (예정: Robolectric/Espresso) | - |
 
+## 💻 로컬 개발 환경 이전 계획 (2026-08-01~)
+
+### 현재 환경 제약 (Termux)
+- Android SDK / aapt2 미설치 → 로컬 APK 빌드 불가
+- `gdx-platform:natives-desktop` 네이티브 lib 없음 → 로컬 단위 테스트 불가
+- 디버깅 편의성 부족 (IDE, 로그 분석 등)
+
+### 목표 환경 (PC - Windows/Linux/macOS)
+```
+요구사항:
+- JDK 17 (Temurin/OpenJDK)
+- Android SDK (cmdline-tools, platform-tools, platforms;android-33, build-tools;33.0.2)
+- Android NDK (r25c 이상) - 네이티브 빌드 시 필요
+- Gradle 8.4+ (Wrapper 사용 권장)
+- IDE: IntelliJ IDEA / Android Studio / VS Code
+```
+
+### 이전 작업 체크리스트
+- [ ] PC에 JDK 17 + Android SDK + NDK 설치
+- [ ] 프로젝트 클론 및 `./gradlew :android:assembleDebug` 로컬 빌드 성공
+- [ ] `./gradlew :core:test` 로컬 테스트 성공 (natives-desktop 자동 다운로드)
+- [ ] 실기기/에뮬레이터에서 `adb install` + 실행 검증
+- [ ] GitHub Actions는 **배포용 CI**로만 유지 (PR 검증, 릴리스 빌드)
+
+### 장점
+- 즉시 빌드/테스트/디버그 사이클
+- 네이티브 라이브러리 자동 다운로드 (Maven Central)
+- IDE 디버거, 프로파일러 활용
+- APK 서명/배포 자동화 용이
+
 ## 📝 변경 이력
+- 2026-08-01: libgdx-freetype.so → libpenguin.so 이름 변경, 네이티브 라이브러리 로딩 수정
 - 2026-07-31: Viewport/Camera 도입, 가상 해상도 960×1600 설정, 렌더링 아키텍처 리팩토링
 - 2026-07-30: GitHub Actions에서 Android SDK 공식 액션으로 마이그레이션, 네이티브 라이브러리 패키징 수정
 - 2026-07-29: Multi-module Gradle 구조 확립, CI 파이프라인 구축
