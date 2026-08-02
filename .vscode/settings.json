@@ -1,6 +1,0 @@
-{
-    "java.configuration.updateBuildConfiguration": "automatic",
-    "java.gradle.buildServer.enabled": "off",
-    "gradle.java.home" : "/data/data/com.termux/files/usr/lib/jvm/java-21-openjdk",
-    "java.jdt.ls.vmargs": "-Xmx2G -XX:+UseG1GC -XX:+UseStringDeduplication"
-}
