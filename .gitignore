@@ -1,13 +1,19 @@
-hist.txt
 bin/
-build/
-.gradle/
 .ai_agent/
-rc.sh
-full_conversation.log
-project_context_export.md
-proposal.md
 .clinerules/
-com.puyo.game.GameTest.html
-error/scr.png
 .vscode/
+
+# Gradle
+.gradle/
+**/build/
+
+# Android Studio
+.idea/
+*.iml
+
+# APK
+*.apk
+*.aab
+
+# Local configuration
+local.properties
