@@ -4,34 +4,41 @@
 
 ---
 
-## v0.1.4 (2026-08-01) - libgdx-freetype.so → libpenguin.so 이름 변경 및 PC 개발 환경 이전 계획
-### 추가
-- **네이티브 라이브러리 이름 변경 로직** (android/build.gradle)
-  - libgdx-freetype.so → libpenguin.so로 이름 변경 (이동, 복사 아님)
-  - armeabi-v7a, arm64-v8a 모두 적용
-- **AndroidLauncher 단일 로드 수정**
-  - System.loadLibrary("gdx-freetype") 제거
-  - System.loadLibrary("penguin")만 유지
-- **architecture.md**에 네이티브 라이브러리 처리 상세 문서화
-- **PC 개발 환경 이전 계획** 문서화 (JDK 17, Android SDK, NDK, 로컬 빌드/테스트/디버그)
+## v0.1.4 (2026-08-02) - libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정
+### 현상
+- APK에 `libpenguin.so` (arm64-v8a: 797KB, armeabi-v7a: 757KB) 정상 포함 확인
+- `readelf -d`로 SONAME `[libpenguin.so]` 정상 확인
+- `patchelf --set-soname`으로 SONAME 수정 후 재서명까지 완료
+- **하지만 실기기(갤럭시 S23, Android 14)에서 여전히 `dlopen failed: library "libpenguin.so" not found` 발생**
 
-### 수정
-- **libgdx-freetype.so 중복 로드 문제 해결**
-  - 원인: gdx-freetype 네이티브 코드 내부에서 dlopen("libpenguin.so") 호출
-  - 별도 파일로 존재 시 동적 링커가 중복 로드로 인식 → 실패
-  - 해결: 단일 파일(libpenguin.so), 단일 이름(penguin)으로만 로드
+### 시도한 해결 방법 (모두 실패)
+1. **libgdx-freetype.so → libpenguin.so 이름 변경** (android/build.gradle copy + rename)
+2. **AndroidLauncher에서 System.loadLibrary("gdx-freetype") 제거**, `System.loadLibrary("penguin")`만 단일 로드
+3. **SONAME 패치** (`patchelf --set-soname libpenguin.so`) 후 APK 재패키징 + 디버그 키 재서명
+4. **armeabi-v7a / arm64-v8a 모두 적용** 확인
+
+### 원인 추정
+- gdx-freetype 네이티브 코드 내부에서 `dlopen("libpenguin.so")` 호출 시 **동적 링커가 이미 로드된 libpenguin.so를 찾지 못함**
+- `android:extractNativeLibs="true"` (기본값)인데도 압축 해제되지 않거나 경로 불일치 가능성
+- **GitHub Actions 러너의 Android SDK/NDK 버전 차이**로 인한 네이티브 라이브러리 빌드/패키징 문제
+- Termux 환경에서 로컬 디버깅 불가 (aapt2, lldb 미작동)
+
+### 결정 사항
+> **GitHub Actions + Termux 환경으로는 네이티브 라이브러리 로드 문제 디버깅/해결 불가능**
+> **PC 로컬 개발 환경으로 이전하여 adb + lldb + Android Studio로 정밀 분석 필요**
 
 ### 변경 파일
 | 파일 | 변경 유형 | 설명 |
 |------|----------|------|
-| android/build.gradle | 수정 | libgdx-freetype.so → libpenguin.so 이름 변경 로직 추가 |
-| android/src/main/java/com/puyo/game/AndroidLauncher.java | 수정 | System.loadLibrary("gdx-freetype") 제거, penguin만 로드 |
-| docs/architecture.md | 수정 | 네이티브 라이브러리 처리, PC 이전 계획 추가 |
-| docs/progress.md | 수정 | 진행 현황 업데이트, v0.1.1 마일스톤 추가 |
-| docs/todo.md | 수정 | P0-4 추가, 완료 작업에 V014-* 추가 |
+| android/build.gradle | 수정 | libgdx-freetype.so → libpenguin.so 이름 변경 로직 (실패) |
+| android/src/main/java/com/puyo/game/AndroidLauncher.java | 수정 | System.loadLibrary("gdx-freetype") 제거, penguin만 로드 (실패) |
+| docs/architecture.md | 수정 | 네이티브 라이브러리 처리 실패 기록, PC 이전 계획 강화 |
+| docs/progress.md | 수정 | 진행 현황 업데이트, 실패 기록, v0.1.1/v0.1.2 마일스톤 추가 |
+| docs/todo.md | 수정 | P0-1~P0-3 재정의 (PC 구축 최우선), 완료 작업에 실패 기록 추가 |
 
 ### 커밋
-- 0961e9c - fix: libgdx-freetype.so -> libpenguin.so 이름 변경, 단일 로드 수정
+- 0961e9c - fix: libgdx-freetype.so → libpenguin.so 이름 변경, 단일 로드 수정 (실패)
+- c519213 - docs: 현행화 (실패 기록 포함)
 
 ---
 
@@ -73,13 +80,8 @@
 ## v0.1.2 (2026-07-27) - 헤드리스 테스트 안정화 & 리소스 로딩 개선
 ### 수정
 - **StoryModeManager.loadStages()** - Java ClassLoader 폴백 추가로 헤드리스 테스트 리소스 로딩 가능
-  - Thread.currentThread().getContextClassLoader() → getClass().getClassLoader() 폴백 체인
-  - InputStream 직접 읽기 후 Json.fromJson() 파싱
-- **MenuLoader** - Gdx.files.classpath() → internal() 폴백 추가 (이미 완료)
-- **GameTest** - GL 컨텍스트 없는 순수 로직 테스트로 재작성
-  - fullStartupFlow_noCrash: LoadingScreen → MenuScreen 전환 검증
-  - mainMenuLoadsCorrectItems - main.json 5개 항목 검증
-  - storyModeSelectLoadsCorrectItems 등 6개 테스트 추가
+- **MenuLoader** - Gdx.files.classpath() → internal() 폴백 추가
+- **GameTest** - GL 컨텍스트 없는 순수 로직 테스트로 재작성 (6개 테스트)
 - **테스트 리소스 복사** - src/test/resources/data/menus/*.json, data/story/stages.json 복사
 
 ### 변경 파일
@@ -100,7 +102,7 @@
 ## v0.1.1 (2026-07-26) - LibGDX 헤드리스 테스트 지원
 ### 수정
 - core/build.gradle - testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop" 추가
-- GameTest.java - 헤드리스 테스트 2종 추가 (메뉴 로드, 메뉴 구조 검증)
+- GameTest.java - 헤드리스 테스트 2종 추가
 
 ---
 
@@ -118,44 +120,6 @@
 | 헤드리스 테스트 | gdx-backend-headless + natives-desktop |
 | GitHub Actions CI | android-build.yml (테스트 → APK 빌드 → 아티팩트 업로드) |
 
-### 초기 생성 파일 (주요)
-| 파일 | 설명 |
-|------|------|
-| build.gradle (root) | AGP 8.1.0, Kotlin 1.8.0, libGDX 1.12.1 |
-| settings.gradle | include 'core', 'desktop', 'android' |
-| core/src/main/java/.../PuyoGame.java | 메인 게임 클래스 (Game 상속) |
-| core/src/main/java/.../logic/engine/GameWorld.java | 게임 루프, 보드, 페어, 중력, 매칭, 연쇄 |
-| core/src/main/java/.../logic/model/ | Puyo, PuyoColor, PuyoPair, Board, StageData |
-| core/src/main/java/.../menus/MenuLoader.java | JSON 메뉴 로딩 |
-| core/src/main/java/.../screens/ | LoadingScreen, MenuScreen, PlayScreen, StoryModeSelectScreen |
-| core/src/main/java/.../story/StoryModeManager.java | 스토리 모드 관리 |
-| android/build.gradle | AGP 8.1, compileSdk 33, NDK abiFilters |
-| .github/workflows/android-build.yml | CI/CD 파이프라인 |
-
 ---
 
-## 파일별 변경 이력 요약
-
-| 파일 | 생성/수정 횟수 | 주요 변경 사유 |
-|------|----------------|----------------|
-| StoryModeManager.java | 3회 | ClassLoader 폴백, JSON 래퍼 파싱, 테스트 리소스 지원 |
-| MenuLoader.java | 2회 | 클래스패스 폴백, 플랫 JSON 배열 지원 |
-| GameTest.java | 3회 | GL 제거, 순수 로직 테스트, 리소스 로드 검증 |
-| assets/data/menus/*.json | 2회 | 래퍼 제거, 플랫 배열, 파일명 통일 |
-| build.gradle (root) | 3회 | AGP 업그레이드, headless natives 추가, gradlePluginPortal 수정 |
-| android-build.yml | 2회 | 테스트 단계 추가, SDK 설치 단순화 |
-| core/build.gradle | 2회 | headless natives 테스트 의존성 추가 |
-| GameViewport.java | 1회 (신규) | 가상 해상도 960x1600, FitViewport 팩토리 |
-| BaseScreen.java | 2회 | 카메라/뷰포트 공통 관리 |
-| PlayScreen.java | 2회 | 가상 좌표계 리팩토링 |
-| MenuScreen.java | 2회 | 뷰포트 적용 |
-| StoryModeSelectScreen.java | 2회 | 뷰포트 적용 |
-| LoadingScreen.java | 2회 | 뷰포트 적용 |
-| GameWorld.java | 2회 | getCurrentChain() 추가 |
-| architecture.md | 2회 | 렌더링 아키텍처 문서화 |
-| android/build.gradle | 2회 | 네이티브 라이브러리 패키징, freetype 이름 변경 |
-| AndroidLauncher.java | 2회 | 네이티브 라이브러리 로드 순서 수정 |
-
----
-
-> 참고: 이 문서는 주요 작업 단위(커밋 단위) 기준으로 작성되었습니다. 세부 라인 단위 변경은 git log -p 또는 GitHub 커밋 히스토리 참조 바랍니다.
+> 참고: v0.1.4는 **해결 실패 기록**입니다. PC 환경에서 재시도 후 성공 시 v0.1.2로 기록 예정.
