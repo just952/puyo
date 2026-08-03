@@ -40,6 +40,15 @@ allprojects {
 project(":core") {
     apply plugin: "java-library"
 
+    // Include assets in core JAR so Android module can access them
+    sourceSets {
+        main {
+            resources {
+                srcDirs = ['src/main/assets']
+            }
+        }
+    }
+
     dependencies {
         api "com.badlogicgames.gdx:gdx:$gdxVersion"
         api "com.badlogicgames.gdx:gdx-ai:$aiVersion"

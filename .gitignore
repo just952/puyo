@@ -17,3 +17,8 @@ bin/
 
 # Local configuration
 local.properties
+
+# Temporary APK extraction
+apk_contents/
+*_error.txt
+*_output.txt

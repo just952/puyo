@@ -21,7 +21,7 @@ public class FontManager implements Disposable {
 
     private FontManager() {
         // TTF 폰트 파일에서 생성기 초기화
-        generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/NotoSansKR-Regular.ttf"));
+        generator = new FreeTypeFontGenerator(Gdx.files.internal("NotoSansKR-Regular.ttf"));
     }
 
     /**
@@ -89,18 +89,23 @@ public class FontManager implements Disposable {
         param.borderWidth = 0;
         param.borderColor = com.badlogic.gdx.graphics.Color.BLACK;
         param.borderStraight = true;
-        // mipmap과 hinting은 해당 libGDX 버전에서 사용 불가하므로 제거
         param.minFilter = Texture.TextureFilter.Linear;
         param.magFilter = Texture.TextureFilter.Linear;
-        param.gamma = 1.8f; // 감마 보정으로 한글 가독성 향상
+        param.gamma = 1.8f;
 
-        // Bold가 필요하면 크기를 약간 키우고 테두리로 시뮬레이션 (FreeType에서 직접 bold 지원 안 함)
+        // 메뉴/게임에서 실제 사용되는 모든 한글 문자 포함
+        // 메뉴: 노말 모드, 엔드리스 모드, 2인 대전, 옵션, 종료, Stage 1: KIKIMORA, < Back
+        // 게임 중: 연쇄, 점수, 레벨, 스테이지, 일시정지, 게임오버, 승리, 패배
+        param.characters = FreeTypeFontGenerator.DEFAULT_CHARS
+            + "노말모드엔드리스인대전옵션종료스테이지키키모라백"
+            + "연쇄점수레벨일시정지게임오버승리패배시작"
+            + "초중급고급설정소리음악진동언어한국어영어";
+
         if (bold) {
             param.borderWidth = Math.max(1, size / 24);
         }
 
         BitmapFont font = generator.generateFont(param);
-        // 텍스처 필터 설정으로 부드러운 확대/축소
         font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
 
         fontCache.put(key, font);
