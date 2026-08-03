@@ -11,7 +11,7 @@
 | 백엔드 (Desktop) | LWJGL3 | 3.3.2 | LibGDX 기본 |
 | 백엔드 (Android) | Android SDK | 33 | LibGDX 기본 |
 | 테스트 (Headless) | gdx-backend-headless | 1.12.1 | CI 전용 |
-| CI/CD | GitHub Actions | - | ubuntu-latest 러너 |
+| CI/CD | GitHub Actions | - | ubuntu-latest 러너 (검증용 유지) |
 | 버전 관리 | Git | - | GitHub 호스팅 |
 
 ---
@@ -22,7 +22,7 @@
 puyo/
 ├── build.gradle              # 루트 빌드 설정 (AGP 8.1.0, libGDX 1.12.1)
 ├── settings.gradle           # 모듈 포함: core, desktop, android
-├── gradle.properties         # JVM 옵션, 버전 상수
+├── gradle.properties         # JVM 옵션, 버전 상수, org.gradle.java.home=JDK 17
 ├── core/                     # 공통 게임 로직 (Pure Java + LibGDX API)
 │   ├── build.gradle          # 의존성: gdx, gdx-ai, gdx-freetype, gdx-platform:natives-desktop(test)
 │   └── src/main/java/com/puyo/game/
@@ -34,17 +34,23 @@ puyo/
 │       ├── menus/MenuLoader.java    # JSON 메뉴 로딩 (classpath/internal 폴백)
 │       ├── screens/                 # BaseScreen, LoadingScreen, MenuScreen, PlayScreen, StoryModeSelectScreen
 │       └── story/StoryModeManager.java # 스토리 모드 JSON 로딩, 스테이지 관리
+│   └── src/main/resources/assets/   # 공통 에셋 (JAR의 assets/ 하위에 포함)
+│       ├── config/
+│       ├── data/
+│       └── NotoSansKR-Regular.ttf
 ├── desktop/                  # 데스크톱 런처 (LWJGL3)
 │   ├── build.gradle          # gdx-backend-lwjgl3, gdx-platform:natives-desktop
 │   └── src/main/java/com/puyo/game/DesktopLauncher.java
 ├── android/                  # 안드로이드 앱
 │   ├── build.gradle          # AGP 8.1, compileSdk 33, ndk.abiFilters [arm64-v8a, armeabi-v7a]
+│   │   # mergeNativeLibs 후 libgdx-freetype.so → libpenguin.so 복사 + Python lief로 SONAME 패치
 │   └── src/main/
 │       ├── java/com/puyo/game/AndroidLauncher.java # AndroidApplication 구현
 │       ├── AndroidManifest.xml # minSdk 21, targetSdk 33, 세로 고정
 │       └── res/                # strings, colors, styles, drawable
 ├── .github/workflows/android-build.yml # CI/CD 파이프라인
-└── docs/                     # 설계/진행 문서
+├── docs/                     # 설계/진행 문서
+└── patch_soname.py           # 빌드 시 SONAME 패치용 Python 스크립트 (lief 사용)
 ```
 
 ---

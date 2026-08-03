@@ -40,11 +40,11 @@ allprojects {
 project(":core") {
     apply plugin: "java-library"
 
-    // Include assets in core JAR so Android module can access them
+    // Include assets in core JAR under assets/ so Android module can access them
     sourceSets {
         main {
             resources {
-                srcDirs = ['src/main/assets']
+                srcDirs = ['src/main/resources']
             }
         }
     }

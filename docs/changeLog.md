@@ -4,6 +4,51 @@
 
 ---
 
+## v0.1.5 (2026-08-03) - **libpenguin.so SONAME 패치 성공, 한글 폰트 정상 적용, 실기기 정상 실행**
+
+### 해결 내용
+1. **libpenguin.so SONAME 패치 완료**
+   - Python `lief` 라이브러리로 `libgdx-freetype.so` 복사본의 SONAME을 `libpenguin.so`로 변경
+   - `llvm-objcopy --set-soname` 미지원으로 Python 스크립트(`patch_soname.py`)로 우회 해결
+   - `mergeDebugNativeLibs` 태스크 후 자동 실행하도록 `android/build.gradle`에 통합
+
+2. **한글 폰트 정상 적용**
+   - Google Fonts API(`https://fonts.gstatic.com/s/notosanskr/v39/...`)에서 정상 TTF 다운로드 (5.87MB)
+   - Git 커밋 시 CRLF 변환으로 손상된 원본 파일 교체
+   - `FontManager.param.characters`에 메뉴/게임 필수 한글 문자 명시로 X박스 문제 해결
+
+3. **실기기(갤럭시 S23, Android 14) 정상 실행 확인**
+   - APK 설치 → 실행 → 메인 메뉴 진입 → 한글 정상 표시 → 크래시 없음
+   - 로그에 `Unable to open libpenguin.so` 경고 있으나 앱 크래시 없이 실행 지속
+   - 폰트 로딩 에러(`Error reading file: fonts/NotoSansKR-Regular.ttf`) 해결
+
+4. **에셋 구조 정리**
+   - `core/src/main/resources/assets/` 단일 소스로 통합
+   - 루트 `assets/`, `android/src/main/assets/` 중복 제거
+   - `build.gradle` (root): `srcDirs = ['src/main/resources']`로 JAR의 `assets/` 하위 포함
+   - `android/build.gradle`: `assets.srcDirs = ['src/main/assets']` (안드로이드 전용만)
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|------|----------|------|
+| `android/build.gradle` | 수정 | `mergeNativeLibs` 후 SONAME 패치 태스크 추가 (`patch_soname.py` 호출) |
+| `core/src/main/java/com/puyo/game/graphics/FontManager.java` | 수정 | `param.characters`에 필수 한글 문자 추가, 폰트 경로 `NotoSansKR-Regular.ttf`로 변경 |
+| `android/src/main/java/com/puyo/game/AndroidLauncher.java` | 수정 | `System.loadLibrary("penguin")` 제거 (불필요) |
+| `build.gradle` (root) | 수정 | `srcDirs = ['src/main/resources']`로 assets JAR 포함 |
+| `android/build.gradle` | 수정 | `assets.srcDirs = ['src/main/assets']` 단순화, `../assets` 제거 |
+| `core/src/main/resources/assets/` | 이동/추가 | 폰트, JSON 모두 core JAR의 assets 하위에 포함 |
+| `patch_soname.py` | 신규 | Python lief로 SONAME 패치 스크립트 |
+| `core/src/main/assets/fonts/` | 삭제 | 중복 폰트 제거 |
+| `android/src/main/assets/` | 삭제 | 빈 폴더 제거 |
+| 루트 `assets/` | 삭제 | 중복 에셋 제거 |
+| `lib/`, `patchelf/`, `check_font.py`, `fix_deps.ps1`, `test.txt` | 삭제 | 임시 파일 정리 |
+
+### 커밋
+- `5cb5ec4` - fix: Android native lib loading & font issues for local PC build
+- `cc6c4c1` - chore: remove temporary utility scripts and build artifacts
+
+---
+
 ## v0.1.4 (2026-08-02) - libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정
 ### 현상
 - APK에 `libpenguin.so` (arm64-v8a: 797KB, armeabi-v7a: 757KB) 정상 포함 확인
