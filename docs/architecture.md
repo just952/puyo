@@ -68,17 +68,124 @@ puyo/
 
 ---
 
-## 렌더링 아키텍처 (v0.1.3~)
+## 렌더링 아키텍처 (v0.2.0~)
 
-### 가상 해상도 시스템
+### 가상 해상도 시스템 (가로 고정 1600×960)
 ```java
 // core/src/main/java/com/puyo/game/config/GameViewport.java
 public class GameViewport {
-    public static final int VIRTUAL_WIDTH = 960;
-    public static final int VIRTUAL_HEIGHT = 1600;  // 3:5 세로 비율
-    public static final float CELL_SIZE = 80f;      // 960 / 12 = 80
-    public static final float BOARD_OFFSET_X = 240f; // (960 - 6*80) / 2
-    public static final float BOARD_OFFSET_Y = 320f; // 상단 여백
+    // === 공통 ===
+    public static final float VIRTUAL_WIDTH = 1600f;
+    public static final float VIRTUAL_HEIGHT = 960f;
+    public static final float CELL_SIZE = 80f;
+    public static final int BOARD_COLS = 6;
+    public static final int BOARD_ROWS = 12;
+    public static final float BOARD_WIDTH = BOARD_COLS * CELL_SIZE;   // 480
+    public static final float BOARD_HEIGHT = BOARD_ROWS * CELL_SIZE;  // 960
+
+    // === 싱글 플레이 (보드 왼쪽, 사이드 패널 오른쪽) ===
+    public static final class Single {
+        public static final float BOARD_OFFSET_X = 80f;
+        public static final float BOARD_OFFSET_Y = 0f;
+        public static final float SIDE_PANEL_X = BOARD_OFFSET_X + BOARD_WIDTH + 40f; // 600
+        public static final float SIDE_PANEL_WIDTH = VIRTUAL_WIDTH - SIDE_PANEL_X - 80f; // ~920
+    }
+
+    // === 대전 모드 (두 보드 나란히 + 중앙 UI) ===
+    public static final class Versus {
+        public static final float CENTER_UI_WIDTH = 200f;
+        public static final float TOTAL_BOARDS_WIDTH = BOARD_WIDTH * 2 + CENTER_UI_WIDTH; // 1160
+        public static final float SIDE_MARGIN = (VIRTUAL_WIDTH - TOTAL_BOARDS_WIDTH) / 2f; // 220
+        
+        public static final float P1_BOARD_OFFSET_X = SIDE_MARGIN; // 220
+        public static final float P1_BOARD_OFFSET_Y = 0f;
+        
+        public static final float P2_BOARD_OFFSET_X = SIDE_MARGIN + BOARD_WIDTH + CENTER_UI_WIDTH; // 900
+        public static final float P2_BOARD_OFFSET_Y = 0f;
+        
+        public static final float CENTER_UI_OFFSET_X = SIDE_MARGIN + BOARD_WIDTH; // 700
+        public static final float CENTER_UI_OFFSET_Y = 0f;
+    }
+
+    // === 메뉴/UI (전체 화면 활용) ===
+    public static final class Menu {
+        public static final float CONTENT_WIDTH = 1200f;
+        public static final float CONTENT_HEIGHT = 720f;
+        public static final float CONTENT_OFFSET_X = (VIRTUAL_WIDTH - CONTENT_WIDTH) / 2f; // 200
+        public static final float CONTENT_OFFSET_Y = (VIRTUAL_HEIGHT - CONTENT_HEIGHT) / 2f; // 120
+    }
+
+    public static FitViewport createViewport() {
+        OrthographicCamera camera = new OrthographicCamera();
+        camera.setToOrtho(false, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        return new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, camera);
+    }
+}
+```
+
+### 입력 아키텍처 (v0.2.0~)
+
+```java
+// core/src/main/java/com/puyo/game/input/InputHandler.java
+public class InputHandler {
+    // PC 키보드 / 모바일 터치 통합 인터페이스
+    // - isMobile 플래그로 분기
+    // - 공통 조회 메서드: getMoveDirection(), isRotatePressed(), isDropPressed(), isHardDropPressed()
+}
+
+// core/src/main/java/com/puyo/game/input/TouchController.java (모바일 전용)
+public class TouchController implements InputProcessor, Disposable {
+    // 4버튼 레이아웃: 좌/우 이동, 회전, 드롭(더블탭=하드드롭)
+    // 정규화 좌표(0~1) 기반 해상도 독립적 터치 영역
+    // 시각적 피드백: 누름 상태 시 알파/크기 변경
+}
+```
+
+| 플랫폼 | 입력 방식 | 구현 클래스 |
+|--------|-----------|-------------|
+| **PC** | 키보드 (WASD/방향키 + Space/Enter) | `InputHandler` (키보드 분기) |
+| **모바일** | 터치 오버레이 (4버튼) | `InputHandler` + `TouchController` |
+
+---
+
+## 안드로이드 모듈 상세 (v0.2.0~)
+
+### AndroidManifest.xml - 가로 고정
+```xml
+<activity
+    android:name=".AndroidLauncher"
+    android:screenOrientation="landscape"
+    android:configChanges="orientation|screenSize|keyboardHidden">
+</activity>
+```
+
+### AndroidLauncher.java - 몰입 모드
+```java
+// 풀스크린 몰입 모드 (네비게이션 바/상태 바 숨김)
+getWindow().getDecorView().setSystemUiVisibility(
+    View.SYSTEM_UI_FLAG_FULLSCREEN
+    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+);
+```
+
+### 네이티브 라이브러리 패키징 (기존 유지)
+- `libgdx.so`, `libpenguin.so` (SONAME 패치됨) → APK `lib/arm64-v8a/`, `lib/armeabi-v7a/`
+- `mergeNativeLibs` 후 Python `lief`로 `libpenguin.so` SONAME 패치
+
+---
+
+## 데스크톱 런처 (v0.2.0~)
+```java
+// desktop/src/main/java/com/puyo/game/DesktopLauncher.java
+Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
+config.setWindowedMode(1600, 960);  // 가로 고정
+config.setResizable(true);  // 비율 유지 리사이즈
+config.setForegroundFPS(60);
+```inal float BOARD_OFFSET_Y = 320f; // 상단 여백
     
     public static FitViewport createViewport() {
         OrthographicCamera camera = new OrthographicCamera();
