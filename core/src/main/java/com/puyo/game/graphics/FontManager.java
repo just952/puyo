@@ -20,8 +20,8 @@ public class FontManager implements Disposable {
     private boolean disposed = false;
 
     private FontManager() {
-        // TTF 폰트 파일에서 생성기 초기화
-        generator = new FreeTypeFontGenerator(Gdx.files.internal("NotoSansKR-Regular.ttf"));
+        // TTF 폰트 파일에서 생성기 초기화 (assets 폴더 하위)
+        generator = new FreeTypeFontGenerator(Gdx.files.internal("assets/NotoSansKR-Regular.ttf"));
     }
 
     /**
@@ -36,6 +36,7 @@ public class FontManager implements Disposable {
 
     /**
      * 지정된 크기의 타이틀용 폰트 반환 (Bold 스타일)
+     * 
      * @param size 폰트 크기 (픽셀)
      * @return BitmapFont
      */
@@ -45,6 +46,7 @@ public class FontManager implements Disposable {
 
     /**
      * 지정된 크기의 메뉴용 폰트 반환
+     * 
      * @param size 폰트 크기 (픽셀)
      * @return BitmapFont
      */
@@ -54,6 +56,7 @@ public class FontManager implements Disposable {
 
     /**
      * 지정된 크기의 UI용 폰트 반환 (점수, 연쇄 등)
+     * 
      * @param size 폰트 크기 (픽셀)
      * @return BitmapFont
      */
@@ -63,6 +66,7 @@ public class FontManager implements Disposable {
 
     /**
      * 지정된 크기의 작은 폰트 반환 (보조 정보용)
+     * 
      * @param size 폰트 크기 (픽셀)
      * @return BitmapFont
      */
@@ -97,9 +101,9 @@ public class FontManager implements Disposable {
         // 메뉴: 노말 모드, 엔드리스 모드, 2인 대전, 옵션, 종료, Stage 1: KIKIMORA, < Back
         // 게임 중: 연쇄, 점수, 레벨, 스테이지, 일시정지, 게임오버, 승리, 패배
         param.characters = FreeTypeFontGenerator.DEFAULT_CHARS
-            + "노말모드엔드리스인대전옵션종료스테이지키키모라백"
-            + "연쇄점수레벨일시정지게임오버승리패배시작"
-            + "초중급고급설정소리음악진동언어한국어영어";
+                + "노말모드엔드리스인대전옵션종료스테이지키키모라백"
+                + "연쇄점수레벨일시정지게임오버승리패배시작"
+                + "초중급고급설정소리음악진동언어한국어영어";
 
         if (bold) {
             param.borderWidth = Math.max(1, size / 24);
@@ -119,16 +123,16 @@ public class FontManager implements Disposable {
         // 타이틀: 48, 36
         getTitleFont(48);
         getTitleFont(36);
-        
+
         // 메뉴: 32, 28
         getMenuFont(32);
         getMenuFont(28);
-        
+
         // UI: 24, 20, 18
         getUIFont(24);
         getUIFont(20);
         getUIFont(18);
-        
+
         // 작은 폰트: 16, 14
         getSmallFont(16);
         getSmallFont(14);

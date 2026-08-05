@@ -44,17 +44,20 @@ public class MenuScreen extends BaseScreen {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        
+
         // 타이틀 폰트 (48px)
         com.badlogic.gdx.graphics.g2d.BitmapFont titleFont = fontManager.getTitleFont(48);
         String title = "PUYO PUYO 2";
         float titleWidth = titleFont.draw(batch, title, 0, 0).width;
-        titleFont.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
+        // 메뉴 레이아웃: 중앙 정렬 영역 사용
+        float contentCenterX = GameViewport.Menu.CONTENT_OFFSET_X + GameViewport.Menu.CONTENT_WIDTH / 2f;
+        titleFont.draw(batch, title, contentCenterX - titleWidth / 2f,
+                GameViewport.Menu.CONTENT_OFFSET_Y + GameViewport.Menu.CONTENT_HEIGHT - 50);
 
         // 메뉴 폰트 (32px)
         com.badlogic.gdx.graphics.g2d.BitmapFont menuFont = fontManager.getMenuFont(32);
 
-        float startY = GameViewport.VIRTUAL_HEIGHT / 2f + 100;
+        float startY = GameViewport.Menu.CONTENT_OFFSET_Y + GameViewport.Menu.CONTENT_HEIGHT / 2f + 100;
         float itemHeight = 80;
 
         for (int i = 0; i < menuItems.length; i++) {
@@ -65,11 +68,11 @@ public class MenuScreen extends BaseScreen {
             } else {
                 menuFont.setColor(1, 1, 1, 1);
             }
-            
+
             float labelWidth = menuFont.draw(batch, label, 0, 0).width;
-            menuFont.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * itemHeight);
+            menuFont.draw(batch, label, contentCenterX - labelWidth / 2f, startY - i * itemHeight);
         }
-        
+
         menuFont.setColor(1, 1, 1, 1);
         batch.end();
 
@@ -88,7 +91,7 @@ public class MenuScreen extends BaseScreen {
         MenuItem item = menuItems[selectedIndex];
         try {
             MenuAction action = MenuAction.valueOf(item.action.toUpperCase());
-            
+
             switch (action) {
                 case PUSH_SCREEN:
                     switch (item.target) {
@@ -121,13 +124,16 @@ public class MenuScreen extends BaseScreen {
     }
 
     @Override
-    public void pause() {}
+    public void pause() {
+    }
 
     @Override
-    public void resume() {}
+    public void resume() {
+    }
 
     @Override
-    public void hide() {}
+    public void hide() {
+    }
 
     @Override
     public void dispose() {

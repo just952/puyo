@@ -10,6 +10,7 @@
         android:theme="@style/AppTheme">
         <activity android:name=".AndroidLauncher"
             android:exported="true"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|keyboardHidden|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

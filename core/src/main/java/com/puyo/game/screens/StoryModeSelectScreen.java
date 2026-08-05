@@ -44,12 +44,15 @@ public class StoryModeSelectScreen extends BaseScreen {
         batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
-        
+
         // 타이틀 폰트 (36px)
         BitmapFont titleFont = fontManager.getTitleFont(36);
         String title = "STORY MODE";
         float titleWidth = titleFont.draw(batch, title, 0, 0).width;
-        titleFont.draw(batch, title, (GameViewport.VIRTUAL_WIDTH - titleWidth) / 2f, GameViewport.VIRTUAL_HEIGHT - 150);
+        // 메뉴 레이아웃: 중앙 정렬 영역 사용
+        float contentCenterX = GameViewport.Menu.CONTENT_OFFSET_X + GameViewport.Menu.CONTENT_WIDTH / 2f;
+        titleFont.draw(batch, title, contentCenterX - titleWidth / 2f,
+                GameViewport.Menu.CONTENT_OFFSET_Y + GameViewport.Menu.CONTENT_HEIGHT - 50);
 
         // 메뉴 폰트 (24px)
         BitmapFont menuFont = fontManager.getMenuFont(24);
@@ -57,33 +60,34 @@ public class StoryModeSelectScreen extends BaseScreen {
         int unlocked = storyManager.getUnlockedStageCount();
         int total = storyManager.getTotalStages();
 
-        float startY = GameViewport.VIRTUAL_HEIGHT / 2f + 200;
+        float startY = GameViewport.Menu.CONTENT_OFFSET_Y + GameViewport.Menu.CONTENT_HEIGHT / 2f + 150;
         float lineHeight = 60;
 
         for (int i = 0; i < total; i++) {
             StageData stage = storyManager.getStageAt(i);
-            if (stage == null) continue;
-            
+            if (stage == null)
+                continue;
+
             boolean isUnlocked = i < unlocked;
             String status = isUnlocked ? "UNLOCKED" : "LOCKED";
             String label = (i + 1) + ". " + stage.opponent + " (" + status + ")";
-            
+
             if (i == selectedIndex) {
                 label = "> " + label + " <";
                 menuFont.setColor(1, 1, 0, 1);
             } else {
                 menuFont.setColor(isUnlocked ? 1 : 0.5f, isUnlocked ? 1 : 0.5f, isUnlocked ? 1 : 0.5f, 1);
             }
-            
+
             if (stage.dialogue != null && stage.dialogue.length > 0) {
                 String dialogueText = "   \"" + stage.dialogue[0] + "\"";
                 float labelWidth = menuFont.draw(batch, label, 0, 0).width;
-                menuFont.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * lineHeight);
+                menuFont.draw(batch, label, contentCenterX - labelWidth / 2f, startY - i * lineHeight);
                 float dialogueWidth = menuFont.draw(batch, dialogueText, 0, 0).width;
-                menuFont.draw(batch, dialogueText, (GameViewport.VIRTUAL_WIDTH - dialogueWidth) / 2f, startY - i * lineHeight - 30);
+                menuFont.draw(batch, dialogueText, contentCenterX - dialogueWidth / 2f, startY - i * lineHeight - 30);
             } else {
                 float labelWidth = menuFont.draw(batch, label, 0, 0).width;
-                menuFont.draw(batch, label, (GameViewport.VIRTUAL_WIDTH - labelWidth) / 2f, startY - i * lineHeight);
+                menuFont.draw(batch, label, contentCenterX - labelWidth / 2f, startY - i * lineHeight);
             }
             menuFont.setColor(1, 1, 1, 1);
         }
@@ -92,8 +96,9 @@ public class StoryModeSelectScreen extends BaseScreen {
         BitmapFont smallFont = fontManager.getSmallFont(16);
         String instructions = "UP/DOWN: Select  ENTER: Start  BACK: Return";
         float instrWidth = smallFont.draw(batch, instructions, 0, 0).width;
-        smallFont.draw(batch, instructions, (GameViewport.VIRTUAL_WIDTH - instrWidth) / 2f, 100);
-        
+        smallFont.draw(batch, instructions, contentCenterX - instrWidth / 2f,
+                GameViewport.Menu.CONTENT_OFFSET_Y + 50);
+
         batch.end();
 
         // input
@@ -120,13 +125,16 @@ public class StoryModeSelectScreen extends BaseScreen {
     }
 
     @Override
-    public void pause() {}
+    public void pause() {
+    }
 
     @Override
-    public void resume() {}
+    public void resume() {
+    }
 
     @Override
-    public void hide() {}
+    public void hide() {
+    }
 
     @Override
     public void dispose() {

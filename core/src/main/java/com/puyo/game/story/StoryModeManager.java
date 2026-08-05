@@ -10,7 +10,7 @@ import com.badlogic.gdx.utils.Json;
  */
 public class StoryModeManager {
     /** 스토리 데이터 JSON 파일의 경로 (assets 내부) */
-    private static final String STORY_DATA_PATH = "data/story/stages.json";
+    private static final String STORY_DATA_PATH = "assets/data/story/stages.json";
     /** 로드된 모든 단계 데이터 배열 */
     private StageData[] stages;
     /** 현재 플레이 중인 단계의 인덱스 (0부터 시작) */
@@ -48,12 +48,12 @@ public class StoryModeManager {
     private void loadStages() {
         // 1) classpath 리소스에서 먼저 시도 (테스트용)
         FileHandle file = Gdx.files.classpath(STORY_DATA_PATH);
-        
+
         // 2) 없으면 internal (애셋/데스크톱/안드로이드) 폴백
         if (file == null || !file.exists()) {
             file = Gdx.files.internal(STORY_DATA_PATH);
         }
-        
+
         // 3) 여전히 없으면 Java ClassLoader 직접 시도 (헤드리스 테스트 리소스용)
         if (file == null || !file.exists()) {
             try {
@@ -81,7 +81,7 @@ public class StoryModeManager {
             stages = new StageData[0];
             return;
         }
-        
+
         Json json = new Json();
         try {
             // JSON은 {"stages": [...]} 래퍼 객체이므로 중간 클래스로 파싱
@@ -91,7 +91,7 @@ public class StoryModeManager {
             Gdx.app.error("StoryModeManager", "Failed to parse story JSON", e);
             stages = new StageData[0];
         }
-        
+
         // 로드 성공 로그 출력
         Gdx.app.log("StoryModeManager", "Loaded " + stages.length + " stages.");
     }
