@@ -46,6 +46,7 @@ public class TouchController implements InputProcessor, Disposable {
     private int activePointer = -1;
     private float dragStartX = 0f;
     private float dragStartY = 0f;
+    private boolean dragStartedInLeftArea = false;
 
     // 더블탭 감지용
     private long lastDropTapTime = 0;
@@ -60,9 +61,10 @@ public class TouchController implements InputProcessor, Disposable {
         float normX = screenX / (float) Gdx.graphics.getWidth();
         float normY = 1f - (screenY / (float) Gdx.graphics.getHeight()); // y축 뒤집기
 
-        // 첫 번째 포인터만 처리 (단일 터치 가정)
-        if (pointer != 0)
+        // 이미 다른 포인터가 활성화되어 있으면 무시 (멀티터치 방지)
+        if (activePointer != -1 && activePointer != pointer) {
             return false;
+        }
         activePointer = pointer;
         dragStartX = normX;
         dragStartY = normY;
@@ -74,6 +76,7 @@ public class TouchController implements InputProcessor, Disposable {
             } else {
                 rightPressed = true;
             }
+            dragStartedInLeftArea = true;
             return true;
         }
 
@@ -85,12 +88,13 @@ public class TouchController implements InputProcessor, Disposable {
                 rotatePressed = true;
                 prevRotatePressed = false; // 엣지 감지용
             } else {
-                // 하단: 드롭
+                // 하단: 드롭 - 더블탭으로 하드 드롭 감지
                 long now = System.currentTimeMillis();
                 if (now - lastDropTapTime < DOUBLE_TAP_WINDOW_MS) {
                     // 더블탭 = 하드 드롭
                     hardDropPressed = true;
                     prevHardDropPressed = false;
+                    dropPressed = false; // 소프트 드롭 취소
                 } else {
                     // 싱글탭 = 소프트 드롭
                     dropPressed = true;
@@ -113,6 +117,7 @@ public class TouchController implements InputProcessor, Disposable {
         rightPressed = false;
         rotatePressed = false;
         dropPressed = false;
+        dragStartedInLeftArea = false;
         // hardDropPressed는 엣지 감지 후 자동 리셋됨
 
         return true;
@@ -127,15 +132,25 @@ public class TouchController implements InputProcessor, Disposable {
         float normX = screenX / (float) Gdx.graphics.getWidth();
         float normY = 1f - (screenY / (float) Gdx.graphics.getHeight());
 
-        // 드래그 중 영역 이탈 시 버튼 해제
-        boolean wasLeft = leftPressed;
-        boolean wasRight = rightPressed;
-
-        leftPressed = isInLeftBtn(normX, normY, true);
-        rightPressed = isInLeftBtn(normX, normY, false);
-
-        // 영역 이탈 시 false로 유지 (버튼에서 손가락 떼지 않았어도 이동 중엔 입력 안 됨)
-        // 실제로는 버튼 영역 내에 있을 때만 true
+        // 왼쪽 영역에서 드래그를 시작한 경우: 영역을 벗어나도 이동 방향 유지
+        if (dragStartedInLeftArea) {
+            // 시작 위치 대비 현재 위치의 상대적 X 변화량으로 방향 결정
+            float deltaX = normX - dragStartX;
+            if (deltaX < -0.02f) { // 왼쪽으로 충분히 드래그
+                leftPressed = true;
+                rightPressed = false;
+            } else if (deltaX > 0.02f) { // 오른쪽으로 충분히 드래그
+                leftPressed = false;
+                rightPressed = true;
+            } else { // 중앙 영역 (데드존)
+                leftPressed = false;
+                rightPressed = false;
+            }
+        } else {
+            // 오른쪽 영역에서 시작한 드래그: 버튼 영역 내에 있을 때만 활성화
+            leftPressed = isInLeftBtn(normX, normY, true);
+            rightPressed = isInLeftBtn(normX, normY, false);
+        }
 
         return true;
     }
