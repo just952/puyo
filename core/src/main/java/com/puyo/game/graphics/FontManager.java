@@ -21,7 +21,8 @@ public class FontManager implements Disposable {
 
     private FontManager() {
         // TTF 폰트 파일에서 생성기 초기화 (assets 폴더 하위)
-        generator = new FreeTypeFontGenerator(Gdx.files.internal("assets/NotoSansKR-Regular.ttf"));
+        // Android에서 Gdx.files.internal()은 assets/ 루트 기준이므로 경로에서 assets/ 제거
+        generator = new FreeTypeFontGenerator(Gdx.files.internal("NotoSansKR-Regular.ttf"));
     }
 
     /**

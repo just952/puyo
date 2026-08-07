@@ -11,7 +11,8 @@ public class AndroidLauncher extends AndroidApplication {
     static {
         System.loadLibrary("gdx");
         System.loadLibrary("gdx-freetype");
-        System.loadLibrary("penguin");
+        // libpenguin.so는 gdx-freetype 네이티브 코드 내부에서 dlopen("libpenguin.so")로 로드됨
+        // Java에서 별도 로드 불필요 (링커 네임스페이스 분리 문제 방지)
     }
 
     @Override

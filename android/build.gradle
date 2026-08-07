@@ -23,11 +23,12 @@ android {
         }  
     }  
   
-    sourceSets {  
-        main {  
-            assets.srcDirs = ['src/main/assets']  
-        }  
-    }  
+    sourceSets {
+        main {
+            // core 모듈의 assets (JAR 내 assets/ 경로) 포함
+            assets.srcDirs = ['src/main/assets', '../../core/build/resources/main/assets']
+        }
+    }
   
     packagingOptions {  
         jniLibs {  

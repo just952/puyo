@@ -1,6 +1,5 @@
 package com.puyo.game.logic.engine;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import com.puyo.game.logic.model.Board;
@@ -56,12 +55,18 @@ public class GameWorld {
     private PuyoColor randomColor() {
         int r = random.nextInt(5);
         switch (r) {
-            case 0: return PuyoColor.RED;
-            case 1: return PuyoColor.GREEN;
-            case 2: return PuyoColor.BLUE;
-            case 3: return PuyoColor.YELLOW;
-            case 4: return PuyoColor.PURPLE;
-            default: return PuyoColor.RED;
+            case 0:
+                return PuyoColor.RED;
+            case 1:
+                return PuyoColor.GREEN;
+            case 2:
+                return PuyoColor.BLUE;
+            case 3:
+                return PuyoColor.YELLOW;
+            case 4:
+                return PuyoColor.PURPLE;
+            default:
+                return PuyoColor.RED;
         }
     }
 
