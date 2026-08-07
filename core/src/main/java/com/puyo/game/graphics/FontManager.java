@@ -1,8 +1,10 @@
 package com.puyo.game.graphics;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.PixmapPacker;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.utils.Disposable;
@@ -12,12 +14,19 @@ import com.badlogic.gdx.utils.ObjectMap;
  * 폰트 생성 및 캐싱 관리 클래스.
  * FreeTypeFontGenerator를 사용하여 런타임에 필요한 크기의 폰트를 생성하고 캐시합니다.
  * 한글 지원을 위해 NotoSansKR-Regular.ttf를 사용합니다.
+ * 
+ * Incremental 모드(동적 글리프 생성)를 사용하여 전체 한글(11,172자) + 영문 + 특수문자 지원.
+ * 채팅 기능 등에서 모든 문자 동적 생성 가능.
  */
 public class FontManager implements Disposable {
     private static FontManager instance;
     private final FreeTypeFontGenerator generator;
     private final ObjectMap<String, BitmapFont> fontCache = new ObjectMap<>();
     private boolean disposed = false;
+
+    // 공통 파라미터 (incremental 모드용 기본 설정)
+    private final FreeTypeFontParameter baseParam;
+    private final PixmapPacker packer;
 
     private FontManager() {
         // TTF 폰트 파일에서 생성기 초기화
@@ -32,6 +41,33 @@ public class FontManager implements Disposable {
             fontPath = "assets/NotoSansKR-Regular.ttf";
         }
         generator = new FreeTypeFontGenerator(Gdx.files.internal(fontPath));
+
+        // 큰 아틀라스용 팩커 생성 (4096x4096)
+        packer = new PixmapPacker(4096, 4096, Pixmap.Format.RGBA8888, 2, false);
+
+        // Incremental 모드용 기본 파라미터 설정
+        baseParam = new FreeTypeFontParameter();
+        baseParam.incremental = true; // 핵심: 동적 글리프 생성 활성화
+        baseParam.packer = packer; // 큰 아틀라스 사용
+        baseParam.minFilter = Texture.TextureFilter.Linear;
+        baseParam.magFilter = Texture.TextureFilter.Linear;
+        baseParam.gamma = 1.8f;
+        baseParam.borderWidth = 0;
+        baseParam.borderColor = com.badlogic.gdx.graphics.Color.BLACK;
+        baseParam.borderStraight = true;
+
+        // 기본 문자셋: DEFAULT_CHARS(영문/숫자/기본기호) + 게임에서 실제 사용하는 한글만
+        // 전체 한글 11,172자는 incremental 모드로 동적 생성
+        baseParam.characters = FreeTypeFontGenerator.DEFAULT_CHARS + getGameSpecificChars();
+    }
+
+    /**
+     * 게임 전용 문자들 (메뉴, UI 등)
+     */
+    private String getGameSpecificChars() {
+        return "노말모드엔드리스인대전옵션종료스테이지키키모라백"
+                + "연쇄점수레벨일시정지게임오버승리패배시작"
+                + "초중급고급설정소리음악진동언어한국어영어";
     }
 
     /**
@@ -85,7 +121,7 @@ public class FontManager implements Disposable {
     }
 
     /**
-     * 내부 폰트 생성/캐싱 로직
+     * 내부 폰트 생성/캐싱 로직 (Incremental 모드)
      */
     private BitmapFont getFont(String prefix, int size, boolean bold) {
         if (disposed) {
@@ -99,21 +135,18 @@ public class FontManager implements Disposable {
         }
 
         FreeTypeFontParameter param = new FreeTypeFontParameter();
-        param.size = size;
-        param.borderWidth = 0;
-        param.borderColor = com.badlogic.gdx.graphics.Color.BLACK;
-        param.borderStraight = true;
-        param.minFilter = Texture.TextureFilter.Linear;
-        param.magFilter = Texture.TextureFilter.Linear;
-        param.gamma = 1.8f;
+        // 기본 파라미터 복사
+        param.incremental = baseParam.incremental;
+        param.packer = baseParam.packer;
+        param.minFilter = baseParam.minFilter;
+        param.magFilter = baseParam.magFilter;
+        param.gamma = baseParam.gamma;
+        param.borderWidth = baseParam.borderWidth;
+        param.borderColor = baseParam.borderColor;
+        param.borderStraight = baseParam.borderStraight;
+        param.characters = baseParam.characters; // 기본 문자셋 포함 (incremental로 추가 글리프 자동 생성)
 
-        // 메뉴/게임에서 실제 사용되는 모든 한글 문자 포함
-        // 메뉴: 노말 모드, 엔드리스 모드, 2인 대전, 옵션, 종료, Stage 1: KIKIMORA, < Back
-        // 게임 중: 연쇄, 점수, 레벨, 스테이지, 일시정지, 게임오버, 승리, 패배
-        param.characters = FreeTypeFontGenerator.DEFAULT_CHARS
-                + "노말모드엔드리스인대전옵션종료스테이지키키모라백"
-                + "연쇄점수레벨일시정지게임오버승리패배시작"
-                + "초중급고급설정소리음악진동언어한국어영어";
+        param.size = size;
 
         if (bold) {
             param.borderWidth = Math.max(1, size / 24);
@@ -170,6 +203,7 @@ public class FontManager implements Disposable {
             }
             fontCache.clear();
             generator.dispose();
+            packer.dispose();
             disposed = true;
             instance = null;
         }
