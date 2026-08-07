@@ -20,9 +20,18 @@ public class FontManager implements Disposable {
     private boolean disposed = false;
 
     private FontManager() {
-        // TTF 폰트 파일에서 생성기 초기화 (assets 폴더 하위)
-        // Android에서 Gdx.files.internal()은 assets/ 루트 기준이므로 경로에서 assets/ 제거
-        generator = new FreeTypeFontGenerator(Gdx.files.internal("NotoSansKR-Regular.ttf"));
+        // TTF 폰트 파일에서 생성기 초기화
+        // 플랫폼별로 리소스 경로가 다름:
+        // - Android: APK의 assets/ 루트 기준 -> "NotoSansKR-Regular.ttf"
+        // - Desktop: core JAR의 classpath 기준 (assets/ 폴더 하위) ->
+        // "assets/NotoSansKR-Regular.ttf"
+        String fontPath;
+        if (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android) {
+            fontPath = "NotoSansKR-Regular.ttf";
+        } else {
+            fontPath = "assets/NotoSansKR-Regular.ttf";
+        }
+        generator = new FreeTypeFontGenerator(Gdx.files.internal(fontPath));
     }
 
     /**
