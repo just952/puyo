@@ -44,7 +44,7 @@ public class Board {
     }
 
     public boolean isEmpty(int x, int y) {
-        return !isInside(x, y) || getPuyoAt(x, y) == null;
+        return isInside(x, y) && getPuyoAt(x, y) == null;
     }
 
     public void placePuyo(Puyo puyo) {
@@ -87,7 +87,9 @@ public class Board {
     }
 
     /**
-     * Checks if the given pair can be placed at its current position (i.e., both puyos are within bounds and the cells are empty).
+     * Checks if the given pair can be placed at its current position (i.e., both
+     * puyos are within bounds and the cells are empty).
+     * 
      * @param pair the pair to check
      * @return true if the position is valid
      */
@@ -142,8 +144,8 @@ public class Board {
         int x = puyo.getX();
         int y = puyo.getY();
         // Check four directions
-        int[] dx = {1, -1, 0, 0};
-        int[] dy = {0, 0, 1, -1};
+        int[] dx = { 1, -1, 0, 0 };
+        int[] dy = { 0, 0, 1, -1 };
         for (int i = 0; i < 4; i++) {
             int nx = x + dx[i];
             int ny = y + dy[i];
@@ -162,8 +164,8 @@ public class Board {
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
                 Puyo puyo = getPuyoAt(x, y);
-                if (puyo != null && !visited[x][y] && 
-                        puyo.getColor() != PuyoColor.OJAMA && 
+                if (puyo != null && !visited[x][y] &&
+                        puyo.getColor() != PuyoColor.OJAMA &&
                         puyo.getColor() != PuyoColor.HARD) {
                     List<Puyo> group = new ArrayList<>();
                     collectGroup(x, y, puyo.getColor(), visited, group);
@@ -234,14 +236,30 @@ public class Board {
                     sb.append(" ");
                 } else {
                     switch (p.getColor()) {
-                        case RED: sb.append("R"); break;
-                        case GREEN: sb.append("G"); break;
-                        case BLUE: sb.append("B"); break;
-                        case YELLOW: sb.append("Y"); break;
-                        case PURPLE: sb.append("P"); break;
-                        case CYAN: sb.append("C"); break;
-                        case OJAMA: sb.append("O"); break;
-                        case HARD: sb.append("H"); break;
+                        case RED:
+                            sb.append("R");
+                            break;
+                        case GREEN:
+                            sb.append("G");
+                            break;
+                        case BLUE:
+                            sb.append("B");
+                            break;
+                        case YELLOW:
+                            sb.append("Y");
+                            break;
+                        case PURPLE:
+                            sb.append("P");
+                            break;
+                        case CYAN:
+                            sb.append("C");
+                            break;
+                        case OJAMA:
+                            sb.append("O");
+                            break;
+                        case HARD:
+                            sb.append("H");
+                            break;
                     }
                 }
             }

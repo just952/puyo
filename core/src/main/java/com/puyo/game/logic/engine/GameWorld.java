@@ -41,7 +41,7 @@ public class GameWorld {
         PuyoColor c2 = randomColor();
         currentPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
         int startX = (FIELD_WIDTH / 2) - 1;
-        int startY = FIELD_HEIGHT;
+        int startY = FIELD_HEIGHT - 1; // 보드 내부(0~11)에서 시작
         currentPair.setPosition(startX, startY);
     }
 
