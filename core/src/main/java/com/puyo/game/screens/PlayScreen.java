@@ -92,6 +92,7 @@ public class PlayScreen extends BaseScreen {
         // Draw game board
         drawBoard();
         drawCurrentPair();
+        drawFallingSinglePuyo();
         drawNextPair();
         drawUI();
     }
@@ -125,7 +126,7 @@ public class PlayScreen extends BaseScreen {
 
             // 소프트 드롭
             if (inputHandler.isDropPressed()) {
-                if (gameWorld.canFall()) {
+                if (gameWorld.canFall() && gameWorld.getCurrentPair() != null) {
                     gameWorld.getCurrentPair().moveDown();
                 }
             }
@@ -196,6 +197,18 @@ public class PlayScreen extends BaseScreen {
         drawPuyo(right,
                 GameViewport.Single.BOARD_OFFSET_X + right.getX() * GameViewport.CELL_SIZE,
                 GameViewport.Single.BOARD_OFFSET_Y + right.getY() * GameViewport.CELL_SIZE);
+        batch.end();
+    }
+
+    private void drawFallingSinglePuyo() {
+        Puyo puyo = gameWorld.getFallingSinglePuyo();
+        if (puyo == null)
+            return;
+
+        batch.begin();
+        drawPuyo(puyo,
+                GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
+                GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
         batch.end();
     }
 

@@ -95,6 +95,14 @@ public class Board {
     }
 
     /**
+     * 단일 뿌요가 아래로 이동 가능한지 확인 (분리 낙하용).
+     * 화면 안(y < HEIGHT)에 있는 뿌요만 체크.
+     */
+    public boolean canMoveDown(Puyo p) {
+        return isInsideVisible(p) && isEmpty(p.getX(), p.getY() - 1);
+    }
+
+    /**
      * Checks if the given pair can be placed at its current position.
      * Only checks puyos that are inside the visible board (y < HEIGHT).
      *

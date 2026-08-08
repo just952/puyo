@@ -2,6 +2,7 @@ bin/
 .ai_agent/
 .clinerules/
 .vscode/
+docs/work-summaries/
 
 # Gradle
 .gradle/

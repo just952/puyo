@@ -44,6 +44,13 @@ public class Puyo {
         alive = true;
     }
 
+    /**
+     * 단일 뿌요 아래로 이동 (분리 낙하용)
+     */
+    public void moveDown() {
+        this.y--;
+    }
+
     @Override
     public String toString() {
         return "Puyo{" +

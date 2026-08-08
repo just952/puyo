@@ -30,6 +30,11 @@ public class GameWorld {
     private static final int MAX_LOCK_DELAY_MOVES = 15; // Tsu rules: max moves during lock delay
     private int currentChain = 0;
 
+    // 분리된 단일 뿌요 자동 낙하 처리용
+    private Puyo fallingSinglePuyo = null;
+    private float singleFallTimer = 0f;
+    private static final float SINGLE_FALL_INTERVAL = 0.05f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도)
+
     public GameWorld() {
         board = new Board();
         random = new Random();
@@ -81,10 +86,12 @@ public class GameWorld {
     }
 
     public boolean canFall() {
-        return board.canMoveDown(currentPair);
+        return currentPair != null && board.canMoveDown(currentPair);
     }
 
     public boolean moveLeft() {
+        if (currentPair == null)
+            return false;
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
             resetLockDelay();
@@ -94,6 +101,8 @@ public class GameWorld {
     }
 
     public boolean moveRight() {
+        if (currentPair == null)
+            return false;
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
             resetLockDelay();
@@ -103,6 +112,8 @@ public class GameWorld {
     }
 
     public void rotateClockwise() {
+        if (currentPair == null)
+            return;
         currentPair.rotateClockwise();
         if (!board.canPlace(currentPair)) {
             if (board.canMoveLeft(currentPair)) {
@@ -117,6 +128,8 @@ public class GameWorld {
     }
 
     public void hardDrop() {
+        if (currentPair == null)
+            return;
         while (canFall()) {
             currentPair.moveDown();
         }
@@ -128,6 +141,13 @@ public class GameWorld {
             return;
         }
 
+        // 1. 분리된 단일 뿌요 자동 낙하 처리 (최우선 - 조작 불가)
+        if (fallingSinglePuyo != null) {
+            updateFallingSinglePuyo(delta);
+            return;
+        }
+
+        // 2. 일반 쌍 뿌요 낙하 처리
         fallTimer += delta;
         if (fallTimer >= fallInterval) {
             fallTimer = 0f;
@@ -135,13 +155,19 @@ public class GameWorld {
                 currentPair.moveDown();
                 resetLockDelay();
             } else {
-                if (!lockDelayActive) {
-                    lockDelayActive = true;
-                    lockDelayTimer = 0f;
+                // 바닥에 닿음 - 가로 상태에서 분리 가능한지 확인
+                if (isHorizontalAndCanSeparate()) {
+                    separatePair();
                 } else {
-                    lockDelayTimer += delta;
-                    if (lockDelayTimer >= LOCK_DELAY_TIME) {
-                        lockPiece();
+                    // 기존 락 딜레이 로직
+                    if (!lockDelayActive) {
+                        lockDelayActive = true;
+                        lockDelayTimer = 0f;
+                    } else {
+                        lockDelayTimer += delta;
+                        if (lockDelayTimer >= LOCK_DELAY_TIME) {
+                            lockPiece();
+                        }
                     }
                 }
             }
@@ -153,6 +179,126 @@ public class GameWorld {
                 lockPiece();
             }
         }
+    }
+
+    /**
+     * 가로 상태(rotation 1 또는 3)에서 한 쪽만 막혀서 분리 가능한지 확인
+     */
+    private boolean isHorizontalAndCanSeparate() {
+        if (currentPair == null)
+            return false;
+        int rotation = currentPair.getRotation();
+        // rotation 1: right(오른쪽), rotation 3: left(왼쪽)
+        if (rotation != 1 && rotation != 3)
+            return false;
+
+        Puyo left = currentPair.getLeft();
+        Puyo right = currentPair.getRight();
+
+        boolean leftCanFall = board.canMoveDown(left);
+        boolean rightCanFall = board.canMoveDown(right);
+
+        // 한 쪽만 이동 가능하면 분리 가능
+        return leftCanFall != rightCanFall;
+    }
+
+    /**
+     * 쌍 분리: 한 쪽은 잠금, 다른 쪽은 단일 뿌요로 자동 낙하 시작
+     */
+    private void separatePair() {
+        Puyo left = currentPair.getLeft();
+        Puyo right = currentPair.getRight();
+
+        boolean leftCanFall = board.canMoveDown(left);
+        boolean rightCanFall = board.canMoveDown(right);
+
+        Puyo blockedPuyo;
+        Puyo freePuyo;
+
+        if (leftCanFall && !rightCanFall) {
+            blockedPuyo = right;
+            freePuyo = left;
+        } else if (rightCanFall && !leftCanFall) {
+            blockedPuyo = left;
+            freePuyo = right;
+        } else {
+            // 둘 다 가능하거나 둘 다 불가능하면 분리 안 함 (락 딜레이로)
+            return;
+        }
+
+        // 막힌 쪽 즉시 잠금
+        board.placePuyo(blockedPuyo);
+
+        // 자유로운 쪽 단일 뿌요로 자동 낙하 시작
+        fallingSinglePuyo = freePuyo;
+        currentPair = null; // 쌍 해제
+        lockDelayActive = false;
+        lockDelayTimer = 0f;
+        lockDelayMoveCount = 0;
+    }
+
+    /**
+     * 분리된 단일 뿌요 자동 낙하 업데이트 (조작 불가)
+     * 단일 뿌요는 소프트 드롭 속도(SINGLE_FALL_INTERVAL)로 낙하
+     */
+    private void updateFallingSinglePuyo(float delta) {
+        singleFallTimer += delta;
+        if (singleFallTimer >= SINGLE_FALL_INTERVAL) {
+            singleFallTimer = 0f;
+            if (board.canMoveDown(fallingSinglePuyo)) {
+                fallingSinglePuyo.moveDown();
+            } else {
+                // 바닥에 닿음 - 잠금 및 매칭 체크
+                board.placePuyo(fallingSinglePuyo);
+                fallingSinglePuyo = null;
+                singleFallTimer = 0f; // 타이머 리셋
+                checkMatchesAndSpawnNext();
+            }
+        }
+    }
+
+    /**
+     * 단일 뿌요 착지 후 매칭/연쇄 체크 및 다음 쌍 스폰
+     */
+    private void checkMatchesAndSpawnNext() {
+        boolean chainOccurred = false;
+        int chainCount = 0;
+        int totalRemoved = 0;
+        do {
+            List<List<Puyo>> groups = board.findAllMatchingGroups();
+            if (groups.isEmpty()) {
+                break;
+            }
+            chainOccurred = true;
+            chainCount++;
+            int removedThis = 0;
+            for (List<Puyo> group : groups) {
+                removedThis += group.size();
+                board.removePuyos(group);
+            }
+            totalRemoved += removedThis;
+            board.applyGravity();
+        } while (chainOccurred);
+
+        if (chainOccurred) {
+            currentChain = chainCount;
+            int earned = totalRemoved * (chainCount + 1) * 10;
+            addScore(earned);
+        } else {
+            currentChain = 0;
+        }
+
+        if (board.isTopOut()) {
+            gameOver = true;
+            return;
+        }
+
+        // 다음 쌍 스폰
+        currentPair = nextPair;
+        spawnNextPair();
+
+        fallTimer = 0f;
+        resetLockDelay();
     }
 
     private void resetLockDelay() {
@@ -229,6 +375,10 @@ public class GameWorld {
 
     public PuyoPair getNextPair() {
         return nextPair;
+    }
+
+    public Puyo getFallingSinglePuyo() {
+        return fallingSinglePuyo;
     }
 
     public int getScore() {
