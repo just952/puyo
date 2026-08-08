@@ -26,6 +26,8 @@ public class GameWorld {
     private boolean lockDelayActive = false;
     private float lockDelayTimer = 0f;
     private static final float LOCK_DELAY_TIME = 0.5f; // seconds to lock after touching bottom
+    private int lockDelayMoveCount = 0;
+    private static final int MAX_LOCK_DELAY_MOVES = 15; // Tsu rules: max moves during lock delay
     private int currentChain = 0;
 
     public GameWorld() {
@@ -38,11 +40,15 @@ public class GameWorld {
     /** Spawns a new pair at the top center and assigns it as the current pair. */
     public void spawnNewPair() {
         currentPair = createAndPositionPair();
+        lockDelayMoveCount = 0; // 이동 카운터 리셋
+        lockDelayActive = false; // 락 딜레이 상태 리셋
     }
 
     /** Spawns the next pair (for preview). */
     public void spawnNextPair() {
         nextPair = createAndPositionPair();
+        lockDelayMoveCount = 0; // 이동 카운터 리셋
+        lockDelayActive = false; // 락 딜레이 상태 리셋
     }
 
     /** Creates a new PuyoPair with random colors at the spawn position. */
@@ -150,8 +156,18 @@ public class GameWorld {
     }
 
     private void resetLockDelay() {
-        lockDelayActive = false;
-        lockDelayTimer = 0f;
+        if (lockDelayActive) {
+            lockDelayMoveCount++;
+            if (lockDelayMoveCount >= MAX_LOCK_DELAY_MOVES) {
+                // 이동 제한 초과 → 즉시 잠금 (Tsu 규칙)
+                lockPiece();
+                return;
+            }
+            lockDelayTimer = 0f; // 타이머만 리셋 (lockDelayActive 유지)
+        } else {
+            lockDelayTimer = 0f;
+            lockDelayMoveCount = 0; // 공중에서 움직일 때는 카운터 리셋
+        }
     }
 
     private void lockPiece() {
