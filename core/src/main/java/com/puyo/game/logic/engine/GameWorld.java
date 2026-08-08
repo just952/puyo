@@ -50,6 +50,9 @@ public class GameWorld {
         PuyoColor c1 = randomColor();
         PuyoColor c2 = randomColor();
         nextPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
+        int startX = (FIELD_WIDTH / 2) - 1;
+        int startY = FIELD_HEIGHT - 1;
+        nextPair.setPosition(startX, startY);
     }
 
     private PuyoColor randomColor() {
