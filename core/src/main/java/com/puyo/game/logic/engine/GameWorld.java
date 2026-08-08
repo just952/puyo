@@ -37,22 +37,23 @@ public class GameWorld {
 
     /** Spawns a new pair at the top center and assigns it as the current pair. */
     public void spawnNewPair() {
-        PuyoColor c1 = randomColor();
-        PuyoColor c2 = randomColor();
-        currentPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
-        int startX = (FIELD_WIDTH / 2) - 1;
-        int startY = FIELD_HEIGHT - 1; // 보드 내부(0~11)에서 시작
-        currentPair.setPosition(startX, startY);
+        currentPair = createAndPositionPair();
     }
 
     /** Spawns the next pair (for preview). */
     public void spawnNextPair() {
+        nextPair = createAndPositionPair();
+    }
+
+    /** Creates a new PuyoPair with random colors at the spawn position. */
+    private PuyoPair createAndPositionPair() {
         PuyoColor c1 = randomColor();
         PuyoColor c2 = randomColor();
-        nextPair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
+        PuyoPair pair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
         int startX = (FIELD_WIDTH / 2) - 1;
         int startY = FIELD_HEIGHT - 1;
-        nextPair.setPosition(startX, startY);
+        pair.setPosition(startX, startY);
+        return pair;
     }
 
     private PuyoColor randomColor() {
