@@ -77,11 +77,6 @@ public class PlayScreen extends BaseScreen {
 
     @Override
     public void render(float delta) {
-        // 입력 핸들러 업데이트 (키보드/터치 상태 갱신)
-        if (inputHandler != null) {
-            inputHandler.update();
-        }
-
         // Update game logic
         update(delta);
 
@@ -113,17 +108,19 @@ public class PlayScreen extends BaseScreen {
 
         // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
         if (inputHandler != null) {
+            // 회전 체크를 inputHandler.update()보다 먼저 수행 (엣지 감지용)
+            if (inputHandler.isRotatePressed()) {
+                gameWorld.rotateClockwise();
+            }
+
+            inputHandler.update();
+
             // 좌우 이동
             int moveDir = inputHandler.getMoveDirection();
             if (moveDir < 0) {
                 gameWorld.moveLeft();
             } else if (moveDir > 0) {
                 gameWorld.moveRight();
-            }
-
-            // 회전
-            if (inputHandler.isRotatePressed()) {
-                gameWorld.getCurrentPair().rotateClockwise();
             }
 
             // 소프트 드롭

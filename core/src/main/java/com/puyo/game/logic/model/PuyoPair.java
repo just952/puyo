@@ -11,17 +11,18 @@ public class PuyoPair {
     private Puyo right;
     private int rotation; // 0: up, 1: right, 2: down, 3: left
     private static final int[][] OFFSETS = {
-            {0, 1},   // 0: up
-            {1, 0},   // 1: right
-            {0, -1},  // 2: down
-            {-1, 0}   // 3: left
+            { 0, 1 }, // 0: up
+            { 1, 0 }, // 1: right
+            { 0, -1 }, // 2: down
+            { -1, 0 } // 3: left
     };
 
     public PuyoPair(Puyo left, Puyo right) {
         this.left = left;
         this.right = right;
         this.rotation = 0; // initial rotation: up (right is above left)
-        // Ensure the puyos are positioned correctly: left at (x,y), right at (x, y+1) for rotation 0.
+        // Ensure the puyos are positioned correctly: left at (x,y), right at (x, y+1)
+        // for rotation 0.
         // We'll adjust in setPosition.
     }
 
@@ -42,9 +43,12 @@ public class PuyoPair {
     }
 
     /**
-     * Sets the position of the pair based on the grid coordinates of the "reference" point.
-     * We'll define the reference point as the position of the left puyo when rotation is 0.
+     * Sets the position of the pair based on the grid coordinates of the
+     * "reference" point.
+     * We'll define the reference point as the position of the left puyo when
+     * rotation is 0.
      * For other rotations, we compute the positions accordingly.
+     * 
      * @param x the x coordinate of the reference point
      * @param y the y coordinate of the reference point
      */
@@ -58,17 +62,20 @@ public class PuyoPair {
 
     /**
      * Returns the positions of the two puyos as an array of [x,y] pairs.
+     * 
      * @return array where [0] is left puyo [x,y], [1] is right puyo [x,y]
      */
     public int[][] getPositions() {
-        return new int[][]{
-                {left.getX(), left.getY()},
-                {right.getX(), right.getY()}
+        return new int[][] {
+                { left.getX(), left.getY() },
+                { right.getX(), right.getY() }
         };
     }
 
     /**
-     * Returns the x coordinate of the left puyo given the reference point (the position of the left puyo when rotation=0).
+     * Returns the x coordinate of the left puyo given the reference point (the
+     * position of the left puyo when rotation=0).
+     * 
      * @param refX the x coordinate of the reference point
      * @param refY the y coordinate of the reference point (ignored for X)
      * @return the x coordinate of the left puyo
@@ -79,6 +86,7 @@ public class PuyoPair {
 
     /**
      * Returns the y coordinate of the left puyo given the reference point.
+     * 
      * @param refX the x coordinate of the reference point (ignored for Y)
      * @param refY the y coordinate of the reference point
      * @return the y coordinate of the left puyo
@@ -89,6 +97,7 @@ public class PuyoPair {
 
     /**
      * Returns the x coordinate of the right puyo given the reference point.
+     * 
      * @param refX the x coordinate of the reference point
      * @param refY the y coordinate of the reference point
      * @return the x coordinate of the right puyo
@@ -99,6 +108,7 @@ public class PuyoPair {
 
     /**
      * Returns the y coordinate of the right puyo given the reference point.
+     * 
      * @param refX the x coordinate of the reference point (ignored for Y)
      * @param refY the y coordinate of the reference point
      * @return the y coordinate of the right puyo
@@ -131,12 +141,16 @@ public class PuyoPair {
 
     /**
      * Rotates the pair clockwise.
-     * Note: This does not change the position of the reference point (the left puyo's position for rotation 0).
-     * After rotation, the actual positions of the puyos change according to the new offset.
-     * The caller should ensure that the new position does not collide with the board.
+     * Note: This does not change the position of the reference point (the left
+     * puyo's position for rotation 0).
+     * After rotation, the actual positions of the puyos change according to the new
+     * offset.
+     * The caller should ensure that the new position does not collide with the
+     * board.
      */
     public void rotateClockwise() {
         rotation = (rotation + 1) % 4;
+        setPosition(left.getX(), left.getY());
     }
 
     /**
@@ -144,5 +158,6 @@ public class PuyoPair {
      */
     public void rotateCounterClockwise() {
         rotation = (rotation + 3) % 4;
+        setPosition(left.getX(), left.getY());
     }
 }
