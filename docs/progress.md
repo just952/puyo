@@ -1,6 +1,6 @@
 # Puyo Puyo 2 - 개발 진행 현황
 
-## 최종 업데이트: 2026-08-07
+## 최종 업데이트: 2026-08-08
 
 ---
 
@@ -15,6 +15,9 @@
 |                     | 4개 이상 연결 시 제거 + 연쇄 처리                                     | 완료     | findAllMatchingGroups() + applyGravity() 루프                        |
 |                     | PuyoPair 생성/회전/이동/하드드롭                                      | 완료     | PuyoPair, PuyoPairGenerator                                          |
 |                     | 점수/연쇄 계산                                                        | 완료     | GameWorld                                                            |
+|                     | **락 딜레이 (Lock Delay) - Tsu 규칙**                                 | **완료** | 0.5초 딜레이, 이동/회전 15회 제한, 초과 시 즉시 잠금                 |
+|                     | **회전 시스템 (벽 킥 포함)**                                          | **완료** | PuyoPair 회전 + setPosition, GameWorld 벽 킥 처리                    |
+|                     | **스폰 위치 통일**                                                    | **완료** | createAndPositionPair() 공통 메서드로 상단 중앙 스폰 보장            |
 | 메뉴 시스템         | JSON 데이터 기반 동적 메뉴                                            | 완료     | MenuLoader, MenuItem, MenuAction                                     |
 |                     | main.json, story_mode_select.json 등                                  | 완료     | 4개 메뉴 파일                                                        |
 |                     | MenuLoader 클래스패스/애셋 폴백 로딩                                  | 완료     | 테스트/앱 모두 지원                                                  |
@@ -29,12 +32,16 @@
 | 스토리 모드         | StoryModeManager (JSON 기반)                                          | 완료     | 3 스테이지, 언락/승리 조건                                           |
 |                     | stages.json (래퍼 객체 파싱)                                          | 완료     | StoryDataWrapper                                                     |
 |                     | clear_to_advance 승리 조건                                            | 완료     | 2승/2승/3승                                                          |
+| 입력 시스템         | **DAS/ARR (Delayed Auto Shift / Auto Repeat Rate) 구현**              | **완료** | 원작 뿌요뿌요 방식: 16프레임 지연 후 2프레임마다 반복 이동           |
+|                     | **화면 밖 뿌요(고스트) 충돌 무시**                                    | **완료** | 스폰 시 상단 뿌요만 보여도 좌우 이동 가능 (원작 방식)                |
 | 폰트/한글           | NotoSansKR-Regular.ttf 적용                                           | **완료** | Google Fonts에서 정상 파일 다운로드                                  |
 |                     | 한글 깨짐(X박스) 해결                                                 | **완료** | FontManager.param.characters에 필수 문자 명시                        |
 |                     | 폰트 경로 정리                                                        | **완료** | core/src/main/resources/assets/ 하나로 통합                          |
+|                     | **증분 폰트 로딩 (Incremental)**                                      | **완료** | FreeTypeFontParameter.incremental=true, 동적 글리프 생성             |
 | 네이티브 라이브러리 | libpenguin.so SONAME 패치                                             | **완료** | Python lief로 SONAME 'libpenguin.so' 패치                            |
 |                     | libgdx-freetype.so → libpenguin.so 복사                               | **완료** | mergeNativeLibs 후 자동 복사                                         |
 |                     | AndroidLauncher 단일 로드                                             | **완료** | gdx, gdx-freetype만 로드 (penguin 불필요)                            |
+|                     | **안드로이드 네이티브 로드 수정**                                     | **완료** | System.loadLibrary("penguin") 제거, extractNativeLibs 제거           |
 | 안드로이드 모듈     | AndroidLauncher, AndroidManifest.xml                                  | 완료     | AGP 8.1, compileSdk 33                                               |
 |                     | 리소스: strings, colors, styles                                       | 완료     | 기본 리소스 완성                                                     |
 |                     | 네이티브 라이브러리 패키징                                            | **완료** | libgdx.so, libpenguin.so APK에 포함, SONAME 패치됨, 실기기 로드 성공 |
@@ -122,14 +129,16 @@
 
 ## 변경 이력 (Changelog)
 
-| 날짜       | 버전  | 주요 변경                                                                                                                        |
-| ---------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-03 | 0.1.5 | **PC 로컬 환경에서 libpenguin.so SONAME 패치 성공, 한글 폰트 정상 적용, 실기기(갤럭시 S23) 정상 실행 확인, 에셋 구조 정리 완료** |
-| 2026-08-02 | 0.1.4 | libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정                                                                      |
-| 2026-08-01 | 0.1.3 | libgdx-freetype.so → libpenguin.so 이름 변경 시도, AndroidLauncher 단일 로드 수정 (해결 안됨)                                    |
-| 2026-07-28 | 0.1.2 | 뷰포트/카메라 시스템 구현, 가상 해상도 960×1600, FitViewport 적용                                                                |
-| 2026-07-26 | 0.1.1 | StoryModeManager classpath 로딩, stages.json 테스트 리소스 복사                                                                  |
-| 2026-07-26 | 0.1.0 | 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성                                                                   |
+| 날짜       | 버전  | 주요 변경                                                                                                                             |
+| ---------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-08 | 0.1.8 | **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림**                                                       |
+| 2026-08-07 | 0.1.7 | **락 딜레이(Tsu 규칙) 완전 구현, 회전 버그 수정, 다음 블록 스폰 버그 수정, 폰트 증분 로딩, 안드로이드 네이티브 라이브러리 로드 수정** |
+| 2026-08-03 | 0.1.5 | **PC 로컬 환경에서 libpenguin.so SONAME 패치 성공, 한글 폰트 정상 적용, 실기기(갤럭시 S23) 정상 실행 확인, 에셋 구조 정리 완료**      |
+| 2026-08-02 | 0.1.4 | libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정                                                                           |
+| 2026-08-01 | 0.1.3 | libgdx-freetype.so → libpenguin.so 이름 변경 시도, AndroidLauncher 단일 로드 수정 (해결 안됨)                                         |
+| 2026-07-28 | 0.1.2 | 뷰포트/카메라 시스템 구현, 가상 해상도 960×1600, FitViewport 적용                                                                     |
+| 2026-07-26 | 0.1.1 | StoryModeManager classpath 로딩, stages.json 테스트 리소스 복사                                                                       |
+| 2026-07-26 | 0.1.0 | 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성                                                                        |
 
 ---
 

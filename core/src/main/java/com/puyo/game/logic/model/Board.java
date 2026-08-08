@@ -59,9 +59,17 @@ public class Board {
         }
     }
 
+    /**
+     * 화면 안(y < HEIGHT)에 있는 뿌요만 충돌 체크.
+     * 화면 밖(위쪽)에 있는 뿌요는 "고스트" 상태로 통과 가능 (원작 방식).
+     */
+    private boolean isInsideVisible(Puyo p) {
+        return p.getY() < HEIGHT;
+    }
+
     public boolean canMoveLeft(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX() - 1, p.getY())) {
+            if (isInsideVisible(p) && !isEmpty(p.getX() - 1, p.getY())) {
                 return false;
             }
         }
@@ -70,7 +78,7 @@ public class Board {
 
     public boolean canMoveRight(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX() + 1, p.getY())) {
+            if (isInsideVisible(p) && !isEmpty(p.getX() + 1, p.getY())) {
                 return false;
             }
         }
@@ -79,7 +87,7 @@ public class Board {
 
     public boolean canMoveDown(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX(), p.getY() - 1)) {
+            if (isInsideVisible(p) && !isEmpty(p.getX(), p.getY() - 1)) {
                 return false;
             }
         }
@@ -87,15 +95,15 @@ public class Board {
     }
 
     /**
-     * Checks if the given pair can be placed at its current position (i.e., both
-     * puyos are within bounds and the cells are empty).
-     * 
+     * Checks if the given pair can be placed at its current position.
+     * Only checks puyos that are inside the visible board (y < HEIGHT).
+     *
      * @param pair the pair to check
      * @return true if the position is valid
      */
     public boolean canPlace(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX(), p.getY())) {
+            if (isInsideVisible(p) && !isEmpty(p.getX(), p.getY())) {
                 return false;
             }
         }

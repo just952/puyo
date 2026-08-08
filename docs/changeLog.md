@@ -4,6 +4,116 @@
 
 ---
 
+## v0.1.8 (2026-08-08) - **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림**
+
+### 추가
+
+1. **DAS/ARR (Delayed Auto Shift / Auto Repeat Rate) 입력 시스템** (`InputHandler.java`)
+   - 키 누름 즉시 1회 이동 (첫 프레임)
+   - DAS_DELAY_FRAMES = 16프레임 (~0.27초) 지연 후 자동 반복 시작
+   - ARR_INTERVAL_FRAMES = 2프레임마다 1칸씩 반복 이동 (초당 30회)
+   - 키 떼면 카운터 완전 리셋, 좌우 동시 누름 시 상쇄
+
+2. **화면 밖(위쪽) 뿌요 고스트 충돌 무시** (`Board.java`)
+   - `isInsideVisible(Puyo p)` 헬퍼 메서드 추가: `p.getY() < HEIGHT`만 체크
+   - `canMoveLeft`, `canMoveRight`, `canMoveDown`, `canPlace` 모두 적용
+   - 스폰 시 right 뿌요가 y=12(화면 밖)에 있어도 left 뿌요만으로 좌우 이동 가능
+   - 원작 뿌요뿌요와 동일: 필드 상단에서 좌우로 피할 수 있음
+
+### 변경 파일
+
+| 파일                                                       | 변경 유형 | 설명                                                                 |
+| ---------------------------------------------------------- | --------- | -------------------------------------------------------------------- |
+| `core/src/main/java/com/puyo/game/input/InputHandler.java` | 수정      | DAS/ARR 상태 필드/상수 추가, updateDasArr(), getMoveDirection() 수정 |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java`  | 수정      | isInsideVisible() 추가, 4개 충돌 체크 메서드에 적용                  |
+
+### 검증 결과
+
+- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
+- 데스크톱 앱 실행 확인 - 게임플레이 진입, 스테이지 로드 정상
+
+### 커밋
+
+- `b158b15` - feat: DAS/ARR input + ghost puyo collision ignore
+
+---
+
+## v0.1.7 (2026-08-07) - **락 딜레이(Tsu 규칙) 완전 구현, 회전 버그 수정, 다음 블록 스폰 버그 수정, 폰트 증분 로딩, 안드로이드 네이티브 라이브러리 로드 수정**
+
+### 해결된 버그
+
+1. **락 딜레이 메커니즘 (Lock Delay) - Tsu 규칙 완전 구현** (`GameWorld.java`)
+   - **문제**: 뿌요가 바닥에 닿아도 계속 움직이면 절대 잠기지 않음
+   - **원인**: `resetLockDelay()`에서 `lockDelayActive` 매번 `false`로 리셋, 이동 카운터 공중에서도 누적
+   - **해결**:
+     - `lockDelayMoveCount` 추가로 이동/회전 15회 제한 구현
+     - `lockDelayActive` 상태 관리 개선 (스폰/잠금 시 리셋)
+     - 공중 이동 시 카운터 리셋, 락 딜레이 중일 때만 카운트
+   - **Tsu 규칙**: 락 딜레이 0.5초, 이동/회전 15회 제한, 초과 시 즉시 잠금
+
+2. **뿌요 회전 안 되는 버그** (`PuyoPair.java`, `PlayScreen.java`)
+   - **문제**: 회전 키를 눌러도 뿌요가 회전하지 않음
+   - **원인**:
+     1. `PuyoPair.rotateClockwise()`가 `setPosition()` 호출 안 함
+     2. `PlayScreen`에서 `gameWorld.rotateClockwise()` 대신 `getCurrentPair().rotateClockwise()` 직접 호출 (벽 킥 무시)
+     3. `render()`에서 `inputHandler.update()` 중복 호출로 엣지 감지 실패
+   - **해결**:
+     - `PuyoPair.rotateClockwise()`/`rotateCounterClockwise()`에 `setPosition()` 추가
+     - `PlayScreen`에서 `gameWorld.rotateClockwise()` 사용 (벽 킥 포함)
+     - `render()`에서 `inputHandler.update()` 제거, `update()`에서 한 번만 호출
+
+3. **다음 블록 바닥 생성 버그** (`GameWorld.java`)
+   - **문제**: 다음 뿌요가 상단 중앙이 아닌 바닥(0,0)에서 생성
+   - **원인**: `spawnNextPair()`에서 `setPosition()` 미호출
+   - **해결**: `createAndPositionPair()` 공통 메서드로 추출하여 스폰 위치 설정
+
+4. **폰트 로딩 지연 최적화** (`FontManager.java`)
+   - **문제**: 한글 11,172자 미리 생성으로 로딩 화면 지연
+   - **해결**:
+     - `FreeTypeFontParameter.incremental = true` 동적 글리프 생성
+     - 기본 문자셋만 미리 생성 (DEFAULT_CHARS + 게임용 한글)
+     - 나머지 11,172자는 런타임 동적 생성
+
+5. **안드로이드 네이티브 라이브러리 로드 실패** (`AndroidLauncher.java`)
+   - **문제**: `libpenguin.so` dlopen 실패
+   - **해결**:
+     - `System.loadLibrary("penguin")` 제거 (gdx-freetype가 내부에서 dlopen)
+     - `android:extractNativeLibs` 제거
+
+### 리팩토링
+
+- **GameWorld.java** - 스폰 로직 통합: `createAndPositionPair()` 공통 메서드 추출
+
+### 변경 파일
+
+| 파일                                                           | 변경 유형 | 설명                                          |
+| -------------------------------------------------------------- | --------- | --------------------------------------------- |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | 락 딜레이 구현, 스폰 로직 리팩토링, 버그 수정 |
+| `core/src/main/java/com/puyo/game/logic/model/PuyoPair.java`   | 수정      | 회전 시 위치 갱신 로직 추가                   |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | 회전 처리 로직 수정, 입력 처리 순서 수정      |
+| `core/src/main/java/com/puyo/game/graphics/FontManager.java`   | 수정      | Incremental 폰트 생성 적용, 한글 로딩 최적화  |
+| `android/src/main/java/com/puyo/game/AndroidLauncher.java`     | 수정      | 네이티브 라이브러리 로드 방식 수정            |
+
+### 검증 결과
+
+- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
+- 데스크톱 앱 2분 51초 크래시 없는 실행
+- 회전 키(↑/W/X/1, Z/2) 정상 작동
+- 락 딜레이: 15회 이동/회전 또는 0.5초 후 자동 잠금
+- 다음 블록 상단 중앙 정상 생성
+- 한글/영문 폰트 정상 렌더링
+
+### 커밋
+
+- `b814c7f` - feat(engine): implement Tsu rules lock delay move limit
+- `ea5636f` - refactor: extract pair creation logic to eliminate duplication
+- `48b84f1` - 다음 생성시 바닥생성 버그 수정
+- `b2192cb` - 회전키 버그 수정
+- `9d58fad` - feat(graphics): switch FontManager to incremental mode for dynamic glyph generation
+- `f4e683d` - fix: handle platform-specific font resource paths for Android and Desktop
+
+---
+
 ## v0.1.6 (2026-08-06) - **GameViewport 1600×960 가로 고정 리팩토링 완료, 터치 컨트롤러 구현, 데스크톱/모바일 가로 모드 적용**
 
 ### 추가
