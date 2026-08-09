@@ -11,9 +11,12 @@ import com.puyo.game.GameMode;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.engine.GameWorld;
+import com.puyo.game.logic.engine.GameWorld.FallingPuyo;
 import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
+
+import java.util.List;
 import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.story.StageData;
 import com.puyo.game.config.GameViewport;
@@ -92,7 +95,7 @@ public class PlayScreen extends BaseScreen {
         // Draw game board
         drawBoard();
         drawCurrentPair();
-        drawFallingSinglePuyo();
+        drawFallingPuyos();
         drawNextPair();
         drawUI();
     }
@@ -200,15 +203,18 @@ public class PlayScreen extends BaseScreen {
         batch.end();
     }
 
-    private void drawFallingSinglePuyo() {
-        Puyo puyo = gameWorld.getFallingSinglePuyo();
-        if (puyo == null)
+    private void drawFallingPuyos() {
+        List<FallingPuyo> fallingPuyos = gameWorld.getFallingPuyos();
+        if (fallingPuyos == null || fallingPuyos.isEmpty())
             return;
 
         batch.begin();
-        drawPuyo(puyo,
-                GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
-                GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
+        for (FallingPuyo fp : fallingPuyos) {
+            Puyo puyo = fp.puyo;
+            drawPuyo(puyo,
+                    GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
+                    GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
+        }
         batch.end();
     }
 

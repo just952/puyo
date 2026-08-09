@@ -4,7 +4,44 @@
 
 ---
 
+## v0.1.11 (2026-08-09) - **연쇄 후 기둥 낙하 동시 애니메이션 + 깜빡임 해결 + 낙하 속도 통일**
+
+### 추가
+
+1. **연쇄 후 기둥 낙하 동시 애니메이션** (`Board.java`, `GameWorld.java`)
+   - `Board.getAllFloatingPuyos()` 재작성: 수직 기둥의 모든 뿌요를 동시에 떠있는 상태로 인식
+   - `GameWorld.updateFalling()` 열(column) 단위 기둥 낙하: 같은 X좌표 뿌요들을 한 덩어리로 동시 이동
+   - `SINGLE_FALL_INTERVAL` 0.1f 적용으로 부드러운 낙하 애니메이션
+
+2. **기둥 낙하 렌더링 깜빡임 해결** (`PlayScreen.java`, `GameWorld.java`)
+   - `drawFallingPuyos()` 메서드 추가: `fallingPuyos` 리스트의 모든 뿌요를 낙하 중에도 렌더링
+   - `GameWorld.FallingPuyo` 클래스와 필드를 `public`으로 변경하여 외부 접근 가능
+
+3. **낙하 속도 통일** (`GameWorld.java`)
+   - `SINGLE_FALL_INTERVAL` 0.05f 유지 (소프트 드롭 속도)
+   - 분리 낙하와 기둥 낙하 모두 0.05초 간격으로 동일 속도 적용
+
+### 변경 파일
+
+| 파일                                                           | 변경 유형 | 설명                                                   |
+| -------------------------------------------------------------- | --------- | ------------------------------------------------------ |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java`      | 수정      | `getAllFloatingPuyos()` 재작성으로 수직 기둥 전체 인식 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | 열 단위 기둥 낙하, FallingPuyo public, 속도 0.1f 적용  |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | `drawFallingPuyos()` 추가, FallingPuyo import 추가     |
+
+### 검증 결과
+
+- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
+- 데스크톱 앱 **6분 50초 크래시 없는 실행**
+- 수직 기둥 동시 낙하 애니메이션 정상 작동
+- 낙하 중 깜빡임 현상 해결
+- 분리/기둥 낙하 속도 통일 (0.1f)
+
+---
+
 ## v0.1.10 (2026-08-09) - **팝(Pop) 애니메이션 구현 + 연쇄 처리 시스템 통합**
+
+REPLACE
 
 ### 추가
 

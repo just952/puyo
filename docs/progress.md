@@ -1,6 +1,6 @@
 # Puyo Puyo 2 - 개발 진행 현황
 
-## 최종 업데이트: 2026-08-08
+## 최종 업데이트: 2026-08-09
 
 ---
 
@@ -37,6 +37,9 @@
 |                     | **뿌요쌍 분리 로직 (Single Puyo Separation)**                         | **완료** | 가로 상태에서 한쪽만 막히면 분리, 단일 뿌요 자동 낙하 (0.08초/칸)    |
 |                     | **단일 뿌요 낙하 속도 분리**                                          | **완료** | 별도 타이머(singleFallTimer)로 소프트 드롭 속도(0.08초/칸) 적용      |
 |                     | **팝 애니메이션 (Pop Animation)**                                     | **완료** | Puyo 모델 팝 상태, updateFalling 통합, 렌더링 스케일 (0.3초)         |
+|                     | **연쇄 후 기둥 낙하 동시 애니메이션**                                 | **완료** | Board.getAllFloatingPuyos() 수정, 열 단위 동시 낙하, 0.05f 속도 적용 |
+|                     | **기둥 낙하 렌더링 깜빡임 해결**                                      | **완료** | drawFallingPuyos() 추가로 모든 fallingPuyos 렌더링                   |
+|                     | **낙하 속도 통일 (0.05f)**                                            | **완료** | SINGLE_FALL_INTERVAL 0.05f 적용, 분리/기둥 동일 속도                 |
 | 폰트/한글           | NotoSansKR-Regular.ttf 적용                                           | **완료** | Google Fonts에서 정상 파일 다운로드                                  |
 |                     | 한글 깨짐(X박스) 해결                                                 | **완료** | FontManager.param.characters에 필수 문자 명시                        |
 |                     | 폰트 경로 정리                                                        | **완료** | core/src/main/resources/assets/ 하나로 통합                          |

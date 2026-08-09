@@ -35,9 +35,9 @@ public class GameWorld {
     private int totalRemoved = 0;
 
     // 통합된 낙하 시스템 (분리/연쇄 모두 처리)
-    private static class FallingPuyo {
-        Puyo puyo;
-        boolean isFromSeparation; // true: 분리, false: 연쇄
+    public static class FallingPuyo {
+        public Puyo puyo;
+        public boolean isFromSeparation; // true: 분리, false: 연쇄
 
         FallingPuyo(Puyo puyo, boolean isFromSeparation) {
             this.puyo = puyo;
@@ -47,7 +47,7 @@ public class GameWorld {
 
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
     private float singleFallTimer = 0f;
-    private static final float SINGLE_FALL_INTERVAL = 0.1f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도) - 2배 느리게
+    private static final float SINGLE_FALL_INTERVAL = 0.05f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도)
 
     public GameWorld() {
         board = new Board();
@@ -480,6 +480,10 @@ public class GameWorld {
             return fallingPuyos.get(0).puyo;
         }
         return null;
+    }
+
+    public List<FallingPuyo> getFallingPuyos() {
+        return fallingPuyos;
     }
 
     public int getScore() {
