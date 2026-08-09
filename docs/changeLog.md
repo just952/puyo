@@ -4,6 +4,45 @@
 
 ---
 
+## v0.1.9 (2026-08-09) - **뿌요쌍 분리 로직 구현 + 단일 뿌요 낙하 속도 소프트 드롭 속도로 수정**
+
+### 추가
+
+1. **뿌요쌍 분리 로직 (Single Puyo Separation)** (`GameWorld.java`, `Board.java`, `Puyo.java`)
+   - 가로 상태(rotation 1, 3)에서 한쪽만 막혔을 때 쌍 분리
+   - 막힌 쪽 즉시 잠금, 자유로운 쪽 단일 뿌요로 자동 낙하 시작
+   - 단일 뿌요는 플레이어 조작 불가, 순수 자동 낙하
+
+2. **단일 뿌요 전용 낙하 속도** (`GameWorld.java`)
+   - `SINGLE_FALL_INTERVAL = 0.08f` (소프트 드롭 속도, 12.5칸/초)
+   - 별도 타이머 `singleFallTimer`로 쌍 뿌요와 독립적인 속도 관리
+   - 착지 시 타이머 리셋
+
+3. **분리된 단일 뿌요 렌더링** (`PlayScreen.java`)
+   - `drawFallingSinglePuyo()` 메서드 추가
+   - `gameWorld.getFallingSinglePuyo()` getter 활용
+
+### 변경 파일
+
+| 파일                                                           | 변경 유형 | 설명                                                              |
+| -------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | 분리 로직, 단일 뿌요 타이머/속도, 착지 후 매칭/스폰 처리          |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java`      | 수정      | `canMoveDown(Puyo)` 단일 뿌요 체크 메서드 추가                    |
+| `core/src/main/java/com/puyo/game/logic/model/Puyo.java`       | 수정      | `moveDown()` 단일 뿌요 이동 메서드 추가                           |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | `drawFallingSinglePuyo()` 렌더링, 소프트 드롭 null 체크           |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | `moveLeft/Right/rotate/hardDrop` null 체크, `canFall()` null 체크 |
+
+### 검증 결과
+
+- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
+- 데스크톱 앱 실행 확인 - 게임플레이 진입, 분리 로직 정상 작동, 단일 뿌요 빠른 낙하 확인
+
+### 커밋
+
+- `eb9d8e9` - feat: Single puyo separation logic + soft drop speed for separated puyo
+
+---
+
 ## v0.1.8 (2026-08-08) - **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림**
 
 ### 추가
