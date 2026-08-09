@@ -1,18 +1,19 @@
 # Puyo Puyo 2 - 기술 아키텍처 문서
 
 ## 기술 스택
-| 영역 | 기술 | 버전 | 비고 |
-|------|------|------|------|
-| 언어 | Java | 17 | LTS, Android 타겟 |
-| 게임 프레임워크 | LibGDX | 1.12.1 | 크로스 플랫폼 (Desktop/Android) |
-| 빌드 시스템 | Gradle | 8.4 | Kotlin DSL 미사용 (Groovy) |
-| 안드로이드 플러그인 | AGP | 8.1.0 | compileSdk 33, minSdk 21 |
-| NDK | Android NDK | r25c+ | 네이티브 라이브러리 빌드용 |
-| 백엔드 (Desktop) | LWJGL3 | 3.3.2 | LibGDX 기본 |
-| 백엔드 (Android) | Android SDK | 33 | LibGDX 기본 |
-| 테스트 (Headless) | gdx-backend-headless | 1.12.1 | CI 전용 |
-| CI/CD | GitHub Actions | - | ubuntu-latest 러너 (검증용 유지) |
-| 버전 관리 | Git | - | GitHub 호스팅 |
+
+| 영역                | 기술                 | 버전   | 비고                             |
+| ------------------- | -------------------- | ------ | -------------------------------- |
+| 언어                | Java                 | 17     | LTS, Android 타겟                |
+| 게임 프레임워크     | LibGDX               | 1.12.1 | 크로스 플랫폼 (Desktop/Android)  |
+| 빌드 시스템         | Gradle               | 8.4    | Kotlin DSL 미사용 (Groovy)       |
+| 안드로이드 플러그인 | AGP                  | 8.1.0  | compileSdk 33, minSdk 21         |
+| NDK                 | Android NDK          | r25c+  | 네이티브 라이브러리 빌드용       |
+| 백엔드 (Desktop)    | LWJGL3               | 3.3.2  | LibGDX 기본                      |
+| 백엔드 (Android)    | Android SDK          | 33     | LibGDX 기본                      |
+| 테스트 (Headless)   | gdx-backend-headless | 1.12.1 | CI 전용                          |
+| CI/CD               | GitHub Actions       | -      | ubuntu-latest 러너 (검증용 유지) |
+| 버전 관리           | Git                  | -      | GitHub 호스팅                    |
 
 ---
 
@@ -25,19 +26,53 @@ puyo/
 ├── gradle.properties         # JVM 옵션, 버전 상수, org.gradle.java.home=JDK 17
 ├── core/                     # 공통 게임 로직 (Pure Java + LibGDX API)
 │   ├── build.gradle          # 의존성: gdx, gdx-ai, gdx-freetype, gdx-platform:natives-desktop(test)
-│   └── src/main/java/com/puyo/game/
-│       ├── PuyoGame.java            # 메인 게임 클래스 (Game 인터페이스 구현)
-│       ├── config/GameViewport.java # 가상 해상도 960x1600, FitViewport 팩토리
-│       ├── graphics/FontManager.java # FreeTypeFontGenerator 한글 폰트 관리
-│       ├── logic/engine/GameWorld.java # 게임 루프, 보드, 페어, 중력, 매칭, 연쇄
-│       ├── logic/model/             # Puyo, PuyoColor, PuyoPair, Board, StageData
-│       ├── menus/MenuLoader.java    # JSON 메뉴 로딩 (classpath/internal 폴백)
-│       ├── screens/                 # BaseScreen, LoadingScreen, MenuScreen, PlayScreen, StoryModeSelectScreen
-│       └── story/StoryModeManager.java # 스토리 모드 JSON 로딩, 스테이지 관리
-│   └── src/main/resources/assets/   # 공통 에셋 (JAR의 assets/ 하위에 포함)
-│       ├── config/
-│       ├── data/
-│       └── NotoSansKR-Regular.ttf
+│   ├── src/main/java/com/puyo/game/
+│   │   ├── PuyoGame.java                 # 메인 게임 클래스 (Game 인터페이스 구현)
+│   │   ├── GameMode.java                 # 게임 모드 열거형 (NORMAL, ENDLESS, VERSUS, OPTION)
+│   │   ├── config/
+│   │   │   ├── ConfigManager.java        # 설정 관리 (JSON 기반)
+│   │   │   └── GameViewport.java         # 가상 해상도 1600x960, FitViewport 팩토리
+│   │   ├── graphics/
+│   │   │   └── FontManager.java          # FreeTypeFontGenerator 한글 폰트 관리
+│   │   ├── input/
+│   │   │   ├── InputHandler.java         # 키보드/터치 통합 입력 처리
+│   │   │   └── TouchController.java      # 모바일 4버튼 터치 컨트롤러
+│   │   ├── logic/
+│   │   │   ├── ai/
+│   │   │   │   └── AIController.java     # AI 대전 컨트롤러 (휴리스틱)
+│   │   │   ├── engine/
+│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 중력, 매칭, 연쇄
+│   │   │   │   ├── GravityEngine.java    # 중력 처리 엔진
+│   │   │   │   ├── GravityEngineTest.java # 중력 엔진 테스트
+│   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
+│   │   │   └── model/
+│   │   │       ├── Board.java            # 6x12 보드, 중력, 매칭, 연쇄
+│   │   │       ├── MatchResult.java      # 매칭 결과 데이터
+│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존)
+│   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
+│   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
+│   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)
+│   │   ├── menus/
+│   │   │   ├── MenuAction.java           # 메뉴 액션 열거형
+│   │   │   ├── MenuItem.java             # 메뉴 아이템 데이터
+│   │   │   ├── MenuLoader.java           # JSON 메뉴 로딩 (classpath/internal 폴백)
+│   │   │   ├── MenuLoaderTest.java       # 메뉴 로더 테스트
+│   │   │   └── MenuSystemDemo.java       # 메뉴 시스템 데모
+│   │   ├── screens/
+│   │   │   ├── BaseScreen.java           # 공통 스크린 베이스 (뷰포트, 카메라)
+│   │   │   ├── LoadingScreen.java        # 로딩 화면
+│   │   │   ├── MenuScreen.java           # 메인 메뉴 화면
+│   │   │   ├── PlayScreen.java           # 게임플레이 화면
+│   │   │   └── StoryModeSelectScreen.java # 스토리 모드 선택 화면
+│   │   └── story/
+│   │       ├── StageData.java            # 스테이지 데이터 모델
+│   │       └── StoryModeManager.java     # 스토리 모드 JSON 로딩, 스테이지 관리
+│   ├── src/main/resources/assets/        # 공통 에셋 (JAR의 assets/ 하위에 포함)
+│   │   ├── config/
+│   │   ├── data/
+│   │   └── NotoSansKR-Regular.ttf
+│   └── src/test/java/com/puyo/game/
+│       └── GameTest.java                 # 게임 로직 단위 테스트
 ├── desktop/                  # 데스크톱 런처 (LWJGL3)
 │   ├── build.gradle          # gdx-backend-lwjgl3, gdx-platform:natives-desktop
 │   └── src/main/java/com/puyo/game/DesktopLauncher.java
@@ -46,7 +81,7 @@ puyo/
 │   │   # mergeNativeLibs 후 libgdx-freetype.so → libpenguin.so 복사 + Python lief로 SONAME 패치
 │   └── src/main/
 │       ├── java/com/puyo/game/AndroidLauncher.java # AndroidApplication 구현
-│       ├── AndroidManifest.xml # minSdk 21, targetSdk 33, 세로 고정
+│       ├── AndroidManifest.xml # minSdk 21, targetSdk 33, 가로 고정
 │       └── res/                # strings, colors, styles, drawable
 ├── .github/workflows/android-build.yml # CI/CD 파이프라인
 ├── docs/                     # 설계/진행 문서
@@ -57,20 +92,21 @@ puyo/
 
 ## 아키텍처 패턴
 
-| 레이어 | 구성 요소 | 설명 |
-|--------|----------|------|
-| **엔트리 포인트** | `PuyoGame` (core), `AndroidLauncher` (android), `DesktopLauncher` (desktop) | 플랫폼별 초기화 |
-| **게임 루프** | `GameWorld` | 업데이트/렌더링 분리, 고정 타임스텝(1/60s) |
-| **상태 관리** | `Screen` 기반 (LibGDX) | Loading → Menu → Play/StorySelect |
-| **렌더링** | `FitViewport` + `OrthographicCamera` | 가상 해상도 960x1600, 자동 스케일링 |
-| **데이터** | JSON + `Json` (LibGDX) | 메뉴, 스테이지 데이터 외부화 |
-| **리소스** | `AssetManager` (예정) | 텍스처/사운드/폰트 통합 관리 |
+| 레이어            | 구성 요소                                                                   | 설명                                       |
+| ----------------- | --------------------------------------------------------------------------- | ------------------------------------------ |
+| **엔트리 포인트** | `PuyoGame` (core), `AndroidLauncher` (android), `DesktopLauncher` (desktop) | 플랫폼별 초기화                            |
+| **게임 루프**     | `GameWorld`                                                                 | 업데이트/렌더링 분리, 고정 타임스텝(1/60s) |
+| **상태 관리**     | `Screen` 기반 (LibGDX)                                                      | Loading → Menu → Play/StorySelect          |
+| **렌더링**        | `FitViewport` + `OrthographicCamera`                                        | 가상 해상도 960x1600, 자동 스케일링        |
+| **데이터**        | JSON + `Json` (LibGDX)                                                      | 메뉴, 스테이지 데이터 외부화               |
+| **리소스**        | `AssetManager` (예정)                                                       | 텍스처/사운드/폰트 통합 관리               |
 
 ---
 
 ## 렌더링 아키텍처 (v0.2.0~)
 
 ### 가상 해상도 시스템 (가로 고정 1600×960)
+
 ```java
 // core/src/main/java/com/puyo/game/config/GameViewport.java
 public class GameViewport {
@@ -96,13 +132,13 @@ public class GameViewport {
         public static final float CENTER_UI_WIDTH = 200f;
         public static final float TOTAL_BOARDS_WIDTH = BOARD_WIDTH * 2 + CENTER_UI_WIDTH; // 1160
         public static final float SIDE_MARGIN = (VIRTUAL_WIDTH - TOTAL_BOARDS_WIDTH) / 2f; // 220
-        
+
         public static final float P1_BOARD_OFFSET_X = SIDE_MARGIN; // 220
         public static final float P1_BOARD_OFFSET_Y = 0f;
-        
+
         public static final float P2_BOARD_OFFSET_X = SIDE_MARGIN + BOARD_WIDTH + CENTER_UI_WIDTH; // 900
         public static final float P2_BOARD_OFFSET_Y = 0f;
-        
+
         public static final float CENTER_UI_OFFSET_X = SIDE_MARGIN + BOARD_WIDTH; // 700
         public static final float CENTER_UI_OFFSET_Y = 0f;
     }
@@ -141,16 +177,17 @@ public class TouchController implements InputProcessor, Disposable {
 }
 ```
 
-| 플랫폼 | 입력 방식 | 구현 클래스 |
-|--------|-----------|-------------|
-| **PC** | 키보드 (WASD/방향키 + Space/Enter) | `InputHandler` (키보드 분기) |
-| **모바일** | 터치 오버레이 (4버튼) | `InputHandler` + `TouchController` |
+| 플랫폼     | 입력 방식                          | 구현 클래스                        |
+| ---------- | ---------------------------------- | ---------------------------------- |
+| **PC**     | 키보드 (WASD/방향키 + Space/Enter) | `InputHandler` (키보드 분기)       |
+| **모바일** | 터치 오버레이 (4버튼)              | `InputHandler` + `TouchController` |
 
 ---
 
 ## 안드로이드 모듈 상세 (v0.2.0~)
 
 ### AndroidManifest.xml - 가로 고정
+
 ```xml
 <activity
     android:name=".AndroidLauncher"
@@ -160,6 +197,7 @@ public class TouchController implements InputProcessor, Disposable {
 ```
 
 ### AndroidLauncher.java - 몰입 모드
+
 ```java
 // 풀스크린 몰입 모드 (네비게이션 바/상태 바 숨김)
 getWindow().getDecorView().setSystemUiVisibility(
@@ -173,49 +211,54 @@ getWindow().getDecorView().setSystemUiVisibility(
 ```
 
 ### 네이티브 라이브러리 패키징 (기존 유지)
+
 - `libgdx.so`, `libpenguin.so` (SONAME 패치됨) → APK `lib/arm64-v8a/`, `lib/armeabi-v7a/`
 - `mergeNativeLibs` 후 Python `lief`로 `libpenguin.so` SONAME 패치
 
 ---
 
 ## 데스크톱 런처 (v0.2.0~)
-```java
+
+````java
 // desktop/src/main/java/com/puyo/game/DesktopLauncher.java
 Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
 config.setWindowedMode(1600, 960);  // 가로 고정
 config.setResizable(true);  // 비율 유지 리사이즈
 config.setForegroundFPS(60);
 ```inal float BOARD_OFFSET_Y = 320f; // 상단 여백
-    
+
     public static FitViewport createViewport() {
         OrthographicCamera camera = new OrthographicCamera();
         camera.setToOrtho(false, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         return new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, camera);
     }
 }
-```
+````
 
 ### 적용된 화면들
-| 화면 | 뷰포트 적용 | 렌더링 방식 |
-|------|------------|------------|
-| `LoadingScreen` | ✅ | ShapeRenderer + 카메라 프로젝션 |
-| `MenuScreen` | ✅ | ShapeRenderer + 중앙 정렬 텍스트 |
-| `StoryModeSelectScreen` | ✅ | ShapeRenderer + 그리드 레이아웃 |
-| `PlayScreen` | ✅ | ShapeRenderer + 가상 좌표계 보드/뿌요 |
+
+| 화면                    | 뷰포트 적용 | 렌더링 방식                           |
+| ----------------------- | ----------- | ------------------------------------- |
+| `LoadingScreen`         | ✅          | ShapeRenderer + 카메라 프로젝션       |
+| `MenuScreen`            | ✅          | ShapeRenderer + 중앙 정렬 텍스트      |
+| `StoryModeSelectScreen` | ✅          | ShapeRenderer + 그리드 레이아웃       |
+| `PlayScreen`            | ✅          | ShapeRenderer + 가상 좌표계 보드/뿌요 |
 
 ---
 
 ## 네이티브 라이브러리 처리 (중요: 현재 미해결)
 
 ### 문제 현황
-| 항목 | 상태 | 비고 |
-|------|------|------|
-| `libgdx.so` | APK 포함됨 | arm64-v8a: 163KB, armeabi-v7a: 160KB |
-| `libgdx-freetype.so` | **이름 변경 시도** | → `libpenguin.so`로 이름 변경 |
-| `libpenguin.so` | APK 포함됨 | arm64-v8a: 797KB, armeabi-v7a: 757KB |
-| **실기기 로드** | **실패** | `dlopen failed: library "libpenguin.so" not found` |
+
+| 항목                 | 상태               | 비고                                               |
+| -------------------- | ------------------ | -------------------------------------------------- |
+| `libgdx.so`          | APK 포함됨         | arm64-v8a: 163KB, armeabi-v7a: 160KB               |
+| `libgdx-freetype.so` | **이름 변경 시도** | → `libpenguin.so`로 이름 변경                      |
+| `libpenguin.so`      | APK 포함됨         | arm64-v8a: 797KB, armeabi-v7a: 757KB               |
+| **실기기 로드**      | **실패**           | `dlopen failed: library "libpenguin.so" not found` |
 
 ### 시도한 해결 (모두 실패)
+
 ```gradle
 // android/build.gradle - 이름 변경 로직 (커밋 0961e9c)
 tasks.register('renameFreetypeToPenguin', Copy) {
@@ -243,12 +286,14 @@ patchelf --set-soname libpenguin.so lib/armeabi-v7a/libpenguin.so
 ```
 
 ### 실패 원인 추정
+
 1. **gdx-freetype 네이티브 코드 내부**에서 `dlopen("libpenguin.so")` 호출 시 **이미 로드된 라이브러리를 찾지 못함**
 2. `android:extractNativeLibs="true"` (기본값)이나 **압축 해제 경로/권한 문제** 가능성
 3. **GitHub Actions 러너의 NDK/SDK 버전** 차이로 인한 네이티브 심볼/의존성 불일치
 4. **Termux 환경에서 `aapt2`, `lldb`, `readelf` 등 디버깅 도구 부재**로 정밀 분석 불가
 
 ### 결정: PC 로컬 개발 환경으로 이전
+
 ```
 # PC에서 필요한 환경
 - JDK 17 (Temurin/OpenJDK)
@@ -259,6 +304,7 @@ patchelf --set-soname libpenguin.so lib/armeabi-v7a/libpenguin.so
 ```
 
 ### PC에서 수행할 디버깅
+
 ```bash
 # 1. 로컬 빌드
 ./gradlew :android:assembleDebug
@@ -280,6 +326,7 @@ adb shell lldb --attach $(pidof com.puyo.game)
 ## 빌드/배포 파이프라인
 
 ### GitHub Actions (현재: CI 검증용 유지)
+
 ```yaml
 # .github/workflows/android-build.yml
 jobs:
@@ -298,6 +345,7 @@ jobs:
 ```
 
 ### PC 로컬 환경 (신규: 주 개발/디버깅 환경)
+
 ```bash
 # 1. 환경 설정 (최초 1회)
 # - JDK 17 설치
@@ -323,14 +371,15 @@ adb install -r android/build/outputs/apk/debug/android-debug.apk
 
 ## 테스트 전략
 
-| 테스트 유형 | 도구 | 실행 환경 | 대상 |
-|-------------|------|-----------|------|
-| 단위 테스트 (로직) | JUnit 5 + LibGDX Headless | GitHub Actions / PC 로컬 | GameWorld, Board, PuyoPair, StoryModeManager |
-| 통합 테스트 (메뉴) | JUnit 5 + LibGDX Headless | GitHub Actions / PC 로컬 | MenuLoader, MenuScreen 네비게이션 |
-| UI 테스트 | Manual / Espresso (예정) | 실기기 / 에뮬레이터 | 화면 전환, 입력 처리 |
-| 네이티브 로드 테스트 | adb + logcat + lldb | **PC 로컬 + 실기기** | libgdx.so, libpenguin.so 로드 검증 |
+| 테스트 유형          | 도구                      | 실행 환경                | 대상                                         |
+| -------------------- | ------------------------- | ------------------------ | -------------------------------------------- |
+| 단위 테스트 (로직)   | JUnit 5 + LibGDX Headless | GitHub Actions / PC 로컬 | GameWorld, Board, PuyoPair, StoryModeManager |
+| 통합 테스트 (메뉴)   | JUnit 5 + LibGDX Headless | GitHub Actions / PC 로컬 | MenuLoader, MenuScreen 네비게이션            |
+| UI 테스트            | Manual / Espresso (예정)  | 실기기 / 에뮬레이터      | 화면 전환, 입력 처리                         |
+| 네이티브 로드 테스트 | adb + logcat + lldb       | **PC 로컬 + 실기기**     | libgdx.so, libpenguin.so 로드 검증           |
 
 ### 헤드리스 테스트 구성 (core/build.gradle)
+
 ```groovy
 testImplementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
 testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
@@ -340,25 +389,25 @@ testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-deskt
 
 ## 알려진 제약사항
 
-| 제약사항 | 영향도 | 대응 방안 |
-|----------|--------|-----------|
-| **Termux에서 aapt2 미작동** | 로컬 APK 빌드 불가 | **PC 이전으로 해결** |
-| **Termux에서 네이티브 lib 미포함** | 로컬 단위 테스트 불가 | **PC 이전으로 해결 (natives-desktop 자동 다운로드)** |
-| **GitHub Actions에서 실기기 테스트 불가** | 네이티브 로드 검증 불가 | **PC + 실기기 adb 연결로 해결** |
-| **libgdx-freetype 네이티브 의존성 불확실** | libpenguin.so 로드 실패 | **PC에서 lldb로 심볼/의존성 분석 후 해결** |
-| **CI 러너 NDK 버전 고정 어려움** | 재현성 저하 | **PC 로컬에서 NDK 버전 고정하여 빌드** |
+| 제약사항                                   | 영향도                  | 대응 방안                                            |
+| ------------------------------------------ | ----------------------- | ---------------------------------------------------- |
+| **Termux에서 aapt2 미작동**                | 로컬 APK 빌드 불가      | **PC 이전으로 해결**                                 |
+| **Termux에서 네이티브 lib 미포함**         | 로컬 단위 테스트 불가   | **PC 이전으로 해결 (natives-desktop 자동 다운로드)** |
+| **GitHub Actions에서 실기기 테스트 불가**  | 네이티브 로드 검증 불가 | **PC + 실기기 adb 연결로 해결**                      |
+| **libgdx-freetype 네이티브 의존성 불확실** | libpenguin.so 로드 실패 | **PC에서 lldb로 심볼/의존성 분석 후 해결**           |
+| **CI 러너 NDK 버전 고정 어려움**           | 재현성 저하             | **PC 로컬에서 NDK 버전 고정하여 빌드**               |
 
 ---
 
 ## 향후 아키텍처 개선 계획
 
-| 영역 | 계획 | 우선순위 |
-|------|------|---------|
-| 리소스 관리 | `AssetManager` 도입 + 텍스처 아틀라스 | P1 |
-| 네이티브 빌드 | 프리빌트 `.so` 대신 소스에서 NDK 빌드 (CMake) | P2 |
-| 의존성 주입 | 수동 팩토리 → Dagger/Hilt 또는 수동 DI 컨테이너 | P3 |
-| 상태 관리 | Screen 기반 → 상태 머신/이벤트 버스 | P3 |
-| 네트워크 | WebSocket + Protobuf (온라인 대전) | P2 |
+| 영역          | 계획                                            | 우선순위 |
+| ------------- | ----------------------------------------------- | -------- |
+| 리소스 관리   | `AssetManager` 도입 + 텍스처 아틀라스           | P1       |
+| 네이티브 빌드 | 프리빌트 `.so` 대신 소스에서 NDK 빌드 (CMake)   | P2       |
+| 의존성 주입   | 수동 팩토리 → Dagger/Hilt 또는 수동 DI 컨테이너 | P3       |
+| 상태 관리     | Screen 기반 → 상태 머신/이벤트 버스             | P3       |
+| 네트워크      | WebSocket + Protobuf (온라인 대전)              | P2       |
 
 ---
 
