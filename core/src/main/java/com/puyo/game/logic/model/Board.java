@@ -141,6 +141,23 @@ public class Board {
         }
     }
 
+    /**
+     * 공중에 떠있는 모든 뿌요를 반환 (아래가 비어있는 뿌요들)
+     * 연쇄 후 낙하 애니메이션용
+     */
+    public List<Puyo> getAllFloatingPuyos() {
+        List<Puyo> floating = new ArrayList<>();
+        for (int x = 0; x < WIDTH; x++) {
+            for (int y = 0; y < HEIGHT; y++) {
+                Puyo puyo = getPuyoAt(x, y);
+                if (puyo != null && puyo.isAlive() && y > 0 && getPuyoAt(x, y - 1) == null) {
+                    floating.add(puyo);
+                }
+            }
+        }
+        return floating;
+    }
+
     // Find all connected puyos of the same color (excluding ojama and hard)
     public List<Puyo> findConnectedPuyos(Puyo start) {
         if (start == null || start.getColor() == PuyoColor.OJAMA || start.getColor() == PuyoColor.HARD) {

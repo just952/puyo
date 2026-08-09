@@ -412,3 +412,190 @@ testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-deskt
 ---
 
 > **핵심**: 현재 네이티브 라이브러리 로드 실패는 **GitHub Actions/Termux 환경의 한계**입니다. **PC 로컬 환경에서 adb + lldb + Android Studio로 정밀 디버깅** 후 해결하는 것이 가장 빠른 경로입니다.
+
+---
+
+## 핵심 게임 루프 및 렌더링 파이프라인 (v0.2.0~)
+
+### 1. 진입점 및 메인 루프
+
+```
+PuyoGame (extends Game)
+├── create() → LoadingScreen 설정
+├── render() → super.render() 호출 → 현재 Screen의 render() 실행
+└── dispose() → 리소스 정리
+```
+
+**PuyoGame.render()**:
+
+```java
+@Override
+public void render() {
+    if (Gdx.gl != null) {
+        Gdx.gl.glClearColor(0, 0, 0, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+    }
+    super.render();  // 현재 Screen의 render() 호출
+}
+```
+
+### 2. Screen 전환 및 더블 버퍼링
+
+- **Screen 전환**: `game.setScreen(new PlayScreen(...))` 호출 시
+  1. 현재 Screen `hide()` → `dispose()`
+  2. 새 Screen `show()` → `initViewport()` 등 초기화
+  3. 다음 `render()`부터 새 Screen의 `render()` 호출
+
+- **더블 버퍼링**: LibGDX가 자동 처리
+  1. `Gdx.gl.glClear()` → 백버퍼 클리어
+  2. `batch.setProjectionMatrix(camera.combined)` → 카메라 행렬 적용
+  3. 그리기 명령들이 백버퍼에 기록
+  4. 프레임 끝 → LibGDX가 백버퍼→프론트버퍼 스왑
+
+### 3. 매 프레임 반복 (PlayScreen → GameWorld)
+
+```
+PlayScreen.render(delta)
+├── update(delta)          // 입력 처리 + 게임 로직
+│   ├── InputHandler 처리
+│   │   ├── isRotatePressed() → gameWorld.rotateClockwise()
+│   │   ├── getMoveDirection() → gameWorld.moveLeft/Right()
+│   │   ├── isDropPressed() → currentPair.moveDown()
+│   │   └── isHardDropPressed() → gameWorld.hardDrop()
+│   └── gameWorld.update(delta)  // 핵심 게임 로직
+│
+└── render()               // 렌더링
+    ├── drawBoard()        // 고정된 뿌요들
+    ├── drawCurrentPair()  // 현재 떨어지는 쌍
+    ├── drawFallingSinglePuyo()  // 분리된 단일 뿌요
+    ├── drawNextPair()     // 다음 뿌요 프리뷰
+    └── drawUI()           // 점수, 연쇄, 스테이지 등
+```
+
+### 4. GameWorld.update(delta) - 핵심 게임 루프
+
+```java
+public void update(float delta) {
+    if (gameOver) return;
+
+    // 1. 통합된 낙하/팝 처리 (분리/연쇄 모두) - 최우선, 조작 불가
+    if (!fallingPuyos.isEmpty()) {
+        updateFalling(delta);  // 매 프레임 팝 애니메이션, 0.05초 간격 분리 낙하
+        return;
+    }
+
+    // 2. 일반 쌍 뿌요 낙하 처리
+    fallTimer += delta;
+    if (fallTimer >= fallInterval) {  // 0.5초마다
+        fallTimer = 0f;
+        if (canFall()) {
+            currentPair.moveDown();
+            resetLockDelay();
+        } else {
+            // 바닥에 닿음 - 가로 상태에서 분리 가능한지 확인
+            if (isHorizontalAndCanSeparate()) {
+                separatePair();  // 한 쪽 잠금, 다른 쪽 단일 뿌요로 분리
+            } else {
+                // 기존 락 딜레이 로직
+                if (!lockDelayActive) {
+                    lockDelayActive = true;
+                    lockDelayTimer = 0f;
+                } else {
+                    lockDelayTimer += delta;
+                    if (lockDelayTimer >= LOCK_DELAY_TIME) {
+                        if (currentPair != null) {
+                            lockPiece();  // 새로운 연쇄/애니메이션 시스템 사용
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (lockDelayActive) {
+        lockDelayTimer += delta;
+        if (lockDelayTimer >= LOCK_DELAY_TIME) {
+            if (currentPair != null) {
+                lockPiece();
+            }
+        }
+    }
+}
+```
+
+### 5. 입력 처리 (InputHandler / TouchController)
+
+```java
+// 키보드 (PC) - InputHandler
+keyDown/keyUp → 상태 플래그 설정
+update() → 이전 프레임 상태 저장 (엣지 감지용)
+
+// 터치 (모바일) - TouchController implements InputProcessor
+touchDown/Up/Dragged → 버튼 영역별 플래그 설정
+정규화 좌표(0~1) 사용으로 해상도 독립적
+
+// 공통 조회 메서드 (InputHandler)
+getMoveDirection()  // -1, 0, 1
+isRotatePressed()   // 엣지 감지 (한 번만 true)
+isDropPressed()     // 홀드 감지
+isHardDropPressed() // 엣지 감지
+```
+
+### 6. 화면 렌더링 파이프라인 (PlayScreen.render)
+
+```java
+@Override
+public void render(float delta) {
+    // 1. Update game logic
+    update(delta);
+
+    // 2. Clear screen (백버퍼 클리어)
+    Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1);
+    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+    // 3. 카메라/프로젝션 매트릭스 업데이트
+    camera.update();
+    batch.setProjectionMatrix(camera.combined);
+    shapeRenderer.setProjectionMatrix(camera.combined);
+
+    // 4. 그리기 (백버퍼에 기록)
+    drawBoard();              // 고정된 뿌요들
+    drawCurrentPair();        // 현재 떨어지는 쌍
+    drawFallingSinglePuyo();  // 분리된 단일 뿌요
+    drawNextPair();           // 다음 뿌요 프리뷰
+    drawUI();                 // 점수, 연쇄, 스테이지 등
+
+    // 5. 프레임 끝 → LibGDX가 백버퍼→프론트버퍼 스왑
+}
+```
+
+### 7. Screen 전환 흐름 (메뉴 → 게임)
+
+```java
+// MenuScreen에서
+if (inputHandler.isEnterPressed()) {
+    game.setScreen(new PlayScreen(game, GameMode.NORMAL));
+}
+
+// PuyoGame.setScreen() 호출 시
+// 1. 현재 Screen.hide() → dispose()
+// 2. 새 Screen.show() → initViewport() 등 초기화
+// 3. 다음 render()부터 새 Screen의 render() 호출
+```
+
+---
+
+## 핵심 설계 포인트 요약
+
+| 구분            | 내용                                                                         |
+| --------------- | ---------------------------------------------------------------------------- |
+| **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `update()` + `render()`            |
+| **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어                      |
+| **입력 처리**   | `InputHandler`가 키보드/터치 통합, `update()`에서 엣지 감지                  |
+| **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유               |
+| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.08s)   |
+| **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙)                   |
+| **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복                          |
+| **렌더링**      | `ShapeRenderer` + `SpriteBatch`, `FitViewport`로 가상 해상도(1600×960) 유지  |
+| **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑)                                 |
+| **Screen 전환** | `Game.setScreen()` → hide/dispose → show/initViewport → 다음 프레임부터 적용 |

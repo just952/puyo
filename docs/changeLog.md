@@ -4,6 +4,60 @@
 
 ---
 
+## v0.1.10 (2026-08-09) - **팝(Pop) 애니메이션 구현 + 연쇄 처리 시스템 통합**
+
+### 추가
+
+1. **팝 애니메이션 (Pop Animation)** (`Puyo.java`, `GameWorld.java`, `PlayScreen.java`)
+   - Puyo 모델에 `PopState` enum, `popTimer`, `popScale` 필드 추가
+   - `startPop()`: 애니메이션 시작 (커짐 1.0→1.3, 작아짐 1.3→0, 0.3초 소요)
+   - `updatePop(delta)`: 매 프레임 매끄러운 애니메이션 업데이트
+   - `getPopScale()`, `isPopping()`: 렌더링/상태 확인용
+
+2. **통합된 연쇄/애니메이션 시스템** (`GameWorld.java`)
+   - `fallingPuyos` 리스트로 분리/연쇄 통합 관리 (`FallingPuyo` 클래스)
+   - `isFromSeparation` 플래그로 분리(낙하) vs 연쇄(팝) 구분
+   - `updateFalling(delta)`: 매 프레임 팝 애니메이션, SINGLE_FALL_INTERVAL 간격 분리 낙하
+   - `lockPiece()` 단순화: 새로운 `checkMatchesAndSpawnNext()` 시스템 사용
+
+3. **단계별 연쇄 처리** (`GameWorld.java`)
+   - `checkMatchesAndSpawnNext()`: 한 번에 한 단계만 처리 후 `updateFalling`에서 재귀 호출
+   - 팝 애니메이션 완료 → `board.removePuyo()` → `board.applyGravity()` → 다음 연쇄 체크
+   - `fallingPuyos`가 비면 다음 쌍 스폰
+
+4. **팝 애니메이션 렌더링** (`PlayScreen.java`)
+   - `drawPuyo()`에서 `puyo.getPopScale()` 적용하여 반지름 스케일링
+   - 스케일 0 이하일 때 그리기 생략 (완전 소멸)
+
+### 수정
+
+- `SINGLE_FALL_INTERVAL` 0.08f → 0.05f (소프트 드롭 속도 향상)
+- `lockPiece()` 기존 연쇄 루프 제거, 새 애니메이션 시스템으로 대체
+- `Board.java`: `removePuyo(Puyo)` 단일 뿌요 제거 메서드 추가 (필요시)
+
+### 변경 파일
+
+| 파일                                                           | 변경 유형 | 설명                                                     |
+| -------------------------------------------------------------- | --------- | -------------------------------------------------------- |
+| `core/src/main/java/com/puyo/game/logic/model/Puyo.java`       | 수정      | 팝 애니메이션 상태/메서드 추가                           |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | fallingPuyos 통합, 팝 애니메이션, 단계별 연쇄, 중력 적용 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | 팝 스케일 렌더링 적용                                    |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java`      | 수정      | `removePuyo(Puyo)` 단일 제거 메서드 추가                 |
+
+### 검증 결과
+
+- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
+- 데스크톱 앱 **5분 21초 크래시 없는 실행**
+- 팝 애니메이션: 커졌다 작아지며 동시 소멸 (원작 느낌)
+- 연쇄 후 남은 뿌요들 중력으로 정상 낙하
+- 모든 연쇄 단계별 애니메이션 처리
+
+### 커밋
+
+- `HEAD` - feat: pop animation + unified chain system
+
+---
+
 ## v0.1.9 (2026-08-09) - **뿌요쌍 분리 로직 구현 + 단일 뿌요 낙하 속도 소프트 드롭 속도로 수정**
 
 ### 추가

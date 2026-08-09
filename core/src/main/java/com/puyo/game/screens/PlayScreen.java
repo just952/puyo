@@ -233,17 +233,24 @@ public class PlayScreen extends BaseScreen {
 
     private void drawPuyo(Puyo puyo, float x, float y) {
         Color color = getColorForPuyo(puyo.getColor());
+        float scale = puyo.getPopScale(); // 팝 애니메이션 스케일 적용
+        float radius = (GameViewport.CELL_SIZE / 2f - 2) * scale;
+
+        // 스케일이 0이면 그리지 않음 (완전히 사라짐)
+        if (radius <= 0)
+            return;
+
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(color);
         shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f,
-                GameViewport.CELL_SIZE / 2f - 2);
+                radius);
         shapeRenderer.end();
 
         // Draw highlight
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         shapeRenderer.setColor(Color.WHITE);
         shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f,
-                GameViewport.CELL_SIZE / 2f - 2);
+                radius);
         shapeRenderer.end();
     }
 
