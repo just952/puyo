@@ -142,16 +142,35 @@ public class Board {
     }
 
     /**
-     * 공중에 떠있는 모든 뿌요를 반환 (아래가 비어있는 뿌요들)
-     * 연쇄 후 낙하 애니메이션용
+     * 공중에 떠있는 모든 뿌요를 반환 (아래가 비어있거나 떠있는 뿌요가 있는 뿌요들)
+     * 연쇄 후 낙하 애니메이션용 - 같은 열의 연속된 떠있는 뿌요들을 모두 포함
+     * 아래(y=0)부터 위로 스캔하여 첫 번째 떠있는 뿌요를 찾고, 그 위쪽 모든 뿌요를 포함
      */
     public List<Puyo> getAllFloatingPuyos() {
         List<Puyo> floating = new ArrayList<>();
         for (int x = 0; x < WIDTH; x++) {
+            // 각 열에서 가장 높은 접지된(grounded) 뿌요의 y좌표를 찾음
+            // 접지된 뿌요: 바닥에 있거나(y=0), 바로 아래에 다른 뿌요가 있는 경우
+            // 가장 높은 접지된 뿌요 위에 있는 모든 뿌요가 떠있는 상태
+
+            int highestGroundedY = -1;
             for (int y = 0; y < HEIGHT; y++) {
                 Puyo puyo = getPuyoAt(x, y);
-                if (puyo != null && puyo.isAlive() && y > 0 && getPuyoAt(x, y - 1) == null) {
-                    floating.add(puyo);
+                if (puyo != null && puyo.isAlive()) {
+                    // 이 뿌요가 접지되어 있는지 확인: 바닥에 있거나, 바로 아래에 뿌요가 있음
+                    boolean isGrounded = (y == 0) || (getPuyoAt(x, y - 1) != null);
+                    if (isGrounded) {
+                        highestGroundedY = y;
+                    } else {
+                        // 접지되지 않은 첫 번째 뿌요 발견 - 이 뿌요와 그 위쪽 모든 뿌요가 떠있는 상태
+                        for (int fy = y; fy < HEIGHT; fy++) {
+                            Puyo floatingPuyo = getPuyoAt(x, fy);
+                            if (floatingPuyo != null && floatingPuyo.isAlive()) {
+                                floating.add(floatingPuyo);
+                            }
+                        }
+                        break; // 첫 번째 떠있는 뿌요를 찾았으면 중단 (그 위는 모두 떠있음)
+                    }
                 }
             }
         }

@@ -1,7 +1,9 @@
 package com.puyo.game.logic.engine;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.PuyoPair;
@@ -45,7 +47,7 @@ public class GameWorld {
 
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
     private float singleFallTimer = 0f;
-    private static final float SINGLE_FALL_INTERVAL = 0.05f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도)
+    private static final float SINGLE_FALL_INTERVAL = 0.1f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도) - 2배 느리게
 
     public GameWorld() {
         board = new Board();
@@ -275,15 +277,42 @@ public class GameWorld {
             }
         }
 
-        // 2. 분리 낙하 처리 (SINGLE_FALL_INTERVAL 간격으로)
+        // 2. 분리/낙하 처리 (SINGLE_FALL_INTERVAL 간격으로) - 완료 체크보다 먼저 실행
+        // 열(column) 단위로 기둥 낙하 처리: 같은 X좌표의 뿌요들을 한 덩어리로 이동
         singleFallTimer += delta;
         boolean shouldFall = (singleFallTimer >= SINGLE_FALL_INTERVAL);
         if (shouldFall) {
             singleFallTimer = 0f;
-            // 분리 낙하 처리
+            // 분리/낙하 처리: 열(column) 단위로 기둥 낙하
+            Map<Integer, List<FallingPuyo>> columns = new HashMap<>();
             for (FallingPuyo fp : fallingPuyos) {
-                if (fp.isFromSeparation && board.canMoveDown(fp.puyo)) {
-                    fp.puyo.moveDown();
+                if (fp.isFromSeparation) {
+                    int x = fp.puyo.getX();
+                    columns.computeIfAbsent(x, k -> new ArrayList<>()).add(fp);
+                }
+            }
+
+            // 각 열(column)별로 독립적으로 한 칸 이동 처리
+            // 한 열이 멈추더라도 다른 열은 계속 낙하
+            for (List<FallingPuyo> column : columns.values()) {
+                // 열 내 가장 아래쪽 뿌요(최소 Y)만 체크
+                FallingPuyo bottomFp = null;
+                int minY = Integer.MAX_VALUE;
+                for (FallingPuyo fp : column) {
+                    if (fp.puyo.getY() < minY) {
+                        minY = fp.puyo.getY();
+                        bottomFp = fp;
+                    }
+                }
+
+                // 가장 아래쪽 뿌요만 체크해서 열 전체 이동 여부 결정
+                boolean canColumnFall = bottomFp != null && board.canMoveDown(bottomFp.puyo);
+
+                // 이동 가능하면 열 전체 한 칸 이동
+                if (canColumnFall) {
+                    for (FallingPuyo fp : column) {
+                        fp.puyo.moveDown(); // 한 칸만 이동
+                    }
                 }
             }
         }
@@ -296,10 +325,27 @@ public class GameWorld {
         }
 
         // 모든 분리 낙하 완료 체크
-        boolean allSeparationDone = true;
+        // 열(column)별로 맨 아래 뿌요만 체크해서 완료 여부 결정 (이동 로직과 일치)
+        Map<Integer, List<FallingPuyo>> columnsForCheck = new HashMap<>();
         for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFromSeparation && board.canMoveDown(fp.puyo)) {
-                return; // 아직 떨어질 곳 있으면 이번 프레임 종료
+            if (fp.isFromSeparation) {
+                int x = fp.puyo.getX();
+                columnsForCheck.computeIfAbsent(x, k -> new ArrayList<>()).add(fp);
+            }
+        }
+
+        for (List<FallingPuyo> column : columnsForCheck.values()) {
+            // 열 내 가장 아래쪽 뿌요만 체크
+            FallingPuyo bottomFp = null;
+            int minY = Integer.MAX_VALUE;
+            for (FallingPuyo fp : column) {
+                if (fp.puyo.getY() < minY) {
+                    minY = fp.puyo.getY();
+                    bottomFp = fp;
+                }
+            }
+            if (bottomFp != null && board.canMoveDown(bottomFp.puyo)) {
+                return; // 이 열의 맨 아래가 아직 움직일 수 있으면 완료 안 됨
             }
         }
 
@@ -319,10 +365,19 @@ public class GameWorld {
         fallingPuyos.clear();
         singleFallTimer = 0f;
 
-        // 팝 애니메이션 완료 후 중력 적용으로 남은 뿌요들이 내려오게 함
-        board.applyGravity();
+        // 팝 애니메이션 완료 후 떠있는 뿌요들을 fallingPuyos에 추가하여 낙하 애니메이션 처리
+        // 보드에서 먼저 제거한 후 fallingPuyos로 관리 (중복 방지)
+        List<Puyo> floating = board.getAllFloatingPuyos();
+        for (Puyo p : floating) {
+            board.removePuyo(p); // 보드에서 먼저 제거
+            fallingPuyos.add(new FallingPuyo(p, true)); // isFromSeparation=true로 분리 낙하처럼 애니메이션
+        }
 
-        checkMatchesAndSpawnNext(); // 연쇄 체크 (내부에서 다시 fallingPuyos 추가 가능)
+        // fallingPuyos가 비어있으면(떠있는 뿌요 없으면) 즉시 다음 연쇄 체크
+        if (fallingPuyos.isEmpty()) {
+            checkMatchesAndSpawnNext();
+        }
+        // 떠있는 뿌요가 있으면 updateFalling이 다음 프레임부터 낙하 애니메이션 처리 후 재귀 호출
     }
 
     /**
