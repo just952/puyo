@@ -5,14 +5,14 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Json;
 
 public class ConfigManager {
-    private static final String CONFIG_DIR = "config/";
+    private static final String CONFIG_DIR = "assets/config/";
     private static ConfigManager instance;
     private GameConfig config;
 
     private static String getEnvironment() {
         String env = System.getProperty("game.env");
         if (env == null || env.isEmpty()) {
-            env = "development";  // 기본값: 개발 환경
+            env = "development"; // 기본값: 개발 환경
         }
         return env.toLowerCase();
     }
@@ -23,7 +23,7 @@ public class ConfigManager {
 
         if (!file.exists()) {
             Gdx.app.error("ConfigManager", "Config file not found: " + env + ".json");
-            config = new GameConfig();  // 기본값으로 fallback
+            config = new GameConfig(); // 기본값으로 fallback
         } else {
             Json json = new Json();
             config = json.fromJson(GameConfig.class, file);
@@ -48,7 +48,7 @@ public class ConfigManager {
         public String api_base_url = "";
         public String ws_url = "";
         public String wss_url = "";
-        public String log_level = "info";  // 기본값: info
+        public String log_level = "info"; // 기본값: info
         public boolean enable_keepalive = false;
         public boolean enable_cheats = false;
         public String matchmaking_server = "";

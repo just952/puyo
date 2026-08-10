@@ -1,130 +1,109 @@
 package com.puyo.game.logic.engine;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoColor;
+import com.puyo.game.util.LogUtil;
+
+import java.util.List;
+import java.util.Random;
 
 /**
- * Manages the game state: the board, the current falling pair, the next pair,
- * and handles the game loop logic (falling, locking, clearing, etc.).
+ * 게임 상태 머신: 보드, 현재/다음 쌍, 점수, 연쇄 수, 게임오버 상태 관리.
+ * 실제 로직은 각 매니저 클래스에 위임.
  */
 public class GameWorld {
-    private static final int FIELD_WIDTH = Board.WIDTH;
-    private static final int FIELD_HEIGHT = Board.HEIGHT;
-
     private final Board board;
+    private final PuyoPairGenerator pairGenerator;
+    private final LockDelayManager lockDelayManager;
+    private final SeparationManager separationManager;
+    private final FallingAnimationManager fallingAnimationManager;
+    private final ChainProcessor chainProcessor;
+
     private PuyoPair currentPair;
     private PuyoPair nextPair;
-    private final Random random;
     private boolean gameOver = false;
     private int score = 0;
     private float fallTimer = 0f;
-    private float fallInterval = 0.5f; // seconds per cell fall (adjustable by level)
-    private boolean lockDelayActive = false;
-    private float lockDelayTimer = 0f;
-    private static final float LOCK_DELAY_TIME = 0.5f; // seconds to lock after touching bottom
-    private int lockDelayMoveCount = 0;
-    private static final int MAX_LOCK_DELAY_MOVES = 15; // Tsu rules: max moves during lock delay
+    private float fallInterval = 0.5f; // 초당 셀 낙하 속도 (레벨별 조정 가능)
     private int currentChain = 0;
     private int totalRemoved = 0;
 
-    // 통합된 낙하 시스템 (분리/연쇄 모두 처리)
+    // 호환성을 위한 FallingPuyo 내부 클래스 (PlayScreen 등에서 사용)
     public static class FallingPuyo {
         public Puyo puyo;
-        public boolean isFromSeparation; // true: 분리, false: 연쇄
+        public boolean isFromSeparation;
 
-        FallingPuyo(Puyo puyo, boolean isFromSeparation) {
+        public FallingPuyo(Puyo puyo, boolean isFromSeparation) {
             this.puyo = puyo;
             this.isFromSeparation = isFromSeparation;
         }
     }
 
-    private List<FallingPuyo> fallingPuyos = new ArrayList<>();
-    private float singleFallTimer = 0f;
-    private static final float SINGLE_FALL_INTERVAL = 0.05f; // 단일 뿌요 낙하 속도 (소프트 드롭 속도)
-
     public GameWorld() {
-        board = new Board();
-        random = new Random();
+        this(new Board());
+    }
+
+    /**
+     * 테스트용 생성자 - 외부 보드 주입 가능
+     */
+    GameWorld(Board board) {
+        this.board = board;
+        pairGenerator = new PuyoPairGenerator();
+        lockDelayManager = new LockDelayManager();
+        separationManager = new SeparationManager();
+        fallingAnimationManager = new FallingAnimationManager();
+        chainProcessor = new ChainProcessor();
+
         spawnNewPair();
         spawnNextPair();
     }
 
-    /** Spawns a new pair at the top center and assigns it as the current pair. */
+    /** 현재 쌍을 새로 스폰하고 락 딜레이 리셋 */
     public void spawnNewPair() {
-        currentPair = createAndPositionPair();
-        lockDelayMoveCount = 0; // 이동 카운터 리셋
-        lockDelayActive = false; // 락 딜레이 상태 리셋
+        currentPair = pairGenerator.generate();
+        pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.HEIGHT);
+        lockDelayManager.reset();
     }
 
-    /** Spawns the next pair (for preview). */
+    /** 다음 쌍을 스폰 (미리보기용) */
     public void spawnNextPair() {
-        nextPair = createAndPositionPair();
-        lockDelayMoveCount = 0; // 이동 카운터 리셋
-        lockDelayActive = false; // 락 딜레이 상태 리셋
+        nextPair = pairGenerator.generate();
+        pairGenerator.positionAtSpawn(nextPair, Board.WIDTH, Board.HEIGHT);
+        lockDelayManager.reset();
     }
 
-    /** Creates a new PuyoPair with random colors at the spawn position. */
-    private PuyoPair createAndPositionPair() {
-        PuyoColor c1 = randomColor();
-        PuyoColor c2 = randomColor();
-        PuyoPair pair = new PuyoPair(new Puyo(c1, 0, 0), new Puyo(c2, 0, 0));
-        int startX = (FIELD_WIDTH / 2) - 1;
-        int startY = FIELD_HEIGHT - 1;
-        pair.setPosition(startX, startY);
-        return pair;
-    }
-
-    private PuyoColor randomColor() {
-        int r = random.nextInt(5);
-        switch (r) {
-            case 0:
-                return PuyoColor.RED;
-            case 1:
-                return PuyoColor.GREEN;
-            case 2:
-                return PuyoColor.BLUE;
-            case 3:
-                return PuyoColor.YELLOW;
-            case 4:
-                return PuyoColor.PURPLE;
-            default:
-                return PuyoColor.RED;
-        }
-    }
-
+    /** 현재 쌍이 낙하 가능한지 확인 */
     public boolean canFall() {
         return currentPair != null && board.canMoveDown(currentPair);
     }
 
+    /** 왼쪽 이동 */
     public boolean moveLeft() {
         if (currentPair == null)
             return false;
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
-            resetLockDelay();
+            lockDelayManager.recordMove();
             return true;
         }
         return false;
     }
 
+    /** 오른쪽 이동 */
     public boolean moveRight() {
         if (currentPair == null)
             return false;
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
-            resetLockDelay();
+            lockDelayManager.recordMove();
             return true;
         }
         return false;
     }
 
+    /** 시계방향 회전 (벽 킥 포함) */
     public void rotateClockwise() {
         if (currentPair == null)
             return;
@@ -138,9 +117,10 @@ public class GameWorld {
                 currentPair.rotateCounterClockwise();
             }
         }
-        resetLockDelay();
+        lockDelayManager.recordMove();
     }
 
+    /** 하드 드롭 */
     public void hardDrop() {
         if (currentPair == null)
             return;
@@ -150,14 +130,33 @@ public class GameWorld {
         lockPiece();
     }
 
+    /** 메인 업데이트 루프 */
     public void update(float delta) {
-        if (gameOver) {
+        if (gameOver)
             return;
-        }
 
-        // 1. 통합된 낙하 처리 (분리/연쇄 모두) - 최우선, 조작 불가
-        if (!fallingPuyos.isEmpty()) {
-            updateFalling(delta);
+        // 1. 낙하/팝 애니메이션 처리 중이면 최우선 처리
+        if (!fallingAnimationManager.isEmpty()) {
+            boolean done = fallingAnimationManager.update(delta, board);
+            if (done) {
+                // 애니메이션 완료: 분리된 뿌요 배치, 부유 뿌요 배치 (팝 제거는 addChainFalling에서 이미 수행)
+                fallingAnimationManager.placeSeparatedPuyos(board);
+                fallingAnimationManager.placeFloatingPuyos(board);
+                // 처리된 아이템들 정리 (중요: 무한 루프 방지)
+                fallingAnimationManager.clear();
+
+                // 연쇄 후 떠있는 뿌요들 낙하 애니메이션 추가
+                List<Puyo> floating = board.getAllFloatingPuyos();
+                if (!floating.isEmpty()) {
+                    for (Puyo p : floating) {
+                        board.removePuyo(p);
+                    }
+                    fallingAnimationManager.addFloatingPuyos(floating);
+                } else {
+                    // 떠있는 뿌요 없으면 다음 연쇄 단계 시작 (비동기식)
+                    startNextChainStep();
+                }
+            }
             return;
         }
 
@@ -167,297 +166,129 @@ public class GameWorld {
             fallTimer = 0f;
             if (canFall()) {
                 currentPair.moveDown();
-                resetLockDelay();
+                lockDelayManager.reset(); // 공중 이동 시 락 딜레이 리셋
             } else {
-                // 바닥에 닿음 - 가로 상태에서 분리 가능한지 확인
-                if (isHorizontalAndCanSeparate()) {
-                    separatePair();
+                // 바닥에 닿음 - 분리 가능한지 확인
+                if (separationManager.canSeparate(currentPair, board)) {
+                    // 분리 실행
+                    separationManager.separate(currentPair, board,
+                            fallingAnimationManager.getInternalFallingPuyos());
+                    currentPair = null;
+                    lockDelayManager.forceLock();
                 } else {
-                    // 기존 락 딜레이 로직
-                    if (!lockDelayActive) {
-                        lockDelayActive = true;
-                        lockDelayTimer = 0f;
-                    } else {
-                        lockDelayTimer += delta;
-                        if (lockDelayTimer >= LOCK_DELAY_TIME) {
-                            if (currentPair != null) {
-                                lockPiece();
-                            }
-                        }
+                    // 락 딜레이 시작/진행
+                    if (!lockDelayManager.isActive()) {
+                        lockDelayManager.activate();
+                    }
+                    lockDelayManager.update(delta);
+                    if (lockDelayManager.shouldLock()) {
+                        lockPiece();
                     }
                 }
             }
         }
 
-        if (lockDelayActive) {
-            lockDelayTimer += delta;
-            if (lockDelayTimer >= LOCK_DELAY_TIME) {
-                if (currentPair != null) {
-                    lockPiece();
-                }
-            }
-        }
-    }
-
-    /**
-     * 가로 상태(rotation 1 또는 3)에서 한 쪽만 막혀서 분리 가능한지 확인
-     */
-    private boolean isHorizontalAndCanSeparate() {
-        if (currentPair == null)
-            return false;
-        int rotation = currentPair.getRotation();
-        // rotation 1: right(오른쪽), rotation 3: left(왼쪽)
-        if (rotation != 1 && rotation != 3)
-            return false;
-
-        Puyo left = currentPair.getLeft();
-        Puyo right = currentPair.getRight();
-
-        boolean leftCanFall = board.canMoveDown(left);
-        boolean rightCanFall = board.canMoveDown(right);
-
-        // 한 쪽만 이동 가능하면 분리 가능
-        return leftCanFall != rightCanFall;
-    }
-
-    /**
-     * 쌍 분리: 한 쪽은 잠금, 다른 쪽은 단일 뿌요로 자동 낙하 시작
-     */
-    private void separatePair() {
-        Puyo left = currentPair.getLeft();
-        Puyo right = currentPair.getRight();
-
-        boolean leftCanFall = board.canMoveDown(left);
-        boolean rightCanFall = board.canMoveDown(right);
-
-        Puyo blockedPuyo;
-        Puyo freePuyo;
-
-        if (leftCanFall && !rightCanFall) {
-            blockedPuyo = right;
-            freePuyo = left;
-        } else if (rightCanFall && !leftCanFall) {
-            blockedPuyo = left;
-            freePuyo = right;
-        } else {
-            // 둘 다 가능하거나 둘 다 불가능하면 분리 안 함 (락 딜레이로)
-            return;
-        }
-
-        // 막힌 쪽 즉시 잠금
-        board.placePuyo(blockedPuyo);
-
-        // 자유로운 쪽 단일 뿌요로 자동 낙하 시작
-        fallingPuyos.add(new FallingPuyo(freePuyo, true)); // isFromSeparation=true
-        currentPair = null; // 쌍 해제
-        lockDelayActive = false;
-        lockDelayTimer = 0f;
-        lockDelayMoveCount = 0;
-    }
-
-    /**
-     * 통합된 낙하/팝 업데이트 (분리/연쇄 모두 처리)
-     * - 분리/낙하: 소프트 드롭 속도(SINGLE_FALL_INTERVAL)로 낙하
-     * - 연쇄/팝: 팝 애니메이션(POP_DURATION) 매 프레임 처리
-     */
-    private void updateFalling(float delta) {
-        // 1. 팝 애니메이션은 매 프레임 업데이트 (부드러운 애니메이션을 위해)
-        // 모든 연쇄 뿌요의 팝 애니메이션을 동시에 진행
-        boolean allPopDone = true;
-        for (FallingPuyo fp : fallingPuyos) {
-            if (!fp.isFromSeparation) {
-                // 연쇄: 팝 애니메이션 (매 프레임 업데이트)
-                if (!fp.puyo.isPopping()) {
-                    fp.puyo.startPop();
-                }
-                boolean popDone = fp.puyo.updatePop(delta);
-                if (!popDone) {
-                    allPopDone = false;
-                }
-            }
-        }
-
-        // 2. 분리/낙하 처리 (SINGLE_FALL_INTERVAL 간격으로) - 완료 체크보다 먼저 실행
-        // 열(column) 단위로 기둥 낙하 처리: 같은 X좌표의 뿌요들을 한 덩어리로 이동
-        singleFallTimer += delta;
-        boolean shouldFall = (singleFallTimer >= SINGLE_FALL_INTERVAL);
-        if (shouldFall) {
-            singleFallTimer = 0f;
-            // 분리/낙하 처리: 열(column) 단위로 기둥 낙하
-            Map<Integer, List<FallingPuyo>> columns = new HashMap<>();
-            for (FallingPuyo fp : fallingPuyos) {
-                if (fp.isFromSeparation) {
-                    int x = fp.puyo.getX();
-                    columns.computeIfAbsent(x, k -> new ArrayList<>()).add(fp);
-                }
-            }
-
-            // 각 열(column)별로 독립적으로 한 칸 이동 처리
-            // 한 열이 멈추더라도 다른 열은 계속 낙하
-            for (List<FallingPuyo> column : columns.values()) {
-                // 열 내 가장 아래쪽 뿌요(최소 Y)만 체크
-                FallingPuyo bottomFp = null;
-                int minY = Integer.MAX_VALUE;
-                for (FallingPuyo fp : column) {
-                    if (fp.puyo.getY() < minY) {
-                        minY = fp.puyo.getY();
-                        bottomFp = fp;
-                    }
-                }
-
-                // 가장 아래쪽 뿌요만 체크해서 열 전체 이동 여부 결정
-                boolean canColumnFall = bottomFp != null && board.canMoveDown(bottomFp.puyo);
-
-                // 이동 가능하면 열 전체 한 칸 이동
-                if (canColumnFall) {
-                    for (FallingPuyo fp : column) {
-                        fp.puyo.moveDown(); // 한 칸만 이동
-                    }
-                }
-            }
-        }
-
-        // 팝 완료 체크
-        for (FallingPuyo fp : fallingPuyos) {
-            if (!fp.isFromSeparation && fp.puyo.isPopping()) {
-                return; // 팝 진행 중이면 이번 프레임은 여기서 종료
-            }
-        }
-
-        // 모든 분리 낙하 완료 체크
-        // 열(column)별로 맨 아래 뿌요만 체크해서 완료 여부 결정 (이동 로직과 일치)
-        Map<Integer, List<FallingPuyo>> columnsForCheck = new HashMap<>();
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFromSeparation) {
-                int x = fp.puyo.getX();
-                columnsForCheck.computeIfAbsent(x, k -> new ArrayList<>()).add(fp);
-            }
-        }
-
-        for (List<FallingPuyo> column : columnsForCheck.values()) {
-            // 열 내 가장 아래쪽 뿌요만 체크
-            FallingPuyo bottomFp = null;
-            int minY = Integer.MAX_VALUE;
-            for (FallingPuyo fp : column) {
-                if (fp.puyo.getY() < minY) {
-                    minY = fp.puyo.getY();
-                    bottomFp = fp;
-                }
-            }
-            if (bottomFp != null && board.canMoveDown(bottomFp.puyo)) {
-                return; // 이 열의 맨 아래가 아직 움직일 수 있으면 완료 안 됨
-            }
-        }
-
-        // 모든 처리 완료 (팝 완료 AND 분리 낙하 완료)
-        // 연쇄 완료: 보드에서 연쇄 뿌요들 제거
-        for (FallingPuyo fp : fallingPuyos) {
-            if (!fp.isFromSeparation) {
-                board.removePuyo(fp.puyo);
-            }
-        }
-        // 분리인 경우만 보드에 배치
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFromSeparation) {
-                board.placePuyo(fp.puyo);
-            }
-        }
-        fallingPuyos.clear();
-        singleFallTimer = 0f;
-
-        // 팝 애니메이션 완료 후 떠있는 뿌요들을 fallingPuyos에 추가하여 낙하 애니메이션 처리
-        // 보드에서 먼저 제거한 후 fallingPuyos로 관리 (중복 방지)
-        List<Puyo> floating = board.getAllFloatingPuyos();
-        for (Puyo p : floating) {
-            board.removePuyo(p); // 보드에서 먼저 제거
-            fallingPuyos.add(new FallingPuyo(p, true)); // isFromSeparation=true로 분리 낙하처럼 애니메이션
-        }
-
-        // fallingPuyos가 비어있으면(떠있는 뿌요 없으면) 즉시 다음 연쇄 체크
-        if (fallingPuyos.isEmpty()) {
-            checkMatchesAndSpawnNext();
-        }
-        // 떠있는 뿌요가 있으면 updateFalling이 다음 프레임부터 낙하 애니메이션 처리 후 재귀 호출
-    }
-
-    /**
-     * 단일 뿌요 착지 후 매칭/연쇄 체크 및 다음 쌍 스폰
-     * 연쇄 발생 시 떠있는 뿌요들을 fallingPuyos에 추가하여 애니메이션 처리
-     * 한 번에 한 단계만 처리 (연쇄당 한 번 호출)
-     */
-    private void checkMatchesAndSpawnNext() {
-        List<List<Puyo>> groups = board.findAllMatchingGroups();
-
-        if (groups.isEmpty()) {
-            // 매칭 없음 - 연쇄 종료
-            if (currentChain > 0) {
-                int earned = totalRemoved * (currentChain + 1) * 10;
-                addScore(earned);
-            }
-            currentChain = 0;
-            totalRemoved = 0;
-
-            if (board.isTopOut()) {
-                gameOver = true;
-                return;
-            }
-
-            // 다음 쌍 스폰
-            currentPair = nextPair;
-            spawnNextPair();
-
-            fallTimer = 0f;
-            resetLockDelay();
-            return;
-        }
-
-        // 매칭 발견 - 연쇄 발생
-        currentChain++;
-        int removedThis = 0;
-        for (List<Puyo> group : groups) {
-            removedThis += group.size();
-            // 팝 애니메이션 시작 (즉시 제거하지 않고 애니메이션용으로 유지)
-            for (Puyo p : group) {
-                p.startPop();
-            }
-        }
-        totalRemoved += removedThis;
-
-        // fallingPuyos에 추가하여 팝 애니메이션 처리 (isFromSeparation=false로 연쇄 표시)
-        // board.removePuyos()는 팝 애니메이션 완료 후 updateFalling에서 처리
-        for (List<Puyo> group : groups) {
-            for (Puyo p : group) {
-                fallingPuyos.add(new FallingPuyo(p, false)); // isFromSeparation=false (연쇄)
-            }
-        }
-        // fallingPuyos가 채워지면 updateFalling에서 팝 애니메이션 처리 후 다시 호출됨
-    }
-
-    private void resetLockDelay() {
-        if (lockDelayActive) {
-            lockDelayMoveCount++;
-            if (lockDelayMoveCount >= MAX_LOCK_DELAY_MOVES) {
-                // 이동 제한 초과 → 즉시 잠금 (Tsu 규칙)
+        // 락 딜레이 타이머 업데이트 (낙하 간격과 별도)
+        if (lockDelayManager.isActive()) {
+            lockDelayManager.update(delta);
+            if (lockDelayManager.shouldLock()) {
                 lockPiece();
-                return;
             }
-            lockDelayTimer = 0f; // 타이머만 리셋 (lockDelayActive 유지)
-        } else {
-            lockDelayTimer = 0f;
-            lockDelayMoveCount = 0; // 공중에서 움직일 때는 카운터 리셋
         }
     }
 
+    /** 연쇄 처리 상태 (ChainProcessor에서 사용) */
+    private ChainProcessor.ChainState chainState = new ChainProcessor.ChainState();
+
+    /** 현재 조각 잠금 및 연쇄 처리 시작 */
     private void lockPiece() {
+        if (currentPair == null)
+            return;
+
         for (Puyo p : currentPair.getPuyos()) {
             if (p.isAlive()) {
                 board.placePuyo(p);
             }
         }
 
-        // 새로운 연쇄/애니메이션 시스템 사용
-        checkMatchesAndSpawnNext();
+        // 연쇄 상태 초기화
+        resetChainState();
+
+        // 첫 연쇄 단계 시작 (ChainProcessor.processChainStep 호출)
+        startNextChainStep();
     }
+
+    /** 연쇄 상태 초기화 */
+    private void resetChainState() {
+        chainState.chainCount = 0;
+        chainState.totalRemoved = 0;
+        chainState.currentGroups = null;
+        chainState.waitingForPop = false;
+        LogUtil.debug("GameWorld", "resetChainState: chainState reset");
+    }
+
+    /** 다음 연쇄 단계 시작 */
+    private void startNextChainStep() {
+        boolean chainDone = chainProcessor.processChainStep(board, chainState,
+                new ChainProcessor.ChainCallback() {
+                    @Override
+                    public void onPopStart(List<Puyo> group) {
+                        LogUtil.debug("GameWorld", "onPopStart: group size=" + group.size());
+                        fallingAnimationManager.addChainFalling(board, group);
+                    }
+
+                    @Override
+                    public void onPopComplete(List<Puyo> group) {
+                        LogUtil.debug("GameWorld", "onPopComplete: group size=" + group.size());
+                        // 실제 제거는 onPopStart에서 FallingAnimationManager가 이미 수행 (board.removePuyo)
+                    }
+
+                    @Override
+                    public void onGravityComplete() {
+                        LogUtil.debug("GameWorld", "onGravityComplete");
+                        // 중력 완료 후 떠있는 뿌요들 확인하여 낙하 애니메이션 추가
+                        List<Puyo> floating = board.getAllFloatingPuyos();
+                        if (!floating.isEmpty()) {
+                            LogUtil.debug("GameWorld", "onGravityComplete: floating count=" + floating.size());
+                            for (Puyo p : floating) {
+                                board.removePuyo(p);
+                            }
+                            fallingAnimationManager.addFloatingPuyos(floating);
+                        }
+                    }
+
+                    @Override
+                    public void onChainEnd(int totalRemoved, int chainCount) {
+                        LogUtil.debug("GameWorld",
+                                "onChainEnd: totalRemoved=" + totalRemoved + ", chainCount=" + chainCount);
+                        GameWorld.this.currentChain = chainCount;
+                        GameWorld.this.totalRemoved = totalRemoved;
+                        if (chainCount > 0) {
+                            int earned = totalRemoved * (chainCount + 1) * 10;
+                            addScore(earned);
+                        }
+
+                        if (board.isTopOut()) {
+                            gameOver = true;
+                            return;
+                        }
+
+                        // 다음 쌍 스폰
+                        currentPair = nextPair;
+                        spawnNextPair();
+                        fallTimer = 0f;
+                        lockDelayManager.reset();
+
+                        // 연쇄 완료 시 chainState 초기화
+                        resetChainState();
+                    }
+                }, fallingAnimationManager);
+
+        // chainDone이 true면 연쇄 완료 (currentPair 스폰은 onChainEnd에서 처리)
+        // false면 팝 애니메이션 대기 중 (update에서 fallingAnimationManager 처리 대기)
+    }
+
+    // --- Getters ---
 
     public boolean isGameOver() {
         return gameOver;
@@ -475,15 +306,19 @@ public class GameWorld {
         return nextPair;
     }
 
+    /** 호환용: 분리 낙하 중인 단일 뿌요 반환 */
     public Puyo getFallingSinglePuyo() {
-        if (!fallingPuyos.isEmpty()) {
-            return fallingPuyos.get(0).puyo;
-        }
-        return null;
+        return fallingAnimationManager.getFallingSinglePuyo();
     }
 
+    /** 호환용: 모든 낙하 중인 뿌요 리스트 반환 (렌더링용) */
     public List<FallingPuyo> getFallingPuyos() {
-        return fallingPuyos;
+        List<com.puyo.game.logic.engine.FallingPuyo> internal = fallingAnimationManager.getFallingPuyos();
+        List<FallingPuyo> result = new java.util.ArrayList<>();
+        for (com.puyo.game.logic.engine.FallingPuyo fp : internal) {
+            result.add(new FallingPuyo(fp.puyo, fp.isFromSeparation()));
+        }
+        return result;
     }
 
     public int getScore() {
@@ -496,8 +331,5 @@ public class GameWorld {
 
     public int getCurrentChain() {
         return currentChain;
-    }
-
-    public void dispose() {
     }
 }

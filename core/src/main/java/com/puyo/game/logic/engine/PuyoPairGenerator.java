@@ -10,8 +10,8 @@ import com.puyo.game.logic.model.PuyoPair;
  */
 public class PuyoPairGenerator {
     private static final PuyoColor[] COLORS = {
-        PuyoColor.RED, PuyoColor.GREEN, PuyoColor.BLUE,
-        PuyoColor.YELLOW, PuyoColor.PURPLE, PuyoColor.CYAN
+            PuyoColor.RED, PuyoColor.GREEN, PuyoColor.BLUE,
+            PuyoColor.YELLOW, PuyoColor.PURPLE
     };
     private final Random random;
 
@@ -31,5 +31,14 @@ public class PuyoPairGenerator {
         Puyo p1 = new Puyo(c1, 0, 0);
         Puyo p2 = new Puyo(c2, 0, 0);
         return new PuyoPair(p1, p2);
+    }
+
+    /**
+     * 생성된 쌍을 스폰 위치(상단 중앙)에 배치
+     */
+    public void positionAtSpawn(PuyoPair pair, int fieldWidth, int fieldHeight) {
+        int startX = (fieldWidth / 2) - 1;
+        int startY = fieldHeight - 1;
+        pair.setPosition(startX, startY);
     }
 }

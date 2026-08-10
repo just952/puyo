@@ -326,8 +326,6 @@ public class PlayScreen extends BaseScreen {
                 return Color.YELLOW;
             case PURPLE:
                 return Color.MAGENTA;
-            case CYAN:
-                return Color.CYAN;
             case OJAMA:
                 return Color.GRAY;
             case HARD:

@@ -1,5 +1,7 @@
 package com.puyo.game.logic.model;
 
+import com.puyo.game.util.LogUtil;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -163,10 +165,14 @@ public class Board {
                         highestGroundedY = y;
                     } else {
                         // 접지되지 않은 첫 번째 뿌요 발견 - 이 뿌요와 그 위쪽 모든 뿌요가 떠있는 상태
+                        LogUtil.debug("Board", "getAllFloatingPuyos: Found floating puyo at (" + x + "," + y
+                                + ") color=" + puyo.getColor());
                         for (int fy = y; fy < HEIGHT; fy++) {
                             Puyo floatingPuyo = getPuyoAt(x, fy);
                             if (floatingPuyo != null && floatingPuyo.isAlive()) {
                                 floating.add(floatingPuyo);
+                                LogUtil.debug("Board", "  Adding floating puyo at (" + x + "," + fy + ") color="
+                                        + floatingPuyo.getColor());
                             }
                         }
                         break; // 첫 번째 떠있는 뿌요를 찾았으면 중단 (그 위는 모두 떠있음)
@@ -174,6 +180,7 @@ public class Board {
                 }
             }
         }
+        LogUtil.debug("Board", "getAllFloatingPuyos: Total floating=" + floating.size());
         return floating;
     }
 
@@ -302,9 +309,6 @@ public class Board {
                             break;
                         case PURPLE:
                             sb.append("P");
-                            break;
-                        case CYAN:
-                            sb.append("C");
                             break;
                         case OJAMA:
                             sb.append("O");
