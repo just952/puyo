@@ -4,6 +4,84 @@
 
 ---
 
+## v0.1.12 (2026-08-10) - **리팩토링 정리 + 이중 제거 버그 수정 + 중복 테스트 정리 + 매니저 분리**
+
+### 추가
+
+1. **엔진 매니저 분리** (`FallingAnimationManager.java`, `SeparationManager.java`, `ChainProcessor.java`, `MatchFinder.java`, `LockDelayManager.java`, `GravityEngine.java`, `PuyoPairGenerator.java`)
+   - `GameWorld.java`에서 각 책임을 전담하는 매니저 클래스로 분리 (SRP 준수)
+   - `FallingAnimationManager`: 팝 애니메이션 + 기둥/분리 낙하 전담
+   - `SeparationManager`: 쌍 분리 로직 전담
+   - `ChainProcessor`: 연쇄 처리(매칭→제거→중력) 전담
+   - `MatchFinder`: 매칭 그룹 찾기 전담 (stateless static 유틸리티)
+   - `LockDelayManager`: 락 딜레이 상태/타이머 관리
+   - `GravityEngine`: 중력 적용 전담
+   - `PuyoPairGenerator`: 다음 쌍 생성 전담
+
+2. **FallingPuyo 클래스 분리** (`FallingPuyo.java`, `GameWorld.java`)
+   - 엔진 내부용: `FallType`(CHAIN_POP/SEPARATION/FLOATING), `originalX/originalY` 원본 좌표 보존
+   - 외부 호환용: `GameWorld` 내부 클래스로 `isFromSeparation`만 가진 DTO
+
+### 수정
+
+1. **이중 제거 버그 수정** (`FallingAnimationManager.java`, `ChainProcessor.java`, `GameWorld.java`)
+   - `addChainFalling`에서 즉시 `board.removePuyo()` 호출로 팝 대상 즉시 제거
+   - `removePoppedPuyos()` 중복 호출 코드 삭제 (이미 제거됨)
+   - `ChainProcessor.processChainStep`에서 팝 완료 후 `board.removePuyo()` 중복 호출 코드 삭제 (카운트만 수행)
+
+2. **MatchFinder stateless 변경** (`MatchFinder.java`, `ChainProcessor.java`)
+   - 모든 메서드 `static`으로 변경, 인스턴스 필드 제거
+   - `ChainProcessor`에서 `MatchFinder` 인스턴스 필드 제거, `MatchFinder.findAllMatchingGroups(board)` static 호출
+
+3. **GameWorld 중복 로직 제거** (`GameWorld.java`)
+   - `checkMatchesAndSpawnNext()` 동기식 연쇄 처리 메서드 삭제 (비동기 `startNextChainStep()`만 사용)
+   - `dispose()` 빈 메서드 삭제
+   - `onPopComplete` 콜백 주석 수정 (실제 제거는 `onPopStart`에서 수행)
+
+4. **테스트 코드 정리**
+   - `core/src/main/java/.../GravityEngineTest.java` 중복 테스트 파일 삭제 (test 패키지에 정상 존재)
+   - `FallingAnimationManagerTest` Board 파라미터 추가로 컴파일 에러 수정
+   - `ChainProcessorTest` 동기식 `processChain()` 복원 (테스트용)
+
+5. **FallingAnimationManager 로직 정리**
+   - `removePoppedPuyos()` 메서드 삭제 (`addChainFalling`에서 즉시 제거하므로 불필요)
+   - `addChainFalling(Board, List<Puyo>)` 시그니처 변경 (즉시 보드 제거 위해)
+
+### 검증 결과
+
+- `:core:compileJava` / `:core:test` (60개 테스트 통과) / `:desktop:run` (2분 54초 크래시 없는 실행) 성공
+- 연쇄 팝 → 부유 뿌요 낙하 → 중력 → 배치 모든 단계 정상 작동
+- 이중 제거 버그 해결, 보드 상태 깨짐 없음
+
+### 변경 파일
+
+| 파일                                                                             | 변경 유형 | 설명                                                   |
+| -------------------------------------------------------------------------------- | --------- | ------------------------------------------------------ |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java`     | 신규/수정 | 팝/낙하 전담, 원본 좌표 보존, 즉시 보드 제거           |
+| `core/src/main/java/com/puyo/game/logic/engine/SeparationManager.java`           | 신규      | 쌍 분리 로직 전담                                      |
+| `core/src/main/java/com/puyo/game/logic/engine/ChainProcessor.java`              | 신규/수정 | 연쇄 처리 전담, MatchFinder static 사용                |
+| `core/src/main/java/com/puyo/game/logic/engine/MatchFinder.java`                 | 수정      | 모든 메서드 static, stateless 유틸리티                 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java`                 | 신규      | 엔진 내부용 낙하 뿌요 모델                             |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java`                   | 대폭 수정 | 매니저 위임, 중복 로직 제거, 콜백 주석 수정            |
+| `core/src/main/java/com/puyo/game/logic/engine/LockDelayManager.java`            | 신규      | 락 딜레이 관리 전담                                    |
+| `core/src/main/java/com/puyo/game/logic/engine/GravityEngine.java`               | 신규      | 중력 적용 전담                                         |
+| `core/src/main/java/com/puyo/game/logic/engine/PuyoPairGenerator.java`           | 신규      | 다음 쌍 생성 전담                                      |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java`                 | 신규      | 엔진 내부용 낙하 모델 (FallType, 원본 좌표)            |
+| `core/src/test/java/com/puyo/game/logic/engine/FallingAnimationManagerTest.java` | 수정      | Board 파라미터 추가                                    |
+| `core/src/test/java/com/puyo/game/logic/engine/ChainProcessorTest.java`          | 수정      | 동기식 processChain 복원                               |
+| `core/src/main/java/com/puyo/game/logic/engine/GravityEngineTest.java`           | 삭제      | main 패키지 중복 테스트 삭제 (test 패키지에 정상 존재) |
+
+### 검증 결과
+
+- `:core:compileJava` / `:core:test` (60개 테스트 통과) / `:desktop:run` (2분 54초 크래시 없는 실행) 성공
+- 연쇄 팝 → 부유 뿌요 낙하 → 중력 → 배치 모든 단계 정상 작동
+- 이중 제거 버그 해결, 보드 상태 깨짐 없음
+- 매니저 클래스 분리 완료 (SRP 준수)
+
+---
+
+## v0.1.11 (2026-08-09) - **연쇄 후 기둥 낙하 동시 애니메이션 + 깜빡임 해결 + 낙하 속도 통일**
+
 ## v0.1.11 (2026-08-09) - **연쇄 후 기둥 낙하 동시 애니메이션 + 깜빡임 해결 + 낙하 속도 통일**
 
 ### 추가
