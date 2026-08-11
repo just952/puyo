@@ -1,5 +1,7 @@
 package com.puyo.game.logic.engine;
 
+import com.puyo.game.util.LogUtil;
+
 /**
  * 락 딜레이(Lock Delay) 관리를 전담하는 클래스.
  * Tsu 규칙: 바닥에 닿은 후 0.5초 동안 이동/회전 가능 (최대 15회), 초과 시 즉시 잠금.
@@ -17,9 +19,13 @@ public class LockDelayManager {
      * 락 딜레이 상태 리셋 (새 조각 스폰 시 또는 공중 이동 시)
      */
     public void reset() {
+        boolean wasActive = active;
+        int oldMoveCount = moveCount;
         active = false;
         timer = 0f;
         moveCount = 0;
+        LogUtil.debug("LockDelay",
+                String.format("LockDelay reset: wasActive=%b, oldMoveCount=%d", wasActive, oldMoveCount));
     }
 
     /**
@@ -29,6 +35,7 @@ public class LockDelayManager {
     public void activate() {
         active = true;
         timer = 0f;
+        LogUtil.debug("LockDelay", "LockDelay activated: timer reset to 0");
     }
 
     /**
@@ -37,6 +44,8 @@ public class LockDelayManager {
     public void recordMove() {
         if (active) {
             moveCount++;
+            LogUtil.debug("LockDelay",
+                    String.format("LockDelay recordMove: moveCount=%d, timer=%.2f", moveCount, timer));
         }
     }
 
@@ -47,7 +56,10 @@ public class LockDelayManager {
      */
     public void update(float delta) {
         if (active) {
+            float oldTimer = timer;
             timer += delta;
+            // LogUtil.debug("LockDelay", String.format("LockDelay update: timer %.2f ->
+            // %.2f", oldTimer, timer));
         }
     }
 
@@ -61,6 +73,13 @@ public class LockDelayManager {
             return false;
         }
         // 시간 초과 또는 이동 횟수 초과 시 즉시 잠금 (15회 초과 = 16번째부터 잠금)
+        boolean shouldLock = timer >= LOCK_DELAY_TIME || moveCount > MAX_LOCK_DELAY_MOVES;
+        if (shouldLock) {
+            LogUtil.debug("LockDelay",
+                    String.format("LockDelay SHOULD LOCK: timer=%.2f (>=%.1f? %b), moveCount=%d (>%d? %b)",
+                            timer, LOCK_DELAY_TIME, timer >= LOCK_DELAY_TIME, moveCount, MAX_LOCK_DELAY_MOVES,
+                            moveCount > MAX_LOCK_DELAY_MOVES));
+        }
         return timer >= LOCK_DELAY_TIME || moveCount > MAX_LOCK_DELAY_MOVES;
     }
 
@@ -96,5 +115,6 @@ public class LockDelayManager {
         active = false;
         timer = 0f;
         moveCount = 0;
+        LogUtil.debug("LockDelay", "LockDelay forceLock called");
     }
 }

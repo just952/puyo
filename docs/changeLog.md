@@ -4,6 +4,44 @@
 
 ---
 
+## v0.1.13 (2026-08-11) - **락 딜레이 버그 수정 + fallTimer 중복 제거 + 락 딜레이 중복 업데이트 제거**
+
+### 수정
+
+1. **fallTimer 중복 증가 버그 수정** (`GameWorld.java`)
+   - **문제**: `fallTimer += delta;`가 프레임당 2번 실행되어 낙하 속도가 2배 빨라짐 (0.5초 → 0.25초)
+   - **해결**: 프레임 시작 시 한 번만 `fallTimer += delta;` 실행하도록 수정
+
+2. **lockDelayManager.update(delta) 중복 호출 버그 수정** (`GameWorld.java`)
+   - **문제**: Line 206과 Line 216에서 `lockDelayManager.update(delta)` 중복 호출로 락 딜레이 타이머가 2배 속도
+   - **해결**: Line 206의 중복 `update(delta)` 제거, 락 딜레이 활성화 시 마지막에 한 번만 호출
+
+3. **락 딜레이 즉시 리셋 로직 개선** (`GameWorld.java`)
+   - `canFall()`이 true가 되면 매 프레임 즉시 `lockDelayManager.reset()` 호출
+   - fallTimer 간격 이동 시에도 이중 리셋 보장
+   - 락 딜레이 활성화 조건 정리 (canFall() true면 즉시 reset, false면 activate)
+
+4. **락 딜레이 타이머 상수 원복** (`LockDelayManager.java`)
+   - 테스트용 3초에서 원복: `LOCK_DELAY_TIME = 0.5f` (Tsu 규칙 준수)
+
+### 검증 결과
+
+- **컴파일**: 성공 ✅
+- **단위 테스트**: 60개 전체 통과 ✅
+- **데스크톱 앱**: 11분 10초 크래시 없이 정상 실행 ✅
+- **낙하 속도**: 정상 (0.5초 간격으로 1칸씩) ✅
+- **락 딜레이**: 0.5초 후 정상 작동, 공중에서 즉시 리셋 ✅
+- **이중 호출 없음**: lockDelayManager.update() 프레임당 1회 ✅
+
+### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | fallTimer 중복 제거, lockDelayManager.update 중복 제거, 락 딜레이 즉시 리셋 로직 추가 |
+| `core/src/main/java/com/puyo/game/logic/engine/LockDelayManager.java` | 수정 | LOCK_DELAY_TIME 0.5f 원복, 디버그 로그 유지 |
+
+---
+
 ## v0.1.12 (2026-08-10) - **리팩토링 정리 + 이중 제거 버그 수정 + 중복 테스트 정리 + 매니저 분리**
 
 ### 추가

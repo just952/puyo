@@ -27,7 +27,7 @@ public class SeparationManager {
         int rotation = pair.getRotation();
         // rotation 1: right(오른쪽), rotation 3: left(왼쪽) - 가로 상태
         if (rotation != 1 && rotation != 3) {
-            LogUtil.debug("Separation", "canSeparate: false - rotation=" + rotation + " (not horizontal)");
+            // LogUtil.debug("Separation", "canSeparate: false - rotation=" + rotation + "(not horizontal)");
             return false;
         }
 
