@@ -20,6 +20,8 @@ public class FallingAnimationManager {
 
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
     private float singleFallTimer = 0f;
+    private boolean popWasDone = false;
+    private boolean wasPopJustDone = false;
 
     /**
      * 분리 낙하용 단일 뿌요 추가
@@ -51,9 +53,10 @@ public class FallingAnimationManager {
      * 떠있는 뿌요들(연쇄 후 공중에 뜬 기둥) 추가
      */
     public void addFloatingPuyos(List<Puyo> floating) {
+        LogUtil.debug("FallingAnim", "addFloatingPuyos: adding " + floating.size() + " floating puyos");
         for (Puyo puyo : floating) {
             fallingPuyos.add(new FallingPuyo(puyo, FallingPuyo.FallType.FLOATING));
-            LogUtil.debug("FallingAnim", "addFloatingPuyos: added puyo at (" + puyo.getX() + "," + puyo.getY()
+            LogUtil.debug("FallingAnim", "  addFloatingPuyos: added puyo at (" + puyo.getX() + "," + puyo.getY()
                     + ") color=" + puyo.getColor() + " hash=" + System.identityHashCode(puyo));
         }
     }
@@ -82,10 +85,20 @@ public class FallingAnimationManager {
             }
         }
 
-        // 팝 진행 중이면 이번 프레임은 여기서 종료
+        // 팝 진행 중이면 이번 프레임은 여기서 종료 (타이머 누적 안 함)
         if (!allPopDone) {
             return false;
         }
+
+        // 팝이 방금 완료되었을 때만 타이머 리셋 (한 번만)
+        if (wasPopJustDone) {
+            singleFallTimer = 0f;
+            wasPopJustDone = false;
+        } else if (!popWasDone) {
+            // 팝이 진행 중이었다가 이번에 완료됨
+            wasPopJustDone = true;
+        }
+        popWasDone = allPopDone;
 
         // 2. 분리/낙하 처리 (SINGLE_FALL_INTERVAL 간격으로)
         singleFallTimer += delta;

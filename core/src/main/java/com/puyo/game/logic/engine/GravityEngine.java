@@ -35,6 +35,7 @@ public class GravityEngine {
 
         LogUtil.debug("GravityEngine", "=== applyGravity START ===");
         LogUtil.debug("GravityEngine", "Board before gravity:\n" + board.toString());
+        LogUtil.debug("GravityEngine", "Called from: " + Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName() + "()");
 
         for (int x = 0; x < width; x++) {
             int writeY = 0; // 뿌요가 새로 위치할(쌓일) 아래쪽 인덱스

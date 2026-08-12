@@ -145,22 +145,56 @@ public class GameWorld {
                 // 처리된 아이템들 정리 (중요: 무한 루프 방지)
                 fallingAnimationManager.clear();
 
-                // 연쇄 후 떠있는 뿌요들 낙하 애니메이션 추가
-                List<Puyo> floating = board.getAllFloatingPuyos();
-                if (!floating.isEmpty()) {
-                    for (Puyo p : floating) {
-                        board.removePuyo(p);
-                    }
-                    fallingAnimationManager.addFloatingPuyos(floating);
-                } else {
-                    // 떠있는 뿌요 없으면 다음 연쇄 단계 시작 (비동기식)
-                    startNextChainStep();
+                // 분리/부유 낙하 완료 후 보드에 매치가 있는지 확인
+                // 매치가 있으면 즉시 연쇄 처리 시작 (지연 방지)
+                List<List<Puyo>> groups = MatchFinder.findAllMatchingGroups(board);
+                if (!groups.isEmpty()) {
+                    LogUtil.debug("GameWorld", "Animation done: found " + groups.size() + " match groups, starting chain");
+                    chainProcessor.startChain();
                 }
+
+                // 분리 애니메이션 완료 후 currentPair가 null이면 다음 쌍 스폰
+                if (currentPair == null && !chainProcessor.hasActiveChain()) {
+                    currentPair = nextPair;
+                    spawnNextPair();
+                    fallTimer = 0f;
+                    lockDelayManager.reset();
+                    chainProcessor.reset();
+                }
+
+                // 연쇄 처리 계속 진행 (상태 머신이 다음 단계 처리)
             }
             return;
         }
 
-        // 2. 일반 쌍 뿌요 낙하 처리
+        // 2. 연쇄 처리 상태 머신 업데이트 (연쇄가 진행 중일 때만)
+        if (chainProcessor.hasActiveChain()) {
+            boolean chainDone = chainProcessor.update(board, fallingAnimationManager, delta);
+            if (chainDone) {
+                // 연쇄 완료
+                int earned = chainProcessor.getTotalRemoved() * (chainProcessor.getChainCount() + 1) * 10;
+                if (earned > 0) {
+                    addScore(earned);
+                    LogUtil.debug("GameWorld", "Chain end: chainCount=" + chainProcessor.getChainCount() + 
+                            ", totalRemoved=" + chainProcessor.getTotalRemoved() + ", earned=" + earned);
+                }
+
+                if (board.isTopOut()) {
+                    gameOver = true;
+                    return;
+                }
+
+                // 다음 쌍 스폰
+                currentPair = nextPair;
+                spawnNextPair();
+                fallTimer = 0f;
+                lockDelayManager.reset();
+                chainProcessor.reset();
+            }
+            return;
+        }
+
+        // 3. 일반 쌍 뿌요 낙하 처리
         fallTimer += delta;
 
         // 매 프레임 canFall() 체크하여 락 딜레이 즉시 리셋/활성화 관리
@@ -187,30 +221,33 @@ public class GameWorld {
             }
         } else {
             // 바닥에 닿음 - 분리 가능한지 확인
-            if (separationManager.canSeparate(currentPair, board)) {
+            if (currentPair != null && separationManager.canSeparate(currentPair, board)) {
                 // 분리 실행
                 separationManager.separate(currentPair, board,
                         fallingAnimationManager.getInternalFallingPuyos());
                 currentPair = null;
                 lockDelayManager.forceLock();
-            } else {
-                // 락 딜레이 시작/진행
+            } else if (currentPair != null) {
+                // 락 딜레이 시작/진행 (쌍이 있을 때만)
                 if (!lockDelayManager.isActive()) {
                     LogUtil.debug("GameWorld", String.format("LockDelay activated: canFall=%b, pair pos=(%d,%d)",
                             canFallNow,
-                            currentPair != null ? currentPair.getLeft().getX() : -1,
-                            currentPair != null ? currentPair.getLeft().getY() : -1));
+                            currentPair.getLeft().getX(),
+                            currentPair.getLeft().getY()));
                     lockDelayManager.activate();
                 }
                 if (lockDelayManager.shouldLock()) {
                     LogUtil.debug("GameWorld", "LockDelay shouldLock triggered lockPiece");
                     lockPiece();
                 }
+            } else if (lockDelayManager.isActive()) {
+                // currentPair가 null이고 락 딜레이가 활성화되어 있으면 강제 종료 (한 번만)
+                lockDelayManager.forceLock();
             }
         }
 
         // 락 딜레이 타이머 업데이트 (락 딜레이 활성화 시에만) - 여기서만 호출
-        if (lockDelayManager.isActive()) {
+        if (lockDelayManager.isActive() && currentPair != null) {
             lockDelayManager.update(delta);
             if (lockDelayManager.shouldLock()) {
                 LogUtil.debug("GameWorld", "LockDelay shouldLock (separate timer) triggered lockPiece");
@@ -218,9 +255,6 @@ public class GameWorld {
             }
         }
     }
-
-    /** 연쇄 처리 상태 (ChainProcessor에서 사용) */
-    private ChainProcessor.ChainState chainState = new ChainProcessor.ChainState();
 
     /** 현재 조각 잠금 및 연쇄 처리 시작 */
     private void lockPiece() {
@@ -233,106 +267,12 @@ public class GameWorld {
             }
         }
 
-        // 연쇄 상태 초기화
-        resetChainState();
-
-        // 첫 연쇄 단계 시작 (ChainProcessor.processChainStep 호출)
-        startNextChainStep();
-    }
-
-    /** 연쇄 상태 초기화 */
-    private void resetChainState() {
-        chainState.chainCount = 0;
-        chainState.totalRemoved = 0;
-        chainState.currentGroups = null;
-        chainState.waitingForPop = false;
-        LogUtil.debug("GameWorld", "resetChainState: chainState reset");
-    }
-
-    /** 다음 연쇄 단계 시작 */
-    private void startNextChainStep() {
-        boolean chainDone = chainProcessor.processChainStep(board, chainState,
-                new ChainProcessor.ChainCallback() {
-                    @Override
-                    public void onPopStart(List<Puyo> group) {
-                        LogUtil.debug("GameWorld", "onPopStart: group size=" + group.size());
-                        fallingAnimationManager.addChainFalling(board, group);
-                    }
-
-                    @Override
-                    public void onPopComplete(List<Puyo> group) {
-                        LogUtil.debug("GameWorld", "onPopComplete: group size=" + group.size());
-                        // 팝 완료 후 실제 제거는 ChainProcessor 내부에서 처리
-                    }
-
-                    @Override
-                    public void onGravityComplete() {
-                        LogUtil.debug("GameWorld", "onGravityComplete");
-                        // 중력 완료 후 떠있는 뿌요들 확인하여 낙하 애니메이션 추가
-                        List<Puyo> floating = board.getAllFloatingPuyos();
-                        if (!floating.isEmpty()) {
-                            LogUtil.debug("GameWorld", "onGravityComplete: floating count=" + floating.size());
-                            for (Puyo p : floating) {
-                                board.removePuyo(p);
-                            }
-                            fallingAnimationManager.addFloatingPuyos(floating);
-                        }
-                    }
-
-                    @Override
-                    public void onChainEnd(int totalRemoved, int chainCount) {
-                        LogUtil.debug("GameWorld",
-                                "onChainEnd: totalRemoved=" + totalRemoved + ", chainCount=" + chainCount);
-                        GameWorld.this.currentChain = chainCount;
-                        GameWorld.this.totalRemoved = totalRemoved;
-                        if (chainCount > 0) {
-                            int earned = totalRemoved * (chainCount + 1) * 10;
-                            addScore(earned);
-                        }
-
-                        if (board.isTopOut()) {
-                            gameOver = true;
-                            return;
-                        }
-
-                        // 다음 쌍 스폰
-                        currentPair = nextPair;
-                        spawnNextPair();
-                        fallTimer = 0f;
-                        lockDelayManager.reset();
-
-                        // 연쇄 완료 시 chainState 초기화
-                        resetChainState();
-                    }
-                }, fallingAnimationManager);
-
-        // chainDone이 true면 연쇄 완료 (currentPair 스폰은 onChainEnd에서 처리)
-        // false면 팝 애니메이션 대기 중 (update에서 fallingAnimationManager 처리 대기)
-    }
-
-    /** 연쇄 체크 및 다음 쌍 스폰 (낙하 애니메이션 완료 후 호출) */
-    private void checkMatchesAndSpawnNext() {
-        // ChainProcessor의 동기식 메서드 사용
-        ChainProcessor.ChainResult result = chainProcessor.processChain(board);
-
-        currentChain = result.chainCount;
-        totalRemoved = result.totalRemoved;
-
-        if (result.chainCount > 0) {
-            int earned = result.totalRemoved * (result.chainCount + 1) * 10;
-            addScore(earned);
-        }
-
-        if (board.isTopOut()) {
-            gameOver = true;
-            return;
-        }
-
-        // 다음 쌍 스폰
-        currentPair = nextPair;
-        spawnNextPair();
-        fallTimer = 0f;
-        lockDelayManager.reset();
+        // 연쇄 상태 초기화 후 시작
+        chainProcessor.reset();
+        chainProcessor.startChain();
+        
+        // 락 딜레이 강제 종료 (이중 잠금 방지)
+        lockDelayManager.forceLock();
     }
 
     // --- Getters ---

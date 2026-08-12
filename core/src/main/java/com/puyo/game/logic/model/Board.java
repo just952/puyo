@@ -150,6 +150,7 @@ public class Board {
      */
     public List<Puyo> getAllFloatingPuyos() {
         List<Puyo> floating = new ArrayList<>();
+        LogUtil.debug("Board", "getAllFloatingPuyos START, board:\n" + this.toString());
         for (int x = 0; x < WIDTH; x++) {
             // 각 열에서 가장 높은 접지된(grounded) 뿌요의 y좌표를 찾음
             // 접지된 뿌요: 바닥에 있거나(y=0), 바로 아래에 다른 뿌요가 있는 경우
@@ -166,7 +167,7 @@ public class Board {
                     } else {
                         // 접지되지 않은 첫 번째 뿌요 발견 - 이 뿌요와 그 위쪽 모든 뿌요가 떠있는 상태
                         LogUtil.debug("Board", "getAllFloatingPuyos: Found floating puyo at (" + x + "," + y
-                                + ") color=" + puyo.getColor());
+                                + ") color=" + puyo.getColor() + ", highestGroundedY=" + highestGroundedY);
                         for (int fy = y; fy < HEIGHT; fy++) {
                             Puyo floatingPuyo = getPuyoAt(x, fy);
                             if (floatingPuyo != null && floatingPuyo.isAlive()) {
@@ -180,7 +181,7 @@ public class Board {
                 }
             }
         }
-        LogUtil.debug("Board", "getAllFloatingPuyos: Total floating=" + floating.size());
+        LogUtil.debug("Board", "getAllFloatingPuyos END: Total floating=" + floating.size());
         return floating;
     }
 

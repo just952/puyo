@@ -31,6 +31,7 @@ public class MatchFinder {
 
         LogUtil.debug("MatchFinder", "=== findAllMatchingGroups START ===");
         LogUtil.debug("MatchFinder", "Board state:\n" + board.toString());
+        LogUtil.debug("MatchFinder", "Called from stack trace: " + Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName() + "()");
 
         for (int x = 0; x < Board.WIDTH; x++) {
             for (int y = 0; y < Board.HEIGHT; y++) {
