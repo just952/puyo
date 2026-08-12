@@ -220,7 +220,7 @@ public class Board {
             for (int x = 0; x < WIDTH; x++) {
                 Puyo p = getPuyoAt(x, y);
                 if (p == null) {
-                    sb.append(" ");
+                    sb.append(".");
                 } else {
                     switch (p.getColor()) {
                         case RED:

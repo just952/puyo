@@ -63,8 +63,8 @@ public class FallingAnimationManager {
             // 원본 보드 좌표 저장 (생성자에서 자동 저장됨)
             FallingPuyo fp = new FallingPuyo(puyo, FallingPuyo.FallType.CHAIN_POP);
             fallingPuyos.add(fp);
-            LogUtil.debug("FallingAnim", "addChainFalling: added puyo at (" + puyo.getX() + "," + puyo.getY()
-                    + ") color=" + puyo.getColor() + " hash=" + System.identityHashCode(puyo));
+            LogUtil.debug("FallingAnim", "☆☆☆☆☆☆☆ addChainFalling: added puyo at (" + puyo.getX() + "," + puyo.getY()
+                    + ") color=" + puyo.getColor() + " hash=" + System.identityHashCode(puyo) + " listSize=" + fallingPuyos.size());
         }
     }
 
@@ -127,12 +127,18 @@ public class FallingAnimationManager {
         // 팝 완료 직후: REMOVE_POPPED 액션 반환 (한 번만)
         if (wasPopJustDone) {
             List<Puyo> poppedPuyos = new ArrayList<>();
+            List<FallingPuyo> toRemove = new ArrayList<>();
             for (FallingPuyo fp : fallingPuyos) {
                 if (fp.isChainPop()) {
                     poppedPuyos.add(fp.puyo);
+                    toRemove.add(fp);
                 }
             }
             if (!poppedPuyos.isEmpty()) {
+                LogUtil.debug("FallingAnim", "☆☆☆☆☆☆☆ REMOVE_POPPED: returning " + poppedPuyos.size() + " puyos, listSize before clear=" + fallingPuyos.size());
+                // CHAIN_POP 엔트리들을 리스트에서 제거 (누적 방지)
+                fallingPuyos.removeAll(toRemove);
+                LogUtil.debug("FallingAnim", "☆☆☆☆☆☆☆ REMOVE_POPPED: removed CHAIN_POP entries, listSize after clear=" + fallingPuyos.size());
                 result.action = FallAction.REMOVE_POPPED;
                 result.puyos = poppedPuyos;
                 result.done = false;
