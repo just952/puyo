@@ -6,6 +6,7 @@ import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.util.LogUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -19,7 +20,6 @@ public class GameWorld {
     private final LockDelayManager lockDelayManager;
     private final SeparationManager separationManager;
     private final FallingAnimationManager fallingAnimationManager;
-    private final ChainProcessor chainProcessor;
     private final GravityEngine gravityEngine;
 
     private PuyoPair currentPair;
@@ -30,6 +30,20 @@ public class GameWorld {
     private float fallInterval = 0.5f; // 초당 셀 낙하 속도 (레벨별 조정 가능)
     private int currentChain = 0;
     private int totalRemoved = 0;
+
+    // 연쇄 처리 상태 머신 (기존 ChainProcessor 내장)
+    private enum ChainPhase {
+        IDLE,               // 대기 중
+        FINDING_MATCHES,    // 매칭 그룹 탐색 중
+        WAITING_POP,        // 팝 애니메이션 대기 중
+        APPLYING_GRAVITY,   // 중력 적용 완료, 부유 확인 필요
+        CHECKING_FLOATING,  // 부유 뿌요 확인 및 낙하 애니메이션 추가 중
+        DONE                // 연쇄 완료
+    }
+    private ChainPhase chainPhase = ChainPhase.IDLE;
+    private List<List<Puyo>> currentGroups = null;
+    private int chainCount = 0;
+    private int totalChainRemoved = 0;
 
     // 호환성을 위한 FallingPuyo 내부 클래스 (PlayScreen 등에서 사용)
     public static class FallingPuyo {
@@ -55,7 +69,6 @@ public class GameWorld {
         lockDelayManager = new LockDelayManager();
         separationManager = new SeparationManager();
         fallingAnimationManager = new FallingAnimationManager();
-        chainProcessor = new ChainProcessor();
         gravityEngine = new GravityEngine();
 
         spawnNewPair();
@@ -185,16 +198,16 @@ public class GameWorld {
                 List<List<Puyo>> groups = MatchFinder.findAllMatchingGroups(board);
                 if (!groups.isEmpty()) {
                     LogUtil.debug("GameWorld", "Animation done: found " + groups.size() + " match groups, starting chain");
-                    chainProcessor.startChain();
+                    startChain();
                 }
 
                 // 분리 애니메이션 완료 후 currentPair가 null이면 다음 쌍 스폰
-                if (currentPair == null && !chainProcessor.hasActiveChain()) {
+                if (currentPair == null && !hasActiveChain()) {
                     currentPair = nextPair;
                     spawnNextPair();
                     fallTimer = 0f;
                     lockDelayManager.reset();
-                    chainProcessor.reset();
+                    resetChain();
                 }
 
                 // 연쇄 처리 계속 진행 (상태 머신이 다음 단계 처리)
@@ -203,70 +216,8 @@ public class GameWorld {
         }
 
         // 2. 연쇄 처리 상태 머신 업데이트 (연쇄가 진행 중일 때만)
-        if (chainProcessor.hasActiveChain()) {
-            ChainProcessor.UpdateResult result = chainProcessor.update(board, fallingAnimationManager, delta);
-            
-            // 액션 실행
-            switch (result.action) {
-                case START_POP:
-                    // 팝 애니메이션 시작
-                    if (result.groups != null) {
-                        LogUtil.debug("GameWorld", "Executing START_POP for " + result.groups.size() + " groups");
-                        for (List<Puyo> group : result.groups) {
-                            fallingAnimationManager.addChainFalling(group);
-                        }
-                    }
-                    break;
-                    
-                case APPLY_GRAVITY:
-                    // 중력 적용
-                    LogUtil.debug("GameWorld", "Executing APPLY_GRAVITY");
-                    gravityEngine.applyGravity(board);
-                    break;
-                    
-                case CHECK_FLOATING:
-                    // 부유 뿌요 확인 및 낙하 애니메이션 시작
-                    if (result.floatingPuyos != null && !result.floatingPuyos.isEmpty()) {
-                        LogUtil.debug("GameWorld", "Executing CHECK_FLOATING for " + result.floatingPuyos.size() + " floating puyos");
-                        for (Puyo p : result.floatingPuyos) {
-                            board.removePuyo(p);
-                        }
-                        fallingAnimationManager.addFloatingPuyos(result.floatingPuyos);
-                    }
-                    break;
-                    
-                case NEXT_CHAIN_STEP:
-                    // 다음 연쇄 단계로 - 아무것도 안 함 (다음 update에서 FINDING_MATCHES 실행)
-                    LogUtil.debug("GameWorld", "Executing NEXT_CHAIN_STEP");
-                    break;
-                    
-                case NONE:
-                default:
-                    // 아무 액션 없음
-                    break;
-            }
-
-            if (result.done) {
-                // 연쇄 완료
-                int earned = result.totalRemoved * (result.chainCount + 1) * 10;
-                if (earned > 0) {
-                    addScore(earned);
-                    LogUtil.debug("GameWorld", "Chain end: chainCount=" + result.chainCount + 
-                            ", totalRemoved=" + result.totalRemoved + ", earned=" + earned);
-                }
-
-                if (board.isTopOut()) {
-                    gameOver = true;
-                    return;
-                }
-
-                // 다음 쌍 스폰
-                currentPair = nextPair;
-                spawnNextPair();
-                fallTimer = 0f;
-                lockDelayManager.reset();
-                chainProcessor.reset();
-            }
+        if (hasActiveChain()) {
+            updateChain(delta);
             return;
         }
 
@@ -342,7 +293,148 @@ public class GameWorld {
         }
     }
 
-    /** 현재 조각 잠금 및 연쇄 처리 시작 */
+    // ===== 연쇄 처리 내부 메서드들 (기존 ChainProcessor 로직 인라인) =====
+
+    /**
+     * 연쇄 처리 상태 업데이트 (비동기식, 프레임당 1스텝)
+     */
+    private void updateChain(float delta) {
+        LogUtil.debug("GameWorld", "=== updateChain START ===");
+        LogUtil.debug("GameWorld", "Phase: " + chainPhase +
+                ", chainCount=" + chainCount +
+                ", totalRemoved=" + totalChainRemoved +
+                ", fallingAnim.isEmpty()=" + fallingAnimationManager.isEmpty() +
+                ", fallingAnim.size=" + fallingAnimationManager.getFallingPuyos().size());
+
+        switch (chainPhase) {
+            case IDLE:
+                LogUtil.debug("GameWorld", "Phase IDLE -> FINDING_MATCHES");
+                chainPhase = ChainPhase.FINDING_MATCHES;
+                return;
+
+            case FINDING_MATCHES:
+                LogUtil.debug("GameWorld", "Finding next matching groups...");
+                List<List<Puyo>> groups = MatchFinder.findAllMatchingGroups(board);
+
+                if (groups.isEmpty()) {
+                    // 매칭 없음 - 연쇄 종료
+                    LogUtil.debug("GameWorld", "No more matches. Chain ending. totalRemoved=" + totalChainRemoved
+                            + ", chainCount=" + chainCount);
+                    chainPhase = ChainPhase.DONE;
+                    return;
+                }
+
+                // 새 연쇄 단계 시작
+                chainCount++;
+                currentGroups = groups;
+                LogUtil.debug("GameWorld", "New chain step: chainCount=" + chainCount + ", groups=" + groups.size());
+                for (int i = 0; i < groups.size(); i++) {
+                    LogUtil.debug("GameWorld",
+                            "  Group " + i + ": color=" + groups.get(i).get(0).getColor() + ", size=" + groups.get(i).size());
+                }
+
+                // 팝 애니메이션 시작
+                LogUtil.debug("GameWorld", "Action: START_POP for " + groups.size() + " groups");
+                chainPhase = ChainPhase.WAITING_POP;
+                for (List<Puyo> group : groups) {
+                    fallingAnimationManager.addChainFalling(group);
+                }
+                return;
+
+            case WAITING_POP:
+                // 팝 애니메이션 대기 중이면 스킵 (FallingAnimationManager가 처리 중)
+                if (!fallingAnimationManager.isEmpty()) {
+                    return; // 아직 팝 애니메이션 진행 중
+                }
+                // 팝 애니메이션 완료됨
+                LogUtil.debug("GameWorld", "Pop animation completed");
+                
+                // 팝 완료: 카운트만
+                if (currentGroups != null) {
+                    int removed = currentGroups.stream().mapToInt(List::size).sum();
+                    totalChainRemoved += removed;
+                    LogUtil.debug("GameWorld", "Pop completed, removed " + removed + " puyos");
+                }
+
+                // 중력 적용
+                LogUtil.debug("GameWorld", "Action: APPLY_GRAVITY");
+                chainPhase = ChainPhase.APPLYING_GRAVITY;
+                gravityEngine.applyGravity(board);
+                return;
+
+            case APPLYING_GRAVITY:
+                // 중력 적용 완료 후 부유 확인
+                LogUtil.debug("GameWorld", "Action: CHECK_FLOATING");
+                chainPhase = ChainPhase.CHECKING_FLOATING;
+                // 바로 다음 프레임에서 CHECKING_FLOATING 처리되도록 return
+                return;
+
+            case CHECKING_FLOATING:
+                // 부유 뿌요 낙하 애니메이션 대기 중
+                if (!fallingAnimationManager.isEmpty()) {
+                    LogUtil.debug("GameWorld", "CHECKING_FLOATING: fallingAnim not empty, waiting... size=" + fallingAnimationManager.getFallingPuyos().size());
+                    return; // 부유 낙하 애니메이션 진행 중
+                }
+                
+                // 부유 뿌요들 확인 및 낙하 애니메이션 추가
+                List<Puyo> floating = board.getAllFloatingPuyos();
+                LogUtil.debug("GameWorld", "CHECKING_FLOATING: floating.size()=" + floating.size() + ", board:\n" + board.toString());
+                if (!floating.isEmpty()) {
+                    LogUtil.debug("GameWorld", "Found " + floating.size() + " floating puyos, Action: CHECK_FLOATING");
+                    for (Puyo p : floating) {
+                        LogUtil.debug("GameWorld", "  Floating puyo at (" + p.getX() + "," + p.getY() + ") color=" + p.getColor());
+                    }
+                    for (Puyo p : floating) {
+                        board.removePuyo(p);
+                    }
+                    fallingAnimationManager.addFloatingPuyos(floating);
+                    LogUtil.debug("GameWorld", "CHECKING_FLOATING -> re-enter (waiting for fall animation)");
+                    return;
+                }
+                
+                // 부유 뿌요 없으면 다음 연쇄 단계로
+                LogUtil.debug("GameWorld", "No floating puyos, Action: NEXT_CHAIN_STEP");
+                chainPhase = ChainPhase.FINDING_MATCHES;
+                return;
+
+            case DONE:
+                return;
+
+            default:
+                chainPhase = ChainPhase.DONE;
+                return;
+        }
+    }
+
+    /**
+     * 연쇄 상태 리셋 (새 조각 스폰 시)
+     */
+    private void resetChain() {
+        chainPhase = ChainPhase.IDLE;
+        currentGroups = null;
+        chainCount = 0;
+        totalChainRemoved = 0;
+    }
+
+    /**
+     * 연쇄 처리 시작 (lockPiece 후 호출)
+     */
+    private void startChain() {
+        if (chainPhase == ChainPhase.IDLE) {
+            chainPhase = ChainPhase.FINDING_MATCHES;
+        }
+    }
+
+    /**
+     * 연쇄가 진행 중인지 확인
+     */
+    private boolean hasActiveChain() {
+        return chainPhase != ChainPhase.IDLE && chainPhase != ChainPhase.DONE;
+    }
+
+    /**
+     * 현재 조각 잠금 및 연쇄 처리 시작
+     */
     private void lockPiece() {
         if (currentPair == null)
             return;
@@ -354,8 +446,8 @@ public class GameWorld {
         }
 
         // 연쇄 상태 초기화 후 시작
-        chainProcessor.reset();
-        chainProcessor.startChain();
+        resetChain();
+        startChain();
         
         // 락 딜레이 강제 종료 (이중 잠금 방지)
         lockDelayManager.forceLock();

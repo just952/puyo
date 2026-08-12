@@ -98,7 +98,7 @@
 | V0114-4 | **매치 감지 지연 버그 수정 (분리 후 즉시 매치 체크)**                        | 2026-08-12 | **애니메이션 완료 시 MatchFinder 즉시 실행** |
 | V0114-5 | **불필요 코드 삭제 (processChain, ChainResult, gravityEngine 필드)**         | 2026-08-12 | **100+ 줄 정리**                |
 | V0114-6 | **결합도 높은 테스트 6개 파일 삭제**                                         | 2026-08-12 | **테스트 정리**                  |
-| V0114-7 | 문서 현행화 (architecture.md, changeLog.md, progress.md, todo.md)          | 2026-08-12 | **모두 최신화**                  |
+| V0114-7 | 문서 현행화 (architecture.md, changeLog.md, progress.md, todo.md)          | 2026-08-12 | **완료 - 모두 최신화**                  |
 
 ---
 

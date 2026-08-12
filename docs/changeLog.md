@@ -4,36 +4,34 @@
 
 ---
 
-## v0.1.14 (2026-08-12) - **ChainProcessor 상태 머신 리팩토링 + 결합도 분리 + 순간이동/지연 버그 수정 + 불필요 코드 정리**
+## v0.1.14 (2026-08-12) - **ChainProcessor 삭제 + GameWorld 단일 상태 머신 통합 + 결합도 분리 + 순간이동/지연 버그 수정 + 불필요 코드 정리**
 
-### 리팩토링: ChainProcessor 완전 재설계 (SRP 준수)
+### 리팩토링: ChainProcessor 클래스 삭제 및 GameWorld 통합 (SRP 준수)
 
-1. **상태 머신 패턴 도입**
-   - `Phase` enum: IDLE → FINDING_MATCHES → WAITING_POP → APPLYING_GRAVITY → CHECKING_FLOATING → DONE
-   - `Action` enum: START_POP, APPLY_GRAVITY, CHECK_FLOATING, NEXT_CHAIN_STEP, NONE
-   - `UpdateResult` 클래스: 액션 + 데이터(groups, floatingPuyos) + 상태(chainCount, totalRemoved, done) 전달
+1. **ChainProcessor 클래스 완전 삭제**
+   - 별도 클래스로 분리되어 있던 연쇄 처리 로직을 `GameWorld` 내부로 이동
+   - 이중 상태 머신(GameWorld + ChainProcessor) → 단일 상태 머신(GameWorld 내 `ChainPhase` enum) 통합
 
-2. **보드 조작 완전 분리** (핵심 변경)
-   - **기존**: `ChainProcessor` 내부에서 `gravityEngine.applyGravity()`, `board.removePuyo()`, `board.getAllFloatingPuyos()` 직접 호출
-   - **변경**: 액션만 반환, `GameWorld`가 유일한 오케스트레이터로 실제 실행
+2. **액션 반환/실행 계층 제거** (핵심 변경)
+   - **기존**: `ChainProcessor`가 `Action` enum 반환 → `GameWorld`가 switch로 실행
+   - **변경**: `GameWorld.updateChain()` private 메서드에서 직접 로직 수행, 중간 계층 완전 제거
 
-3. **불필요 코드 삭제**
-   - 동기식 `processChain(Board board)` 메서드 삭제 (테스트 파일 삭제 후 사용처 없음)
+3. **보드 조작 완전 분리** (FallingAnimationManager, SeparationManager)
+   - 두 매니저는 액션(`FallAction`, `SeparationResult`)만 반환, Board 조작은 `GameWorld`가 수행
+   - `GravityEngine`은 stateless로 `applyGravity(Board)` 파라미터 전달만 수행
+
+4. **불필요 코드 삭제**
+   - `Phase`, `Action`, `UpdateResult` 클래스 삭제 (ChainProcessor 내부용이었음)
+   - 동기식 `processChain(Board board)` 메서드 삭제
    - `ChainResult` static 클래스 삭제
    - `gravityEngine` 필드 및 생성자 초기화 삭제
    - `GravityEngine` import 제거
 
 ### GameWorld - 유일한 오케스트레이터로 역할 명확화
 
-```java
-// ChainProcessor.UpdateResult의 action 실행
-switch (result.action) {
-    case START_POP:     → fallingAnim.addChainFalling()
-    case APPLY_GRAVITY: → gravityEngine.applyGravity(board)
-    case CHECK_FLOATING:→ board.removePuyo() + fallingAnim.addFloatingPuyos()
-    case NEXT_CHAIN_STEP:→ 다음 update에서 자동 처리
-}
-```
+- 내부 `ChainPhase` enum: `IDLE` → `FINDING_MATCHES` → `WAITING_POP` → `APPLYING_GRAVITY` → `CHECKING_FLOATING` → `DONE`
+- 연쇄 처리 로직이 `updateChain()` 메서드에 직접 구현됨
+- `FallingAnimationManager`, `SeparationManager`, `GravityEngine`, `MatchFinder`, `LockDelayManager`, `PuyoPairGenerator` 위임
 
 ### GravityEngine 단순화 (Stateless)
 
@@ -48,11 +46,11 @@ switch (result.action) {
 
 2. **매치 감지 지연 버그 (Match Detection Delay)**
    - 원인: 분리 애니메이션 완료 후 즉시 매치 체크 안 하고 다음 조각 잠길 때까지 대기
-   - 해결: 애니메이션 완료 블록에서 `MatchFinder` 즉시 실행 → 매치 있으면 `chainProcessor.startChain()`
+   - 해결: 애니메이션 완료 블록에서 `MatchFinder` 즉시 실행 → 매치 있으면 연쇄 시작
 
 ### 테스트 파일 정리
 
-삭제된 결합도 높은 테스트들:
+삭제된 결합도 높은 테스트들 (6개):
 - `ChainProcessorTest.java`, `GravityEngineTest.java`
 - `FallingAnimationManagerTest.java`, `LockDelayManagerTest.java`
 - `MatchFinderTest.java`, `SeparationManagerTest.java`
@@ -67,8 +65,8 @@ switch (result.action) {
 
 | 파일 | 변경 유형 | 설명 |
 |-----|---------|-----|
-| `core/src/main/java/com/puyo/game/logic/engine/ChainProcessor.java` | 전면 재작성 | 상태 머신 + 액션 반환 패턴, 불필요 메서드 삭제 |
-| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | 액션 실행 로직 추가, 중력/부유 처리 일괄 수행 |
+| `core/src/main/java/com/puyo/game/logic/engine/ChainProcessor.java` | **삭제** | 클래스 완전 제거 (241줄), GameWorld로 통합 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | ChainProcessor 로직 인라인 병합, ChainPhase enum 추가 |
 | `core/src/main/java/com/puyo/game/logic/engine/GravityEngine.java` | 단순화 | stateless 변경, 미사용 메서드 삭제 |
 | `core/src/main/java/com/puyo/game/logic/engine/MatchFinder.java` | 수정 | 호출 스택 트레이스 로그 추가 |
 | `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java` | 수정 | 부유 추가 로그 추가 |

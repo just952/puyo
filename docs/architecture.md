@@ -41,8 +41,7 @@ puyo/
 │   │   │   ├── ai/
 │   │   │   │   └── AIController.java     # AI 대전 컨트롤러 (휴리스틱)
 │   │   │   ├── engine/
-│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 상태 머신 오케스트레이터
-│   │   │   │   ├── ChainProcessor.java   # 연쇄 처리 상태 머신 (액션 반환)
+│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 상태 머신 오케스트레이터 (ChainPhase enum으로 연쇄 처리 통합)
 │   │   │   │   ├── GravityEngine.java    # 중력 처리 엔진 (stateless, Board 파라미터)
 │   │   │   │   ├── MatchFinder.java      # 매칭 그룹 탐색 (static 메서드)
 │   │   │   │   ├── FallingAnimationManager.java # 팝/낙하 애니메이션 관리
@@ -103,6 +102,21 @@ puyo/
 | **렌더링**        | `FitViewport` + `OrthographicCamera`                                        | 가상 해상도 960x1600, 자동 스케일링        |
 | **데이터**        | JSON + `Json` (LibGDX)                                                      | 메뉴, 스테이지 데이터 외부화               |
 | **리소스**        | `AssetManager` (예정)                                                       | 텍스처/사운드/폰트 통합 관리               |
+
+---
+## 엔진 모듈 구조 (v0.1.14~)
+
+| 클래스 | 책임 | 비고 |
+|--------|------|------|
+| `GameWorld` | **메인 상태 머신** (오케스트레이터) | 게임 루프, 보드, 페어, 연쇄 처리, 락 딜레이, 분리, 스폰 등 전체 상태 관리 |
+| `FallingAnimationManager` | 팝/낙하 애니메이션 관리 | `FallAction`(REMOVE_POPPED, PLACE_SEPARATED, PLACE_FLOATING) 액션 반환, Board 조작 안 함 |
+| `SeparationManager` | 가로 쌍 분리 로직 | `SeparationResult` 반환, Board 조작 안 함 |
+| `GravityEngine` | 중력 적용 (stateless) | `applyGravity(Board)` 파라미터 전달 |
+| `MatchFinder` | 매칭 그룹 탐색 | static 메서드만, stateless 유틸리티 |
+| `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한 |
+| `PuyoPairGenerator` | 랜덤 PuyoPair 생성 | 스폰 위치 설정 포함 |
+
+**주요 변경 (v0.1.14)**: `ChainProcessor` 클래스 삭제 → `GameWorld` 내부에 `ChainPhase` enum으로 통합. 단일 상태 머신으로 단순화, 액션 반환/실행 계층 제거.
 
 ---
 

@@ -66,6 +66,9 @@
 | 터치 컨트롤러       | 4버튼 레이아웃 (좌/우/회전/드롭+하드드롭)                             | **완료** | TouchController + InputHandler 통합 (2026-08-06)                     |
 | 모바일 가로 고정    | AndroidManifest landscape + 몰입 모드                                 | **완료** | 적용됨 (2026-08-06 확인)                                             |
 | 데스크톱 가로 고정  | DesktopLauncher 1600×960 창 크기, 비율 유지                           | **완료** | (2026-08-06 완료)                                                    |
+| **엔진 리팩토링**   | **ChainProcessor 삭제, GameWorld 단일 상태 머신 통합**                | **완료** | v0.1.14 (2026-08-12), 결합도 분리, 순간이동/지연 버그 수정           |
+| **보드 조작 분리**  | **액션 기반 패턴으로 GameWorld가 유일한 오케스트레이터**              | **완료** | v0.1.14, FallingAnimationManager/SeparationManager 보드 조작 없음    |
+| **불필요 코드 정리**| **동기식 processChain, ChainResult, gravityEngine 필드, 결합도 높은 테스트 삭제** | **완료** | v0.1.14, 100+ 줄 정리                                                 |
 
 ---
 
