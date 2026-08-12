@@ -5,13 +5,21 @@ import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.util.LogUtil;
 
-import java.util.List;
-
 /**
  * 뿌요쌍 분리(Separation) 로직을 전담하는 클래스.
  * 가로 상태(rotation 1 또는 3)에서 한쪽만 막혔을 때 쌍을 분리합니다.
+ * 보드 조작은 하지 않고 액션만 반환합니다 (GameWorld가 실행).
  */
 public class SeparationManager {
+
+    /**
+     * 분리 실행 결과
+     */
+    public static class SeparationResult {
+        public boolean separated = false;
+        public Puyo blockedPuyo = null;   // GameWorld가 placePuyo
+        public Puyo freePuyo = null;      // GameWorld가 falling에 추가
+    }
 
     /**
      * 가로 상태에서 분리 가능한지 확인
@@ -48,17 +56,17 @@ public class SeparationManager {
     }
 
     /**
-     * 쌍 분리 실행
-     * 막힌 쪽은 즉시 잠금, 자유로운 쪽은 단일 뿌요로 자동 낙하 시작
+     * 쌍 분리 실행 (보드 조작 없음, 액션만 반환)
      * 
-     * @param pair         현재 떨어지는 뿌요쌍
-     * @param board        게임 보드
-     * @param fallingPuyos 낙하 중인 뿌요 리스트 (자유로운 쪽 추가됨)
-     * @return 분리되었으면 true, 아니면 false
+     * @param pair  현재 떨어지는 뿌요쌍
+     * @param board 게임 보드
+     * @return 분리 결과 (blockedPuyo, freePuyo 포함)
      */
-    public boolean separate(PuyoPair pair, Board board, List<FallingPuyo> fallingPuyos) {
+    public SeparationResult separate(PuyoPair pair, Board board) {
+        SeparationResult result = new SeparationResult();
+        
         if (!canSeparate(pair, board)) {
-            return false;
+            return result;
         }
 
         Puyo left = pair.getLeft();
@@ -83,22 +91,17 @@ public class SeparationManager {
         } else {
             // 둘 다 가능하거나 둘 다 불가능하면 분리 안 함
             LogUtil.debug("Separation", "Separating: both can fall or both cannot fall - no separation");
-            return false;
+            return result;
         }
 
-        // 막힌 쪽 즉시 잠금
-        LogUtil.debug("Separation", "Placing blocked puyo at (" + blockedPuyo.getX() + "," + blockedPuyo.getY()
-                + ") color=" + blockedPuyo.getColor());
-        board.placePuyo(blockedPuyo);
-
-        // 자유로운 쪽을 보드에서 제거 (중복 방지)
-        board.removePuyo(freePuyo);
-
-        // 자유로운 쪽 단일 뿌요로 자동 낙하 시작
-        LogUtil.debug("Separation", "Adding free puyo to falling: (" + freePuyo.getX() + "," + freePuyo.getY()
-                + ") color=" + freePuyo.getColor() + " hash=" + System.identityHashCode(freePuyo));
-        fallingPuyos.add(new FallingPuyo(freePuyo, FallingPuyo.FallType.SEPARATION)); // isFromSeparation=true
-
-        return true;
+        // 결과만 반환 (GameWorld가 실제 보드 조작 수행)
+        result.separated = true;
+        result.blockedPuyo = blockedPuyo;
+        result.freePuyo = freePuyo;
+        
+        LogUtil.debug("Separation", "SeparationResult: blocked=(" + blockedPuyo.getX() + "," + blockedPuyo.getY()
+                + "), free=(" + freePuyo.getX() + "," + freePuyo.getY() + ")");
+        
+        return result;
     }
 }

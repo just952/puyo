@@ -12,6 +12,7 @@ import java.util.Map;
 /**
  * 팝 애니메이션과 기둥 낙하 애니메이션을 전담하는 클래스.
  * GameWorld의 updateFalling 로직을 분리했습니다.
+ * Board 조작은 하지 않고 액션만 반환합니다 (GameWorld가 실행).
  */
 public class FallingAnimationManager {
 
@@ -24,6 +25,25 @@ public class FallingAnimationManager {
     private boolean wasPopJustDone = false;
 
     /**
+     * 낙하 처리 시 수행해야 할 액션
+     */
+    public enum FallAction {
+        NONE,               // 아무 액션 없음
+        REMOVE_POPPED,      // 팝 완료된 뿌요들 보드에서 제거
+        PLACE_SEPARATED,    // 분리 낙하 완료된 뿌요들 보드에 배치
+        PLACE_FLOATING,     // 부유 낙하 완료된 뿌요들 보드에 배치
+    }
+
+    /**
+     * 업데이트 결과 (다음에 수행할 액션 포함)
+     */
+    public static class UpdateResult {
+        public FallAction action = FallAction.NONE;
+        public List<Puyo> puyos = null; // 액션 대상 뿌요들
+        public boolean done = false;    // 전체 애니메이션 완료 여부
+    }
+
+    /**
      * 분리 낙하용 단일 뿌요 추가
      */
     public void addSeparationFalling(Puyo puyo) {
@@ -32,9 +52,10 @@ public class FallingAnimationManager {
 
     /**
      * 연쇄 팝 애니메이션용 그룹 추가
-     * 즉시 보드에서 제거하고 원본 좌표를 저장
+     * 즉시 보드에서 제거하지 않고 원본 좌표만 저장
+     * 제거는 UpdateResult.REMOVE_POPPED 액션으로 GameWorld가 수행
      */
-    public void addChainFalling(Board board, List<Puyo> group) {
+    public void addChainFalling(List<Puyo> group) {
         for (Puyo puyo : group) {
             if (!puyo.isPopping()) {
                 puyo.startPop();
@@ -42,8 +63,6 @@ public class FallingAnimationManager {
             // 원본 보드 좌표 저장 (생성자에서 자동 저장됨)
             FallingPuyo fp = new FallingPuyo(puyo, FallingPuyo.FallType.CHAIN_POP);
             fallingPuyos.add(fp);
-            // 즉시 보드에서 제거 - 애니메이션 중 위치 변경되어도 원본 좌표 보존
-            board.removePuyo(puyo);
             LogUtil.debug("FallingAnim", "addChainFalling: added puyo at (" + puyo.getX() + "," + puyo.getY()
                     + ") color=" + puyo.getColor() + " hash=" + System.identityHashCode(puyo));
         }
@@ -65,12 +84,15 @@ public class FallingAnimationManager {
      * 낙하/팝 애니메이션 업데이트
      * 
      * @param delta 프레임 시간
-     * @param board 게임 보드
-     * @return 모든 처리가 완료되었으면 true, 진행 중이면 false
+     * @param board 게임 보드 (낙하 판정용 읽기 전용)
+     * @return 업데이트 결과 (액션, 대상 뿌요, 완료 여부 포함)
      */
-    public boolean update(float delta, Board board) {
+    public UpdateResult update(float delta, Board board) {
+        UpdateResult result = new UpdateResult();
+
         if (fallingPuyos.isEmpty()) {
-            return true; // 처리할 것 없음
+            result.done = true;
+            return result; // 처리할 것 없음
         }
 
         // 1. 팝 애니메이션은 매 프레임 업데이트 (부드러운 애니메이션을 위해)
@@ -87,7 +109,9 @@ public class FallingAnimationManager {
 
         // 팝 진행 중이면 이번 프레임은 여기서 종료 (타이머 누적 안 함)
         if (!allPopDone) {
-            return false;
+            result.done = false;
+            result.action = FallAction.NONE;
+            return result;
         }
 
         // 팝이 방금 완료되었을 때만 타이머 리셋 (한 번만)
@@ -99,6 +123,22 @@ public class FallingAnimationManager {
             wasPopJustDone = true;
         }
         popWasDone = allPopDone;
+
+        // 팝 완료 직후: REMOVE_POPPED 액션 반환 (한 번만)
+        if (wasPopJustDone) {
+            List<Puyo> poppedPuyos = new ArrayList<>();
+            for (FallingPuyo fp : fallingPuyos) {
+                if (fp.isChainPop()) {
+                    poppedPuyos.add(fp.puyo);
+                }
+            }
+            if (!poppedPuyos.isEmpty()) {
+                result.action = FallAction.REMOVE_POPPED;
+                result.puyos = poppedPuyos;
+                result.done = false;
+                return result;
+            }
+        }
 
         // 2. 분리/낙하 처리 (SINGLE_FALL_INTERVAL 간격으로)
         singleFallTimer += delta;
@@ -134,7 +174,7 @@ public class FallingAnimationManager {
                 // 이동 가능하면 열 전체 한 칸 이동
                 if (canColumnFall) {
                     for (FallingPuyo fp : column) {
-                        fp.puyo.moveDown(); // 한 칸만 이동
+                        fp.puyo.moveDown(); // 한 칸만 이동 (Puyo 상태 변경, Board 조작 아님)
                     }
                 }
             }
@@ -150,6 +190,7 @@ public class FallingAnimationManager {
             }
         }
 
+        boolean anyCanFall = false;
         for (List<FallingPuyo> column : columnsForCheck.values()) {
             // 열 내 가장 아래쪽 뿌요만 체크
             FallingPuyo bottomFp = null;
@@ -160,44 +201,68 @@ public class FallingAnimationManager {
                     bottomFp = fp;
                 }
             }
-            if (bottomFp != null && canFallInColumn(board, column, bottomFp.puyo)) {
-                return false; // 이 열의 맨 아래가 아직 움직일 수 있으면 완료 안 됨
+            if (bottomFp != null) {
+                boolean canFall = canFallInColumn(board, column, bottomFp.puyo);
+                if (canFall) {
+                    anyCanFall = true;
+                    break; // 이 열의 맨 아래가 아직 움직일 수 있으면 완료 안 됨
+                }
             }
+        }
+
+        if (anyCanFall) {
+            result.done = false;
+            result.action = FallAction.NONE;
+            return result; // 아직 낙하 중
+        }
+
+        // 4. 모든 낙하 완료: 배치 액션 반환
+        List<FallingPuyo> separatedFalling = new ArrayList<>();
+        List<FallingPuyo> floatingFalling = new ArrayList<>();
+        for (FallingPuyo fp : fallingPuyos) {
+            if (fp.type == FallingPuyo.FallType.SEPARATION) {
+                separatedFalling.add(fp);
+            } else if (fp.type == FallingPuyo.FallType.FLOATING) {
+                floatingFalling.add(fp);
+            }
+        }
+
+        // 분리 낙하 완료된 것부터 배치
+        if (!separatedFalling.isEmpty()) {
+            List<Puyo> separatedPuyos = new ArrayList<>();
+            for (FallingPuyo fp : separatedFalling) {
+                separatedPuyos.add(fp.puyo);
+            }
+            // 처리된 항목들 내부 리스트에서 제거 (무한 루프 방지)
+            fallingPuyos.removeAll(separatedFalling);
+            
+            result.action = FallAction.PLACE_SEPARATED;
+            result.puyos = separatedPuyos;
+            // 처리 후 리스트가 비었으면 완료 (부유 낙하가 없으면)
+            result.done = fallingPuyos.isEmpty();
+            return result;
+        }
+
+        // 부유 낙하 완료된 것 배치
+        if (!floatingFalling.isEmpty()) {
+            List<Puyo> floatingPuyos = new ArrayList<>();
+            for (FallingPuyo fp : floatingFalling) {
+                floatingPuyos.add(fp.puyo);
+            }
+            // 처리된 항목들 내부 리스트에서 제거
+            fallingPuyos.removeAll(floatingFalling);
+            
+            result.action = FallAction.PLACE_FLOATING;
+            result.puyos = floatingPuyos;
+            // 처리 후 리스트가 비었으면 완료
+            result.done = fallingPuyos.isEmpty();
+            return result;
         }
 
         // 모든 처리 완료 (팝 완료 AND 분리/부유 낙하 완료)
-        return true;
-    }
-
-    /**
-     * 분리 낙하 완료된 뿌요들을 보드에 배치
-     */
-    public void placeSeparatedPuyos(Board board) {
-        LogUtil.debug("FallingAnim", "=== placeSeparatedPuyos START ===");
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.type == FallingPuyo.FallType.SEPARATION) {
-                LogUtil.debug("FallingAnim", "Placing separated puyo at (" + fp.puyo.getX() + "," + fp.puyo.getY()
-                        + ") color=" + fp.puyo.getColor() + " hash=" + System.identityHashCode(fp.puyo));
-                board.placePuyo(fp.puyo);
-            }
-        }
-        LogUtil.debug("FallingAnim", "=== placeSeparatedPuyos END ===");
-    }
-
-    /**
-     * 부유 낙하 완료된 뿌요들(연쇄 후 공중에 뜬 기둥)을 보드에 배치
-     * 이미 중력이 적용된 최종 위치에 배치
-     */
-    public void placeFloatingPuyos(Board board) {
-        LogUtil.debug("FallingAnim", "=== placeFloatingPuyos START ===");
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.type == FallingPuyo.FallType.FLOATING) {
-                LogUtil.debug("FallingAnim", "Placing floating puyo at final (" + fp.puyo.getX() + "," + fp.puyo.getY()
-                        + ") color=" + fp.puyo.getColor() + " hash=" + System.identityHashCode(fp.puyo));
-                board.placePuyo(fp.puyo);
-            }
-        }
-        LogUtil.debug("FallingAnim", "=== placeFloatingPuyos END ===");
+        result.done = true;
+        result.action = FallAction.NONE;
+        return result;
     }
 
     /**
@@ -206,6 +271,8 @@ public class FallingAnimationManager {
     public void clear() {
         fallingPuyos.clear();
         singleFallTimer = 0f;
+        popWasDone = false;
+        wasPopJustDone = false;
     }
 
     /**
@@ -259,13 +326,5 @@ public class FallingAnimationManager {
         }
 
         return true;
-    }
-
-    /**
-     * 내부 fallingPuyos 리스트 반환 (SeparationManager 등에서 사용)
-     * package-private으로 제한
-     */
-    List<FallingPuyo> getInternalFallingPuyos() {
-        return fallingPuyos;
     }
 }

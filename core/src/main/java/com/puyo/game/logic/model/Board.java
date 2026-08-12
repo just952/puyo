@@ -3,10 +3,7 @@ package com.puyo.game.logic.model;
 import com.puyo.game.util.LogUtil;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class Board {
     public static final int WIDTH = 6;
@@ -183,76 +180,6 @@ public class Board {
         }
         LogUtil.debug("Board", "getAllFloatingPuyos END: Total floating=" + floating.size());
         return floating;
-    }
-
-    // Find all connected puyos of the same color (excluding ojama and hard)
-    public List<Puyo> findConnectedPuyos(Puyo start) {
-        if (start == null || start.getColor() == PuyoColor.OJAMA || start.getColor() == PuyoColor.HARD) {
-            return Collections.emptyList();
-        }
-        Set<Puyo> visited = new HashSet<>();
-        List<Puyo> result = new ArrayList<>();
-        dfs(start, start.getColor(), visited, result);
-        return result;
-    }
-
-    private void dfs(Puyo puyo, PuyoColor color, Set<Puyo> visited, List<Puyo> result) {
-        if (!visited.add(puyo)) {
-            return;
-        }
-        result.add(puyo);
-        int x = puyo.getX();
-        int y = puyo.getY();
-        // Check four directions
-        int[] dx = { 1, -1, 0, 0 };
-        int[] dy = { 0, 0, 1, -1 };
-        for (int i = 0; i < 4; i++) {
-            int nx = x + dx[i];
-            int ny = y + dy[i];
-            Puyo neighbor = getPuyoAt(nx, ny);
-            if (neighbor != null && neighbor.getColor() == color && neighbor.isAlive() && !visited.contains(neighbor)) {
-                dfs(neighbor, color, visited, result);
-            }
-        }
-    }
-
-    // Find all groups of 4 or more connected puyos of the same color
-    public List<List<Puyo>> findAllMatchingGroups() {
-        boolean[][] visited = new boolean[WIDTH][HEIGHT];
-        List<List<Puyo>> groups = new ArrayList<>();
-
-        for (int x = 0; x < WIDTH; x++) {
-            for (int y = 0; y < HEIGHT; y++) {
-                Puyo puyo = getPuyoAt(x, y);
-                if (puyo != null && !visited[x][y] &&
-                        puyo.getColor() != PuyoColor.OJAMA &&
-                        puyo.getColor() != PuyoColor.HARD) {
-                    List<Puyo> group = new ArrayList<>();
-                    collectGroup(x, y, puyo.getColor(), visited, group);
-                    if (group.size() >= 4) {
-                        groups.add(group);
-                    }
-                }
-            }
-        }
-        return groups;
-    }
-
-    private void collectGroup(int x, int y, PuyoColor color, boolean[][] visited, List<Puyo> group) {
-        if (!isInside(x, y) || visited[x][y]) {
-            return;
-        }
-        Puyo puyo = getPuyoAt(x, y);
-        if (puyo == null || !puyo.isAlive() || puyo.getColor() != color) {
-            return;
-        }
-        visited[x][y] = true;
-        group.add(puyo);
-        // Check neighbors
-        collectGroup(x + 1, y, color, visited, group);
-        collectGroup(x - 1, y, color, visited, group);
-        collectGroup(x, y + 1, color, visited, group);
-        collectGroup(x, y - 1, color, visited, group);
     }
 
     public void removePuyos(List<Puyo> puyos) {

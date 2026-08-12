@@ -139,12 +139,45 @@ public class GameWorld {
 
         // 1. 낙하/팝 애니메이션 처리 중이면 최우선 처리
         if (!fallingAnimationManager.isEmpty()) {
-            boolean done = fallingAnimationManager.update(delta, board);
-            if (done) {
-                // 애니메이션 완료: 분리된 뿌요 배치, 부유 뿌요 배치 (팝 제거는 addChainFalling에서 이미 수행)
-                fallingAnimationManager.placeSeparatedPuyos(board);
-                fallingAnimationManager.placeFloatingPuyos(board);
-                // 처리된 아이템들 정리 (중요: 무한 루프 방지)
+            FallingAnimationManager.UpdateResult animResult = fallingAnimationManager.update(delta, board);
+            
+            // 액션 실행
+            switch (animResult.action) {
+                case REMOVE_POPPED:
+                    // 팝 완료된 뿌요들 보드에서 제거
+                    if (animResult.puyos != null) {
+                        for (Puyo p : animResult.puyos) {
+                            board.removePuyo(p);
+                        }
+                    }
+                    break;
+                    
+                case PLACE_SEPARATED:
+                    // 분리 낙하 완료된 뿌요들 보드에 배치
+                    if (animResult.puyos != null) {
+                        for (Puyo p : animResult.puyos) {
+                            board.placePuyo(p);
+                        }
+                    }
+                    break;
+                    
+                case PLACE_FLOATING:
+                    // 부유 낙하 완료된 뿌요들 보드에 배치
+                    if (animResult.puyos != null) {
+                        for (Puyo p : animResult.puyos) {
+                            board.placePuyo(p);
+                        }
+                    }
+                    break;
+                    
+                case NONE:
+                default:
+                    // 아무 액션 없음 (애니메이션 진행 중)
+                    break;
+            }
+
+            if (animResult.done) {
+                // 애니메이션 완료: 정리
                 fallingAnimationManager.clear();
 
                 // 분리/부유 낙하 완료 후 보드에 매치가 있는지 확인
@@ -180,7 +213,7 @@ public class GameWorld {
                     if (result.groups != null) {
                         LogUtil.debug("GameWorld", "Executing START_POP for " + result.groups.size() + " groups");
                         for (List<Puyo> group : result.groups) {
-                            fallingAnimationManager.addChainFalling(board, group);
+                            fallingAnimationManager.addChainFalling(group);
                         }
                     }
                     break;
@@ -265,9 +298,19 @@ public class GameWorld {
         } else {
             // 바닥에 닿음 - 분리 가능한지 확인
             if (currentPair != null && separationManager.canSeparate(currentPair, board)) {
-                // 분리 실행
-                separationManager.separate(currentPair, board,
-                        fallingAnimationManager.getInternalFallingPuyos());
+                // 분리 실행 (액션만 반환, GameWorld가 보드 조작 수행)
+                SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
+                if (sepResult.separated) {
+                    // 막힌 쪽 즉시 잠금
+                    LogUtil.debug("GameWorld", "Placing blocked puyo at (" + sepResult.blockedPuyo.getX() + "," + sepResult.blockedPuyo.getY()
+                            + ") color=" + sepResult.blockedPuyo.getColor());
+                    board.placePuyo(sepResult.blockedPuyo);
+
+                    // 자유로운 쪽 단일 뿌요로 자동 낙하 시작
+                    LogUtil.debug("GameWorld", "Adding free puyo to falling: (" + sepResult.freePuyo.getX() + "," + sepResult.freePuyo.getY()
+                            + ") color=" + sepResult.freePuyo.getColor() + " hash=" + System.identityHashCode(sepResult.freePuyo));
+                    fallingAnimationManager.addSeparationFalling(sepResult.freePuyo);
+                }
                 currentPair = null;
                 lockDelayManager.forceLock();
             } else if (currentPair != null) {
