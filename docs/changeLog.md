@@ -4,6 +4,79 @@
 
 ---
 
+## v0.1.14 (2026-08-12) - **ChainProcessor 상태 머신 리팩토링 + 결합도 분리 + 순간이동/지연 버그 수정 + 불필요 코드 정리**
+
+### 리팩토링: ChainProcessor 완전 재설계 (SRP 준수)
+
+1. **상태 머신 패턴 도입**
+   - `Phase` enum: IDLE → FINDING_MATCHES → WAITING_POP → APPLYING_GRAVITY → CHECKING_FLOATING → DONE
+   - `Action` enum: START_POP, APPLY_GRAVITY, CHECK_FLOATING, NEXT_CHAIN_STEP, NONE
+   - `UpdateResult` 클래스: 액션 + 데이터(groups, floatingPuyos) + 상태(chainCount, totalRemoved, done) 전달
+
+2. **보드 조작 완전 분리** (핵심 변경)
+   - **기존**: `ChainProcessor` 내부에서 `gravityEngine.applyGravity()`, `board.removePuyo()`, `board.getAllFloatingPuyos()` 직접 호출
+   - **변경**: 액션만 반환, `GameWorld`가 유일한 오케스트레이터로 실제 실행
+
+3. **불필요 코드 삭제**
+   - 동기식 `processChain(Board board)` 메서드 삭제 (테스트 파일 삭제 후 사용처 없음)
+   - `ChainResult` static 클래스 삭제
+   - `gravityEngine` 필드 및 생성자 초기화 삭제
+   - `GravityEngine` import 제거
+
+### GameWorld - 유일한 오케스트레이터로 역할 명확화
+
+```java
+// ChainProcessor.UpdateResult의 action 실행
+switch (result.action) {
+    case START_POP:     → fallingAnim.addChainFalling()
+    case APPLY_GRAVITY: → gravityEngine.applyGravity(board)
+    case CHECK_FLOATING:→ board.removePuyo() + fallingAnim.addFloatingPuyos()
+    case NEXT_CHAIN_STEP:→ 다음 update에서 자동 처리
+}
+```
+
+### GravityEngine 단순화 (Stateless)
+
+- `board` 필드 제거, `applyGravity(Board board)` 파라미터 전달
+- 미사용 메서드 삭제: `findMatches()`, `findGroup()`, `clearPositions()`, `setBoard()`
+
+### 수정된 버그
+
+1. **순간이동 버그 (Teleport Bug)**
+   - 원인: 중력이 한 번에 여러 칸 적용됨
+   - 해결: `APPLY_GRAVITY` 액션으로 프레임당 한 번만 호출 → 한 칸씩 정상 낙하
+
+2. **매치 감지 지연 버그 (Match Detection Delay)**
+   - 원인: 분리 애니메이션 완료 후 즉시 매치 체크 안 하고 다음 조각 잠길 때까지 대기
+   - 해결: 애니메이션 완료 블록에서 `MatchFinder` 즉시 실행 → 매치 있으면 `chainProcessor.startChain()`
+
+### 테스트 파일 정리
+
+삭제된 결합도 높은 테스트들:
+- `ChainProcessorTest.java`, `GravityEngineTest.java`
+- `FallingAnimationManagerTest.java`, `LockDelayManagerTest.java`
+- `MatchFinderTest.java`, `SeparationManagerTest.java`
+
+### 검증 결과
+
+- ✅ 컴파일 성공
+- ✅ 게임 실행: 2분 49초 / 1분 41초 정상 플레이
+- ✅ 로그 확인: Phase 전이 정상, 중력 한 칸씩 적용, 체인 순환 정상
+
+### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/ChainProcessor.java` | 전면 재작성 | 상태 머신 + 액션 반환 패턴, 불필요 메서드 삭제 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | 액션 실행 로직 추가, 중력/부유 처리 일괄 수행 |
+| `core/src/main/java/com/puyo/game/logic/engine/GravityEngine.java` | 단순화 | stateless 변경, 미사용 메서드 삭제 |
+| `core/src/main/java/com/puyo/game/logic/engine/MatchFinder.java` | 수정 | 호출 스택 트레이스 로그 추가 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java` | 수정 | 부유 추가 로그 추가 |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 수정 | 부유 탐색 상세 로그 추가 |
+| 테스트 6개 파일 | 삭제 | 결합도 높은 테스트 제거 |
+
+---
+
 ## v0.1.13 (2026-08-11) - **락 딜레이 버그 수정 + fallTimer 중복 제거 + 락 딜레이 중복 업데이트 제거**
 
 ### 수정

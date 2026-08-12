@@ -9,12 +9,10 @@ import java.util.List;
 
 /**
  * 연쇄 처리를 전담하는 클래스.
- * GravityEngine과 MatchFinder를 조율하여 매칭→제거→중력 반복 처리를 수행합니다.
- * 상태 머신 기반으로 팝 애니메이션 대기 등을 처리합니다.
+ * 상태 머신 기반으로 매칭→팝→중력→부유확인 단계를 순차적으로 처리합니다.
+ * 실제 보드 조작(중력, 제거, 배치)은 GameWorld에서 담당합니다.
  */
 public class ChainProcessor {
-
-    private final GravityEngine gravityEngine;
 
     /**
      * 연쇄 처리 단계
@@ -23,9 +21,33 @@ public class ChainProcessor {
         IDLE,               // 대기 중
         FINDING_MATCHES,    // 매칭 그룹 탐색 중
         WAITING_POP,        // 팝 애니메이션 대기 중
-        APPLYING_GRAVITY,   // 중력 적용 중
+        POP_COMPLETED,      // 팝 완료, 중력 적용 필요
+        APPLYING_GRAVITY,   // 중력 적용 완료, 부유 확인 필요
         CHECKING_FLOATING,  // 부유 뿌요 확인 및 낙하 애니메이션 추가 중
         DONE                // 연쇄 완료
+    }
+
+    /**
+     * 다음에 수행해야 할 액션 (GameWorld가 실행)
+     */
+    public enum Action {
+        NONE,               // 아무 액션 없음
+        START_POP,          // 팝 애니메이션 시작 (groups 포함)
+        APPLY_GRAVITY,      // 중력 적용
+        CHECK_FLOATING,     // 부유 뿌요 확인 및 낙하 애니메이션 시작
+        NEXT_CHAIN_STEP     // 다음 연쇄 단계로 (매칭 탐색)
+    }
+
+    /**
+     * 업데이트 결과
+     */
+    public static class UpdateResult {
+        public boolean done = false;           // 연쇄 완료 여부
+        public Action action = Action.NONE;    // 다음 액션
+        public List<List<Puyo>> groups = null; // 팝할 그룹 (START_POP 시)
+        public List<Puyo> floatingPuyos = null; // 부유 뿌요 (CHECK_FLOATING 시)
+        public int chainCount = 0;
+        public int totalRemoved = 0;
     }
 
     private Phase phase = Phase.IDLE;
@@ -34,81 +56,21 @@ public class ChainProcessor {
     private int totalRemoved = 0;
 
     public ChainProcessor() {
-        this.gravityEngine = new GravityEngine(null); // board는 update에서 설정
-    }
-
-    /**
-     * 연쇄 처리 결과 (동기식 processChain용)
-     */
-    public static class ChainResult {
-        public int chainCount = 0;
-        public int totalRemoved = 0;
-        public List<List<Puyo>> allRemovedGroups = new ArrayList<>();
-    }
-
-    /**
-     * 콜백 없이 연쇄 처리 (동기식, 즉시 완료) - 테스트 및 동기식 사용용
-     */
-    public ChainResult processChain(Board board) {
-        return processChain(board, null);
-    }
-
-    /**
-     * 콜백과 함께 연쇄 처리 (동기식, 즉시 완료) - 테스트용
-     * 비동기식(update)과 달리 팝 애니메이션 없이 즉시 처리
-     */
-    public ChainResult processChain(Board board, Object callback) {
-        ChainResult result = new ChainResult();
-        int chainCount = 0;
-        int totalRemoved = 0;
-
-        // GravityEngine에 board 설정
-        gravityEngine.setBoard(board);
-
-        while (true) {
-            // 1. 매칭 그룹 찾기 (static 메서드 사용)
-            List<List<Puyo>> groups = MatchFinder.findAllMatchingGroups(board);
-
-            if (groups.isEmpty()) {
-                // 매칭 없음 - 연쇄 종료
-                break;
-            }
-
-            chainCount++;
-            int removedThisChain = 0;
-
-            // 4. 실제 보드에서 제거
-            for (List<Puyo> group : groups) {
-                removedThisChain += group.size();
-                for (Puyo puyo : group) {
-                    board.removePuyo(puyo);
-                }
-                result.allRemovedGroups.add(group);
-            }
-
-            totalRemoved += removedThisChain;
-
-            // 5. 중력 적용
-            gravityEngine.applyGravity();
-        }
-
-        ChainResult finalResult = new ChainResult();
-        finalResult.chainCount = chainCount;
-        finalResult.totalRemoved = totalRemoved;
-        return finalResult;
     }
 
     /**
      * 연쇄 처리 상태 업데이트 (비동기식, 프레임당 1스텝)
-     * GameWorld.update()에서 fallingAnimationManager가 비어있을 때 호출
+     * 보드 조작은 하지 않고 다음에 수행할 액션만 반환합니다.
      * 
      * @param board                   게임 보드
      * @param fallingAnim             팝 애니메이션 매니저 (대기 확인용)
      * @param delta                   프레임 시간
-     * @return true면 연쇄 완료(더 이상 처리할 것 없음), false면 진행 중
+     * @return 업데이트 결과 (다음 액션 포함)
      */
-    public boolean update(Board board, FallingAnimationManager fallingAnim, float delta) {
-        gravityEngine.setBoard(board);
+    public UpdateResult update(Board board, FallingAnimationManager fallingAnim, float delta) {
+        UpdateResult result = new UpdateResult();
+        result.chainCount = chainCount;
+        result.totalRemoved = totalRemoved;
 
         LogUtil.debug("ChainProcessor", "=== update START ===");
         LogUtil.debug("ChainProcessor", "Phase: " + phase +
@@ -121,7 +83,8 @@ public class ChainProcessor {
             case IDLE:
                 LogUtil.debug("ChainProcessor", "Phase IDLE -> FINDING_MATCHES");
                 phase = Phase.FINDING_MATCHES;
-                return false;
+                result.done = false;
+                return result;
 
             case FINDING_MATCHES:
                 LogUtil.debug("ChainProcessor", "Finding next matching groups...");
@@ -132,7 +95,8 @@ public class ChainProcessor {
                     LogUtil.debug("ChainProcessor", "No more matches. Chain ending. totalRemoved=" + totalRemoved
                             + ", chainCount=" + chainCount);
                     phase = Phase.DONE;
-                    return true; // 연쇄 완료
+                    result.done = true;
+                    return result;
                 }
 
                 // 새 연쇄 단계 시작
@@ -144,67 +108,87 @@ public class ChainProcessor {
                             "  Group " + i + ": color=" + groups.get(i).get(0).getColor() + ", size=" + groups.get(i).size());
                 }
 
-                // 팝 애니메이션 시작
-                LogUtil.debug("ChainProcessor", "Starting pop animation for " + groups.size() + " groups");
-                for (List<Puyo> group : groups) {
-                    fallingAnim.addChainFalling(board, group);
-                }
+                // 팝 애니메이션 시작 액션 반환
+                LogUtil.debug("ChainProcessor", "Action: START_POP for " + groups.size() + " groups");
                 phase = Phase.WAITING_POP;
-                return false; // 팝 애니메이션 대기 중
+                result.done = false;
+                result.action = Action.START_POP;
+                result.groups = groups;
+                return result;
 
             case WAITING_POP:
                 // 팝 애니메이션 대기 중이면 스킵 (FallingAnimationManager가 처리 중)
                 if (!fallingAnim.isEmpty()) {
-                    return false; // 아직 팝 애니메이션 진행 중
+                    result.done = false;
+                    result.action = Action.NONE;
+                    return result; // 아직 팝 애니메이션 진행 중
                 }
                 // 팝 애니메이션 완료됨
                 LogUtil.debug("ChainProcessor", "Pop animation completed");
                 
-                // 팝 완료: 보드에서 제거 (이미 onPopStart에서 FallingAnimationManager가 즉시 제거했으므로 여기서는 카운트만)
+                // 팝 완료: 카운트만
                 if (currentGroups != null) {
                     int removed = currentGroups.stream().mapToInt(List::size).sum();
                     totalRemoved += removed;
                     LogUtil.debug("ChainProcessor", "Pop completed, removed " + removed + " puyos");
                 }
 
-                // 중력 적용
-                LogUtil.debug("ChainProcessor", "Applying gravity...");
-                gravityEngine.applyGravity();
+                // 중력 적용 액션 반환
+                LogUtil.debug("ChainProcessor", "Action: APPLY_GRAVITY");
+                phase = Phase.APPLYING_GRAVITY;
+                result.done = false;
+                result.action = Action.APPLY_GRAVITY;
+                return result;
+
+            case APPLYING_GRAVITY:
+                // 중력 적용 완료 후 부유 확인 액션 반환
+                LogUtil.debug("ChainProcessor", "Action: CHECK_FLOATING");
                 phase = Phase.CHECKING_FLOATING;
-                return false;
+                result.done = false;
+                result.action = Action.CHECK_FLOATING;
+                return result;
 
             case CHECKING_FLOATING:
                 // 부유 뿌요 낙하 애니메이션 대기 중
                 if (!fallingAnim.isEmpty()) {
                     LogUtil.debug("ChainProcessor", "CHECKING_FLOATING: fallingAnim not empty, waiting... size=" + fallingAnim.getFallingPuyos().size());
-                    return false; // 부유 낙하 애니메이션 진행 중
+                    result.done = false;
+                    result.action = Action.NONE;
+                    return result; // 부유 낙하 애니메이션 진행 중
                 }
                 
-                // 부유 뿌요들 확인 및 낙하 애니메이션 추가
+                // 부유 뿌요들 확인 및 낙하 애니메이션 추가 액션 반환
                 List<Puyo> floating = board.getAllFloatingPuyos();
                 LogUtil.debug("ChainProcessor", "CHECKING_FLOATING: floating.size()=" + floating.size() + ", board:\n" + board.toString());
                 if (!floating.isEmpty()) {
-                    LogUtil.debug("ChainProcessor", "Found " + floating.size() + " floating puyos, starting fall animation");
+                    LogUtil.debug("ChainProcessor", "Found " + floating.size() + " floating puyos, Action: CHECK_FLOATING");
                     for (Puyo p : floating) {
-                        LogUtil.debug("ChainProcessor", "  Removing floating puyo at (" + p.getX() + "," + p.getY() + ") color=" + p.getColor());
-                        board.removePuyo(p);
+                        LogUtil.debug("ChainProcessor", "  Floating puyo at (" + p.getX() + "," + p.getY() + ") color=" + p.getColor());
                     }
-                    fallingAnim.addFloatingPuyos(floating);
                     phase = Phase.CHECKING_FLOATING; // 재진입 (낙하 완료까지 대기)
+                    result.done = false;
+                    result.action = Action.CHECK_FLOATING;
+                    result.floatingPuyos = floating;
                     LogUtil.debug("ChainProcessor", "CHECKING_FLOATING -> re-enter (waiting for fall animation)");
-                    return false;
+                    return result;
                 }
                 
                 // 부유 뿌요 없으면 다음 연쇄 단계로
-                LogUtil.debug("ChainProcessor", "No floating puyos, phase CHECKING_FLOATING -> FINDING_MATCHES");
+                LogUtil.debug("ChainProcessor", "No floating puyos, Action: NEXT_CHAIN_STEP");
                 phase = Phase.FINDING_MATCHES;
-                return false;
+                result.done = false;
+                result.action = Action.NEXT_CHAIN_STEP;
+                return result;
 
             case DONE:
-                return true; // 연쇄 완료
+                result.done = true;
+                result.action = Action.NONE;
+                return result;
 
             default:
-                return true;
+                result.done = true;
+                result.action = Action.NONE;
+                return result;
         }
     }
 

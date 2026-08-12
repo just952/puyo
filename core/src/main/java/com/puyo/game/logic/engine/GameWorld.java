@@ -20,6 +20,7 @@ public class GameWorld {
     private final SeparationManager separationManager;
     private final FallingAnimationManager fallingAnimationManager;
     private final ChainProcessor chainProcessor;
+    private final GravityEngine gravityEngine;
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
@@ -55,6 +56,7 @@ public class GameWorld {
         separationManager = new SeparationManager();
         fallingAnimationManager = new FallingAnimationManager();
         chainProcessor = new ChainProcessor();
+        gravityEngine = new GravityEngine();
 
         spawnNewPair();
         spawnNextPair();
@@ -169,14 +171,55 @@ public class GameWorld {
 
         // 2. 연쇄 처리 상태 머신 업데이트 (연쇄가 진행 중일 때만)
         if (chainProcessor.hasActiveChain()) {
-            boolean chainDone = chainProcessor.update(board, fallingAnimationManager, delta);
-            if (chainDone) {
+            ChainProcessor.UpdateResult result = chainProcessor.update(board, fallingAnimationManager, delta);
+            
+            // 액션 실행
+            switch (result.action) {
+                case START_POP:
+                    // 팝 애니메이션 시작
+                    if (result.groups != null) {
+                        LogUtil.debug("GameWorld", "Executing START_POP for " + result.groups.size() + " groups");
+                        for (List<Puyo> group : result.groups) {
+                            fallingAnimationManager.addChainFalling(board, group);
+                        }
+                    }
+                    break;
+                    
+                case APPLY_GRAVITY:
+                    // 중력 적용
+                    LogUtil.debug("GameWorld", "Executing APPLY_GRAVITY");
+                    gravityEngine.applyGravity(board);
+                    break;
+                    
+                case CHECK_FLOATING:
+                    // 부유 뿌요 확인 및 낙하 애니메이션 시작
+                    if (result.floatingPuyos != null && !result.floatingPuyos.isEmpty()) {
+                        LogUtil.debug("GameWorld", "Executing CHECK_FLOATING for " + result.floatingPuyos.size() + " floating puyos");
+                        for (Puyo p : result.floatingPuyos) {
+                            board.removePuyo(p);
+                        }
+                        fallingAnimationManager.addFloatingPuyos(result.floatingPuyos);
+                    }
+                    break;
+                    
+                case NEXT_CHAIN_STEP:
+                    // 다음 연쇄 단계로 - 아무것도 안 함 (다음 update에서 FINDING_MATCHES 실행)
+                    LogUtil.debug("GameWorld", "Executing NEXT_CHAIN_STEP");
+                    break;
+                    
+                case NONE:
+                default:
+                    // 아무 액션 없음
+                    break;
+            }
+
+            if (result.done) {
                 // 연쇄 완료
-                int earned = chainProcessor.getTotalRemoved() * (chainProcessor.getChainCount() + 1) * 10;
+                int earned = result.totalRemoved * (result.chainCount + 1) * 10;
                 if (earned > 0) {
                     addScore(earned);
-                    LogUtil.debug("GameWorld", "Chain end: chainCount=" + chainProcessor.getChainCount() + 
-                            ", totalRemoved=" + chainProcessor.getTotalRemoved() + ", earned=" + earned);
+                    LogUtil.debug("GameWorld", "Chain end: chainCount=" + result.chainCount + 
+                            ", totalRemoved=" + result.totalRemoved + ", earned=" + earned);
                 }
 
                 if (board.isTopOut()) {

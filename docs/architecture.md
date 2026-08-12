@@ -41,14 +41,17 @@ puyo/
 │   │   │   ├── ai/
 │   │   │   │   └── AIController.java     # AI 대전 컨트롤러 (휴리스틱)
 │   │   │   ├── engine/
-│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 중력, 매칭, 연쇄
-│   │   │   │   ├── GravityEngine.java    # 중력 처리 엔진
-│   │   │   │   ├── GravityEngineTest.java # 중력 엔진 테스트
+│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 상태 머신 오케스트레이터
+│   │   │   │   ├── ChainProcessor.java   # 연쇄 처리 상태 머신 (액션 반환)
+│   │   │   │   ├── GravityEngine.java    # 중력 처리 엔진 (stateless, Board 파라미터)
+│   │   │   │   ├── MatchFinder.java      # 매칭 그룹 탐색 (static 메서드)
+│   │   │   │   ├── FallingAnimationManager.java # 팝/낙하 애니메이션 관리
+│   │   │   │   ├── SeparationManager.java # 가로 쌍 분리 로직
+│   │   │   │   ├── LockDelayManager.java  # 락 딜레이 타이머/이동 카운트
 │   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
 │   │   │   └── model/
-│   │   │       ├── Board.java            # 6x12 보드, 중력, 매칭, 연쇄
-│   │   │       ├── MatchResult.java      # 매칭 결과 데이터
-│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존)
+│   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
+│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, 팝 애니메이션)
 │   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
 │   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
 │   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)
