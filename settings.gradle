@@ -1,2 +1,6 @@
 rootProject.name = 'puyo'
-include 'core', 'desktop', 'android'
+include 'core', 'desktop'
+
+if (!System.getenv('ANDROID_SKIP')) {
+    include 'android'
+}
