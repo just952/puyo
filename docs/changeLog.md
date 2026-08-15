@@ -31,6 +31,11 @@
 - `collectAndPlaceCompletedFalling(FallType)` → `collectAndPlaceCompletedFalling()` 파라미터 제거
 - `CHAIN_POP_WAIT` 단계에서 모든 `CHAIN_POP`이 제거되므로 `FALLING_ANIMATION` 단계엔 `FALLING` 타입만 존재함 → 타입 필터링 불필요
 
+### 5. GamePhase 이름 변경 (가독성 개선)
+- `CHAIN_POP_WAIT` → `CHAIN_POP_ANIMATION`: 팝 애니메이션 대기 단계임을 명확히 표현
+- `CHAIN_GRAVITY` → `CHAIN_FLOATING_CHECK`: 중력 적용이 아닌 부유 뿌요 체크 단계임을 명확히 표현
+- switch case 및 모든 메서드 참조 업데이트 (`handleChainPopWait` → `handleChainPopAnimation`, `handleChainGravity` → `handleChainFloatingCheck`)
+
 ### 검증 결과
 - **컴파일 성공** ✅
 - **단위 테스트 통과** (6/6) ✅

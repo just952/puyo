@@ -73,6 +73,7 @@
 | **Phase 통합**    | **SEPARATING + CHAIN_FLOATING → FALLING_ANIMATION**                  | **완료** | v0.1.16, 중복 낙하 로직 단일화, 약 200줄 감소                         |
 | **FallType 단순화**| **SEPARATION + FLOATING → FALLING**                                  | **완료** | v0.1.16, enum/메서드/분기 로직 정리                                   |
 | **파라미터 제거**  | **updateFallingAnimation, collectAndPlaceCompletedFalling 단순화**    | **완료** | v0.1.16, 타입 필터링 불필요 제거                                      |
+| **GamePhase 이름 변경** | **CHAIN_POP_WAIT→CHAIN_POP_ANIMATION, CHAIN_GRAVITY→CHAIN_FLOATING_CHECK** | **완료** | v0.1.16, Phase 역할 명확화로 가독성 개선                                |
 
 ---
 
