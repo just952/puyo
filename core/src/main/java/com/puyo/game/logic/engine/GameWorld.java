@@ -18,7 +18,6 @@ public class GameWorld {
     private final Board board;
     private final PuyoPairGenerator pairGenerator;
     private final SeparationManager separationManager;
-    private final GravityEngine gravityEngine;
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
@@ -69,7 +68,6 @@ public class GameWorld {
         this.board = board;
         pairGenerator = new PuyoPairGenerator();
         separationManager = new SeparationManager();
-        gravityEngine = new GravityEngine();
 
         // 초기 상태는 SPAWNING, update()에서 처리
     }
@@ -317,9 +315,9 @@ public class GameWorld {
             }
         }
         if (!poppedPuyos.isEmpty()) {
-            LogUtil.debug("GameWorld", "☆☆☆☆☆☆☆ collectAndClearChainPop: " + poppedPuyos.size() + " puyos, listSize before=" + fallingPuyos.size());
+            LogUtil.debug("GameWorld", "collectAndClearChainPop: " + poppedPuyos.size() + " puyos, listSize before=" + fallingPuyos.size());
             fallingPuyos.removeAll(toRemove);
-            LogUtil.debug("GameWorld", "☆☆☆☆☆☆☆ collectAndClearChainPop: removed CHAIN_POP, listSize after=" + fallingPuyos.size());
+            LogUtil.debug("GameWorld", "collectAndClearChainPop: removed CHAIN_POP, listSize after=" + fallingPuyos.size());
         }
         return poppedPuyos;
     }
@@ -593,10 +591,10 @@ public class GameWorld {
                 LogUtil.debug("GameWorld", "Popped puyos removed: " + poppedPuyos.size());
             }
 
-            // 중력 적용
-            gravityEngine.applyGravity(board);
+            // 중력 적용 제거 - CHAIN_GRAVITY에서 getAllFloatingPuyos()로 부유 뿌요 감지 후
+            // CHAIN_FLOATING에서 애니메이션으로 자연스럽게 낙하 처리
             gamePhase = GamePhase.CHAIN_GRAVITY;
-            LogUtil.debug("GameWorld", "Phase: CHAIN_POP_WAIT -> CHAIN_GRAVITY");
+            LogUtil.debug("GameWorld", "Phase: CHAIN_POP_WAIT -> CHAIN_GRAVITY (no instant gravity)");
         }
     }
 

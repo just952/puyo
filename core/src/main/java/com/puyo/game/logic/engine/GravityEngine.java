@@ -2,11 +2,8 @@ package com.puyo.game.logic.engine;
 
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.Puyo;
-import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.util.LogUtil;
 
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 뿌요의 낙하, 소멸 및 연쇄 반응을 처리하는 엔진입니다.
