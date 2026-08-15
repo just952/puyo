@@ -11,7 +11,7 @@ import com.puyo.game.GameMode;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.engine.GameWorld;
-import com.puyo.game.logic.engine.FallingAnimationManager;
+import com.puyo.game.logic.engine.FallingPuyo;
 import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
@@ -204,12 +204,12 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawFallingPuyos() {
-        List<FallingAnimationManager.FallingPuyo> fallingPuyos = gameWorld.getFallingPuyos();
+        List<FallingPuyo> fallingPuyos = gameWorld.getFallingPuyos();
         if (fallingPuyos == null || fallingPuyos.isEmpty())
             return;
 
         batch.begin();
-        for (FallingAnimationManager.FallingPuyo fp : fallingPuyos) {
+        for (FallingPuyo fp : fallingPuyos) {
             Puyo puyo = fp.puyo;
             drawPuyo(puyo,
                     GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
