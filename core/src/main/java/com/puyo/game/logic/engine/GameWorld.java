@@ -18,6 +18,7 @@ public class GameWorld {
     private final Board board;
     private final PuyoPairGenerator pairGenerator;
     private final SeparationManager separationManager;
+    private final LockDelayManager lockDelayManager = new LockDelayManager();
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
@@ -39,11 +40,6 @@ public class GameWorld {
         GAME_OVER
     }
     private GamePhase gamePhase = GamePhase.SPAWNING;
-
-    // 락딜레이 상태 (GameWorld에서 직접 관리)
-    private boolean lockDelayActive = false;
-    private float lockDelayTimer = 0f;
-    private int lockDelayMoves = 0;
 
     // 애니메이션 상태 (GameWorld에서 직접 관리)
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
@@ -78,9 +74,7 @@ public class GameWorld {
             currentPair = pairGenerator.generate();
         }
         pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.HEIGHT);
-        lockDelayActive = false;
-        lockDelayTimer = 0f;
-        lockDelayMoves = 0;
+        lockDelayManager.deactivate();
     }
 
     /** 다음 쌍을 스폰 (미리보기용) */
@@ -100,10 +94,8 @@ public class GameWorld {
             return false;
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
-            if (lockDelayActive) {
-                lockDelayMoves++;
-                lockDelayTimer = 0f; // Tsu 규칙: 이동 시 타이머 리셋
-                LogUtil.debug("GameWorld", "LockDelay recordMove: moveCount=" + lockDelayMoves + ", timer reset");
+            if (lockDelayManager.isActive()) {
+                lockDelayManager.recordMove();
             }
             return true;
         }
@@ -116,10 +108,8 @@ public class GameWorld {
             return false;
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
-            if (lockDelayActive) {
-                lockDelayMoves++;
-                lockDelayTimer = 0f;
-                LogUtil.debug("GameWorld", "LockDelay recordMove: moveCount=" + lockDelayMoves + ", timer reset");
+            if (lockDelayManager.isActive()) {
+                lockDelayManager.recordMove();
             }
             return true;
         }
@@ -140,10 +130,8 @@ public class GameWorld {
                 currentPair.rotateCounterClockwise();
             }
         }
-        if (lockDelayActive) {
-            lockDelayMoves++;
-            lockDelayTimer = 0f;
-            LogUtil.debug("GameWorld", "LockDelay recordMove: moveCount=" + lockDelayMoves + ", timer reset");
+        if (lockDelayManager.isActive()) {
+            lockDelayManager.recordMove();
         }
     }
 
@@ -210,10 +198,10 @@ public class GameWorld {
 
     private void handleFalling(float delta) {
         // 락딜레이 타이머 업데이트 및 체크
-        if (lockDelayActive) {
-            lockDelayTimer += delta;
+        if (lockDelayManager.isActive()) {
+            lockDelayManager.recordTime(delta);
 
-            if (LockDelayManager.shouldLock(lockDelayTimer, lockDelayMoves, true)) {
+            if (lockDelayManager.shouldLock()) {
                 LogUtil.debug("GameWorld", "LockDelay shouldLock triggered lockPiece");
                 lockPiece();
                 return;
@@ -227,10 +215,9 @@ public class GameWorld {
             if (canFall()) {
                 currentPair.moveDown();
                 // Tsu 규칙: 공중에서 이동 시 락딜레이 리셋
-                if (lockDelayActive) {
-                    lockDelayTimer = 0f;
-                    lockDelayMoves = 0;
-                    LogUtil.debug("GameWorld", "Air move: LockDelay reset");
+                if (lockDelayManager.isActive()) {
+                    lockDelayManager.resetTimerAndMoves();
+                    LogUtil.debug("GameWorld", "Air move: LockDelay resetTimerAndMoves");
                 }
             } else {
                 // 바닥에 닿음
@@ -257,19 +244,10 @@ public class GameWorld {
                 gamePhase = GamePhase.FALLING_ANIMATION;
                 LogUtil.debug("GameWorld", "Phase: FALLING -> FALLING_ANIMATION (FALLING)");
             } else {
-                activateLockDelay();
+                lockDelayManager.activate();
             }
         } else {
-            activateLockDelay();
-        }
-    }
-
-    private void activateLockDelay() {
-        if (!lockDelayActive) {
-            lockDelayActive = true;
-            lockDelayTimer = 0f;
-            lockDelayMoves = 0;
-            LogUtil.debug("GameWorld", "LockDelay activated");
+            lockDelayManager.activate();
         }
     }
 
@@ -450,9 +428,7 @@ public class GameWorld {
 
             // 정리
             currentPair = null;
-            lockDelayActive = false;
-            lockDelayTimer = 0f;
-            lockDelayMoves = 0;
+            lockDelayManager.deactivate();
 
             // 무조건 연쇄 찾기 단계로
             gamePhase = GamePhase.CHAIN_FINDING;
@@ -536,9 +512,7 @@ public class GameWorld {
             }
         }
 
-        lockDelayActive = false;
-        lockDelayTimer = 0f;
-        lockDelayMoves = 0;
+        lockDelayManager.deactivate();
         currentPair = null;
 
         // 연쇄 시작

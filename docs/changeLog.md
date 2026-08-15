@@ -4,6 +4,39 @@
 
 ---
 
+## v0.1.18 (2026-08-15) - **LockDelayManager 상태 관리 리팩토링 + 공중 잠금 버그 수정**
+
+### 1. LockDelayManager 상태 관리 클래스로 리팩토링
+- **기존**: GameWorld에 `lockDelayActive`, `lockDelayTimer`, `lockDelayMoves` 필드 분산, LockDelayManager는 stateless static 유틸리티
+- **변경**: LockDelayManager를 stateful 클래스로 변경, 인스턴스 필드로 상태 관리
+- **이점**: 디버깅 시 LockDelayManager 하나만 확인, reset 로직 중앙화, 캡슐화
+
+### 2. 명확한 메서드 네이밍으로 역할 분리
+| 메서드 | 역할 | 호출 시점 |
+|-------|------|----------|
+| `activate()` | 활성화 (active=true, timer=0, moves=0) | 바닥에 닿음 (`handleLanding`) |
+| `deactivate()` | 완전 비활성화 (active=false, timer=0, moves=0) | 잠금/스폰/분리 완료 (`lockPiece`, `spawnNewPair`, `handleFallingAnimation`) |
+| `resetTimerAndMoves()` | timer/moves만 리셋 (active 유지) | 공중 이동/자동낙하 (`handleFalling`) |
+| `recordTime(delta)` | 타이머 증가 | 매 프레임 (`handleFalling`) |
+| `recordMove()` | 이동/회전 기록 (moves++, timer=0) | 좌우/회전/하드드롭 |
+| `shouldLock()` | 잠금 판단 (내부 필드 사용) | 락딜레이 체크 (`handleFalling`) |
+
+### 3. 공중 잠금 버그 수정
+- **원인**: `handleFalling()`에서 `shouldLock(lockDelayTimer, lockDelayMoves, true)` 하드코딩 `true`로 인해 `lockDelayActive`와 무관하게 잠금 판단 가능성
+- **해결**: `lockDelayManager.shouldLock()` 내부 필드 기반 판단으로 변경
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **단위 테스트 통과** (6/6) ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/LockDelayManager.java` | 전체 재작성 | stateful 클래스로 변경, 메서드 추가 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | 필드 3개 제거, LockDelayManager 위임으로 전환 |
+
+---
+
 ## v0.1.17 (2026-08-15) - **다음 뿌요 미리보기/실제 스폰 불일치 버그 수정**
 
 ### 문제
