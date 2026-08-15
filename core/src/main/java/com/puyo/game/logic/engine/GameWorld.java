@@ -33,15 +33,12 @@ public class GameWorld {
 
     // 연쇄 처리 상태 머신 (기존 ChainProcessor 내장)
     private enum ChainPhase {
-        IDLE,               // 대기 중
-        FINDING_MATCHES,    // 매칭 그룹 탐색 중
+        FINDING_MATCHES,    // 연쇄 시작점 + 다음 단계 진입점
         WAITING_POP,        // 팝 애니메이션 대기 중
-        //APPLYING_GRAVITY,   // 중력 적용 완료, 부유 확인 필요
-        CHECKING_FLOATING  // 부유 뿌요 확인 및 낙하 애니메이션 추가 중
-        //DONE                // 연쇄 완료
+        CHECKING_FLOATING,  // 부유 뿌요 확인 및 낙하 애니메이션 추가 중
+        INACTIVE            // 연쇄 비활성 (구 IDLE/DONE 통합)
     }
-    //private ChainPhase chainPhase = ChainPhase.IDLE;
-    private ChainPhase chainPhase = ChainPhase.FINDING_MATCHES;
+    private ChainPhase chainPhase = ChainPhase.INACTIVE;
     private List<List<Puyo>> currentGroups = null;
     private int chainCount = 0;
     private int totalChainRemoved = 0;
@@ -294,6 +291,16 @@ public class GameWorld {
                 lockPiece();
             }
         }
+
+        // 4. 연쇄도 애니메이션도 없고 현재 조각도 없으면 다음 조각 스폰
+        if (currentPair == null && !hasActiveChain() && fallingAnimationManager.isEmpty()) {
+            LogUtil.debug("GameWorld", "No active piece/chain/anim, spawning next pair");
+            currentPair = nextPair;
+            spawnNextPair();
+            fallTimer = 0f;
+            lockDelayManager.reset();
+            resetChain();
+        }
     }
 
     // ===== 연쇄 처리 내부 메서드들 (기존 ChainProcessor 로직 인라인) =====
@@ -323,17 +330,8 @@ public class GameWorld {
                     // 매칭 없음 - 연쇄 종료
                     LogUtil.debug("GameWorld", "No more matches. Chain ending. totalRemoved=" + totalChainRemoved
                             + ", chainCount=" + chainCount);
-                    //chainPhase = ChainPhase.DONE;
-                    chainPhase = ChainPhase.IDLE;
-                    
-                    // 연쇄가 완전히 종료되었으므로 다음 조각 스폰
-                    if (currentPair == null) {
-                        LogUtil.debug("GameWorld", "Chain DONE: spawning next pair");
-                        currentPair = nextPair;
-                        spawnNextPair();
-                        fallTimer = 0f;
-                        lockDelayManager.reset();
-                    }
+                    chainPhase = ChainPhase.INACTIVE;
+                    // 스폰은 메인 update 루프에서 처리 (중복 방지)
                     return;
                 }
 
@@ -412,12 +410,12 @@ public class GameWorld {
                 return;
 
             //case DONE:
-            case IDLE:    
+            case INACTIVE:    
                 return;
 
             default:
                 //chainPhase = ChainPhase.DONE;
-                chainPhase = ChainPhase.IDLE;
+                chainPhase = ChainPhase.INACTIVE;
                 return;
         }
     }
@@ -426,7 +424,7 @@ public class GameWorld {
      * 연쇄 상태 리셋 (새 조각 스폰 시)
      */
     private void resetChain() {
-        chainPhase = ChainPhase.IDLE;
+        chainPhase = ChainPhase.INACTIVE;
         currentGroups = null;
         chainCount = 0;
         totalChainRemoved = 0;
@@ -436,16 +434,14 @@ public class GameWorld {
      * 연쇄 처리 시작 (lockPiece 후 호출)
      */
     private void startChain() {
-        //if (chainPhase == ChainPhase.IDLE) {
-            chainPhase = ChainPhase.FINDING_MATCHES;
-        //}
+        chainPhase = ChainPhase.FINDING_MATCHES;
     }
 
     /**
      * 연쇄가 진행 중인지 확인
      */
     private boolean hasActiveChain() {
-        return chainPhase != ChainPhase.IDLE ; //&& chainPhase != ChainPhase.DONE;
+        return chainPhase != ChainPhase.INACTIVE;
     }
 
     /**
