@@ -69,6 +69,10 @@
 | **엔진 리팩토링**   | **ChainProcessor 삭제, GameWorld 단일 상태 머신 통합**                | **완료** | v0.1.14 (2026-08-12), 결합도 분리, 순간이동/지연 버그 수정           |
 | **보드 조작 분리**  | **액션 기반 패턴으로 GameWorld가 유일한 오케스트레이터**              | **완료** | v0.1.14, FallingAnimationManager/SeparationManager 보드 조작 없음    |
 | **불필요 코드 정리**| **동기식 processChain, ChainResult, gravityEngine 필드, 결합도 높은 테스트 삭제** | **완료** | v0.1.14, 100+ 줄 정리                                                 |
+| **버그 수정**      | **부유 뿌요 순간이동 버그 수정**                                     | **완료** | v0.1.16 (2026-08-15), 즉시 중력 적용 제거로 자연스러운 애니메이션 복구 |
+| **Phase 통합**    | **SEPARATING + CHAIN_FLOATING → FALLING_ANIMATION**                  | **완료** | v0.1.16, 중복 낙하 로직 단일화, 약 200줄 감소                         |
+| **FallType 단순화**| **SEPARATION + FLOATING → FALLING**                                  | **완료** | v0.1.16, enum/메서드/분기 로직 정리                                   |
+| **파라미터 제거**  | **updateFallingAnimation, collectAndPlaceCompletedFalling 단순화**    | **완료** | v0.1.16, 타입 필터링 불필요 제거                                      |
 
 ---
 

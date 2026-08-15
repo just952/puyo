@@ -4,6 +4,48 @@
 
 ---
 
+## v0.1.16 (2026-08-15) - **부유 뿌요 순간이동 버그 수정 + Phase/FallType 통합 리팩토링 + 불필요 파라미터 제거**
+
+### 1. 부유 뿌요 순간이동 버그 수정
+- **문제**: 연쇄 팝 완료 후 `gravityEngine.applyGravity(board)`가 즉시 전체 압축하여 부유 뿌요 애니메이션이 생략되고 순간이동 발생
+- **해결**: `GameWorld.handleChainPopWait()`에서 즉시 중력 적용 코드(597번 라인) 삭제
+- **결과**: `CHAIN_GRAVITY` → `CHAIN_FLOATING`(현 `FALLING_ANIMATION`) 단계에서 자연스럽게 한 칸씩 낙하 애니메이션 처리
+
+### 2. Phase 통합: SEPARATING + CHAIN_FLOATING → FALLING_ANIMATION
+- 분리 낙하(`SEPARATING`)와 부유 뿌요 낙하(`CHAIN_FLOATING`)가 동일한 "열 단위 기둥 낙하" 로직을 공유함을 발견
+- `GamePhase` enum에서 `SEPARATING`, `CHAIN_FLOATING` 제거, `FALLING_ANIMATION` 단일 Phase로 통합
+- `handleSeparating()` + `handleChainFloating()` → `handleFallingAnimation()` 단일 메서드로 통합
+- `updateSeparationFalling()` + `updateFloatingFalling()` → `updateFallingAnimation()` 단일 메서드로 통합
+- `collectCompletedFalling()` → `collectAndPlaceCompletedFalling()` 단일 메서드로 통합
+- 타이머 필드 2개(`separationFallTimer`, `floatingFallTimer`) → 1개(`fallingAnimationTimer`)로 통합
+- 상수 2개 → 1개(`FALLING_ANIMATION_INTERVAL`)로 통합
+
+### 3. FallType enum 단순화: SEPARATION + FLOATING → FALLING
+- `FallingPuyo.FallType`에서 `SEPARATION`, `FLOATING` 제거, `FALLING` 단일 타입으로 통합 (`CHAIN_POP`은 유지)
+- `isFromSeparation()`, `isFloating()` 제거, `isFalling()` 추가
+- `GameWorld` 내 타입 분기 로직 완전 제거 (`fp.isFalling()`만 체크)
+- `getFallingSinglePuyo()` `@Deprecated` 처리, `FALLING` 타입 기준으로 변경
+
+### 4. 불필요 파라미터 제거
+- `updateFallingAnimation(float delta, FallType)` → `updateFallingAnimation(float delta)` 파라미터 제거
+- `collectAndPlaceCompletedFalling(FallType)` → `collectAndPlaceCompletedFalling()` 파라미터 제거
+- `CHAIN_POP_WAIT` 단계에서 모든 `CHAIN_POP`이 제거되므로 `FALLING_ANIMATION` 단계엔 `FALLING` 타입만 존재함 → 타입 필터링 불필요
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **단위 테스트 통과** (6/6) ✅
+- **게임 실행**: 5분+ 크래시 없이 정상 플레이 ✅
+- **분리/부유 애니메이션** 정상 작동 (통합된 `FALLING` 타입)
+- **연쇄 4단계**까지 정상 처리 ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | 버그 수정, Phase/FallType 통합, 파라미터 제거, 약 200줄 감소 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java` | 수정 | FallType enum 단순화, 메서드 정리 |
+
+---
+
 ## v0.1.15 (2026-08-15) - **FallingAnimationManager GameWorld 완전 통합 + 프리징 버그 해결 + FallingPuyo 단일화 + 불필요 코드 정리**
 
 ### 리팩토링: FallingAnimationManager GameWorld 내장화 및 단일 상태 머신 완성
