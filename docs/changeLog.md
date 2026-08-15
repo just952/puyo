@@ -4,6 +4,48 @@
 
 ---
 
+## v0.1.15 (2026-08-15) - **FallingAnimationManager GameWorld 완전 통합 + 프리징 버그 해결 + FallingPuyo 단일화 + 불필요 코드 정리**
+
+### 리팩토링: FallingAnimationManager GameWorld 내장화 및 단일 상태 머신 완성
+
+1. **FallingAnimationManager 클래스 완전 삭제 및 GameWorld 통합**
+   - 정적 유틸리티 메서드들(`updatePop`, `updateSeparationAndFloatingFalling`, `collectAndClearChainPop`, `collectCompletedFalling`, `canFallInColumn`)을 `GameWorld` private 메서드로 이동
+   - `FallingAnimationManager.FallingPuyo` 중첩 클래스 → 별도 파일 `FallingPuyo.java`로 단일화 (중복 제거)
+   - `FallingAnimationManager` 클래스 자체 삭제 (더 이상 필요 없음)
+
+2. **타이머 버그 수정 (프리징 원인 해결)**
+   - **문제**: `float[]` 래퍼 패턴(`new float[]{timer}[0]`)으로 타이머 업데이트가 반영되지 않아 분리/부유 낙하에서 무한 루프/프리징 발생
+   - **해결**: 필드 직접 사용(`separationFallTimer`, `floatingFallTimer`)으로 변경, 메서드 분리(`updateSeparationFalling`, `updateFloatingFalling`)
+
+3. **불필요 코드 정리**
+   - 미사용 임포트 제거: `PuyoColor`, `Random`
+   - 미사용 필드 제거: `currentChain` (삭제), `totalChainRemoved` (삭제)
+   - `getCurrentChain()` → `chainCount` 반환으로 변경 (실제 연쇄 카운트)
+   - `LockDelayManager.shouldLock()` 호출 단순화 (하드코딩된 `true` 제거)
+
+4. **단일 상태 머신 완성**
+   - `GamePhase` enum 8단계로 모든 Phase 처리 (`SPAWNING`, `FALLING`, `SEPARATING`, `CHAIN_FINDING`, `CHAIN_POP_WAIT`, `CHAIN_GRAVITY`, `CHAIN_FLOATING`, `GAME_OVER`)
+   - 단일 `switch(gamePhase)`로 전체 게임 로직 처리, 우선순위 경쟁 제거
+
+### 검증 결과
+
+- **컴파일 성공** ✅
+- **게임 실행**: 3분+ 크래시 없이 정상 플레이 ✅
+- **로그 확인**: Phase 전이 정상 (`SPAWNING` → `FALLING` → `SEPARATING` → `CHAIN_FINDING` → `CHAIN_POP_WAIT` → `CHAIN_GRAVITY` → `CHAIN_FINDING` → `SPAWNING`)
+- **분리 애니메이션 프리징 완전 해결** ✅
+- **연쇄/락딜레이/스폰 모든 기능 정상** ✅
+
+### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | FallingAnimationManager 로직 내장화, 타이머 버그 수정, 불필요 코드 정리 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java` | **삭제** | 클래스 완전 제거, 로직 GameWorld로 이동 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java` | 수정 | 중복 클래스 단일화, 별도 파일로 이동 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | 수정 | `FallingPuyo` 타입 변경 (`FallingAnimationManager.FallingPuyo` → `FallingPuyo`) |
+
+---
+
 ## v0.1.14 (2026-08-12) - **ChainProcessor 삭제 + GameWorld 단일 상태 머신 통합 + 결합도 분리 + 순간이동/지연 버그 수정 + 불필요 코드 정리**
 
 ### 리팩토링: ChainProcessor 클래스 삭제 및 GameWorld 통합 (SRP 준수)

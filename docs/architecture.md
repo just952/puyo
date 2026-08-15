@@ -41,10 +41,9 @@ puyo/
 │   │   │   ├── ai/
 │   │   │   │   └── AIController.java     # AI 대전 컨트롤러 (휴리스틱)
 │   │   │   ├── engine/
-│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 상태 머신 오케스트레이터 (ChainPhase enum으로 연쇄 처리 통합)
+│   │   │   │   ├── GameWorld.java        # 게임 루프, 보드, 페어, 상태 머신 오케스트레이터 (GamePhase enum으로 전체 상태 관리)
 │   │   │   │   ├── GravityEngine.java    # 중력 처리 엔진 (stateless, Board 파라미터)
 │   │   │   │   ├── MatchFinder.java      # 매칭 그룹 탐색 (static 메서드)
-│   │   │   │   ├── FallingAnimationManager.java # 팝/낙하 애니메이션 관리
 │   │   │   │   ├── SeparationManager.java # 가로 쌍 분리 로직
 │   │   │   │   ├── LockDelayManager.java  # 락 딜레이 타이머/이동 카운트
 │   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
@@ -104,19 +103,18 @@ puyo/
 | **리소스**        | `AssetManager` (예정)                                                       | 텍스처/사운드/폰트 통합 관리               |
 
 ---
-## 엔진 모듈 구조 (v0.1.14~)
+## 엔진 모듈 구조 (v0.1.15~)
 
 | 클래스 | 책임 | 비고 |
 |--------|------|------|
-| `GameWorld` | **메인 상태 머신** (오케스트레이터) | 게임 루프, 보드, 페어, 연쇄 처리, 락 딜레이, 분리, 스폰 등 전체 상태 관리 |
-| `FallingAnimationManager` | 팝/낙하 애니메이션 관리 | `FallAction`(REMOVE_POPPED, PLACE_SEPARATED, PLACE_FLOATING) 액션 반환, Board 조작 안 함 |
+| `GameWorld` | **메인 상태 머신** (오케스트레이터) | 게임 루프, 보드, 페어, 연쇄 처리, 락 딜레이, 분리, 스폰, 팝/낙하 애니메이션 등 전체 상태 관리 |
 | `SeparationManager` | 가로 쌍 분리 로직 | `SeparationResult` 반환, Board 조작 안 함 |
 | `GravityEngine` | 중력 적용 (stateless) | `applyGravity(Board)` 파라미터 전달 |
 | `MatchFinder` | 매칭 그룹 탐색 | static 메서드만, stateless 유틸리티 |
 | `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한 |
 | `PuyoPairGenerator` | 랜덤 PuyoPair 생성 | 스폰 위치 설정 포함 |
 
-**주요 변경 (v0.1.14)**: `ChainProcessor` 클래스 삭제 → `GameWorld` 내부에 `ChainPhase` enum으로 통합. 단일 상태 머신으로 단순화, 액션 반환/실행 계층 제거.
+**주요 변경 (v0.1.15)**: `FallingAnimationManager` 클래스 삭제 → 로직을 `GameWorld` 내부에 private 메서드로 통합 (`updatePopAnimation`, `updateSeparationFalling`, `updateFloatingFalling`, `collectAndClearChainPop`, `collectCompletedFalling`, `canFallInColumn`). `FallingAnimationManager.FallingPuyo` 중첩 클래스 → 별도 파일 `FallingPuyo.java`로 단일화. `float[]` 래퍼 패턴 제거로 타이머 버그(프리징) 해결. 단일 `GamePhase` enum으로 모든 Phase 처리.
 
 ---
 
