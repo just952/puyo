@@ -34,8 +34,8 @@ public class GameWorld {
         FALLING,            // 일반 낙하 (이동/회전/락딜레이 포함)
         FALLING_ANIMATION,  // 분리/부유 뿌요 낙하 애니메이션
         CHAIN_FINDING,      // 연쇄: 매치 탐색
-        CHAIN_POP_WAIT,     // 연쇄: 팝 애니메이션 대기
-        CHAIN_GRAVITY,      // 연쇄: 중력 적용 후 부유 확인
+        CHAIN_POP_ANIMATION, // 연쇄: 팝 애니메이션 재생 중
+        CHAIN_FLOATING_CHECK, // 연쇄: 부유 뿌요 체크 후 낙하 준비
         GAME_OVER
     }
     private GamePhase gamePhase = GamePhase.SPAWNING;
@@ -174,12 +174,12 @@ public class GameWorld {
                 handleChainFinding();
                 break;
             }
-            case CHAIN_POP_WAIT: {
-                handleChainPopWait(delta);
+            case CHAIN_POP_ANIMATION: {
+                handlePopAnimation(delta);
                 break;
             }
-            case CHAIN_GRAVITY: {
-                handleChainGravity();
+            case CHAIN_FLOATING_CHECK: {
+                handleFloatingCheck();
                 break;
             }
             case GAME_OVER:
@@ -479,11 +479,11 @@ public class GameWorld {
                 addFallingPuyo(puyo, FallingPuyo.FallType.CHAIN_POP);
             }
         }
-        gamePhase = GamePhase.CHAIN_POP_WAIT;
-        LogUtil.debug("GameWorld", "Phase: CHAIN_FINDING -> CHAIN_POP_WAIT, fallingPuyos=" + fallingPuyos.size());
+        gamePhase = GamePhase.CHAIN_POP_ANIMATION;
+        LogUtil.debug("GameWorld", "Phase: CHAIN_FINDING -> CHAIN_POP_ANIMATION, fallingPuyos=" + fallingPuyos.size());
     }
 
-    private void handleChainPopWait(float delta) {
+    private void handlePopAnimation(float delta) {
         boolean allPopDone = updatePopAnimation(delta);
 
         if (allPopDone) {
@@ -496,14 +496,13 @@ public class GameWorld {
                 LogUtil.debug("GameWorld", "Popped puyos removed: " + poppedPuyos.size());
             }
 
-            // 중력 적용 제거 - CHAIN_GRAVITY에서 getAllFloatingPuyos()로 부유 뿌요 감지 후
-            // FALLING_ANIMATION에서 애니메이션으로 자연스럽게 낙하 처리
-            gamePhase = GamePhase.CHAIN_GRAVITY;
-            LogUtil.debug("GameWorld", "Phase: CHAIN_POP_WAIT -> CHAIN_GRAVITY (no instant gravity)");
+            // 부유 뿌요 체크 단계로
+            gamePhase = GamePhase.CHAIN_FLOATING_CHECK;
+            LogUtil.debug("GameWorld", "Phase: CHAIN_POP_ANIMATION -> CHAIN_FLOATING_CHECK");
         }
     }
 
-    private void handleChainGravity() {
+    private void handleFloatingCheck() {
         // 부유 뿌요 확인
         List<Puyo> floating = board.getAllFloatingPuyos();
         if (!floating.isEmpty()) {
@@ -514,7 +513,7 @@ public class GameWorld {
             }
             fallingAnimationTimer = 0f;
             gamePhase = GamePhase.FALLING_ANIMATION;
-            LogUtil.debug("GameWorld", "Phase: CHAIN_GRAVITY -> FALLING_ANIMATION (FALLING)");
+            LogUtil.debug("GameWorld", "Phase: CHAIN_FLOATING_CHECK -> FALLING_ANIMATION (FALLING)");
         } else {
             // 부유 없으면 다음 연쇄 단계
             gamePhase = GamePhase.CHAIN_FINDING;
