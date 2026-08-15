@@ -71,7 +71,12 @@ public class GameWorld {
 
     /** 현재 쌍을 새로 스폰하고 상태 초기화 */
     public void spawnNewPair() {
-        currentPair = pairGenerator.generate();
+        // 미리보기로 보여준 nextPair를 현재 쌍으로 사용
+        if (nextPair != null) {
+            currentPair = nextPair;
+        } else {
+            currentPair = pairGenerator.generate();
+        }
         pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.HEIGHT);
         lockDelayActive = false;
         lockDelayTimer = 0f;
@@ -81,7 +86,7 @@ public class GameWorld {
     /** 다음 쌍을 스폰 (미리보기용) */
     public void spawnNextPair() {
         nextPair = pairGenerator.generate();
-        pairGenerator.positionAtSpawn(nextPair, Board.WIDTH, Board.HEIGHT);
+        // 미리보기용이므로 보드 스폰 위치 설정 불필요 (렌더링 시 고정 좌표 사용)
     }
 
     /** 현재 쌍이 낙하 가능한지 확인 */

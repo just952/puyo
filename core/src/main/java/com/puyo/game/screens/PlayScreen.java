@@ -1,7 +1,6 @@
 package com.puyo.game.screens;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -232,8 +231,8 @@ public class PlayScreen extends BaseScreen {
         Puyo left = next.getLeft();
         Puyo right = next.getRight();
 
-        drawPuyo(left, nextX, nextY + GameViewport.CELL_SIZE);
-        drawPuyo(right, nextX, nextY);
+        drawPuyo(left, nextX, nextY);
+        drawPuyo(right, nextX, nextY + GameViewport.CELL_SIZE);
         batch.end();
     }
 

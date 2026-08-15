@@ -4,6 +4,27 @@
 
 ---
 
+## v0.1.17 (2026-08-15) - **다음 뿌요 미리보기/실제 스폰 불일치 버그 수정**
+
+### 문제
+- 화면에 보이는 NEXT 미리보기와 실제 스폰되는 뿌요 쌍이 다름
+- `handleSpawning()`에서 `spawnNewPair()`가 미리보기(`nextPair`)를 무시하고 매번 새로운 랜덤 쌍 생성
+
+### 해결
+1. **`spawnNewPair()` 수정**: 기존 `nextPair`가 있으면 그걸 `currentPair`로 사용, 없으면 새로 생성
+2. **`spawnNextPair()` 최적화**: 미리보기용이므로 `positionAtSpawn()` 호출 제거 (렌더링 시 고정 좌표 사용)
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **단위 테스트 통과** (6/6) ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | `spawnNewPair()`/`spawnNextPair()` 로직 수정 |
+
+---
+
 ## v0.1.16 (2026-08-15) - **부유 뿌요 순간이동 버그 수정 + Phase/FallType 통합 리팩토링 + 불필요 파라미터 제거**
 
 ### 1. 부유 뿌요 순간이동 버그 수정
