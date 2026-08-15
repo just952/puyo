@@ -4,6 +4,27 @@
 
 ---
 
+## v0.1.19 (2026-08-15) - **공중 락딜레이 비활성화 버그 수정 (이동/자동낙하 시)**
+
+### 문제
+- 바닥에 닿아 락딜레이가 활성화된 상태에서 옆으로 움직여 공중으로 빠져나오면 `active=true`가 유지됨
+- 자동낙하로 한 칸 내려간 후 여전히 공중인데 `resetTimerAndMoves()`만 호출되어 `active=true` 유지
+- 타이머가 0.5초 누적되어 공중에서 잠금 발생 (`shouldLock` 트리거)
+
+### 해결
+1. **`moveLeft`, `moveRight`, `rotateClockwise`**: 이동/회전 성공 후 `canFall()`이 true(공중)이면 `lockDelayManager.deactivate()` 호출
+2. **`handleFalling` 자동낙하**: `moveDown()` 후 여전히 `canFall()`이 true면 `deactivate()`, 바닥에 닿으면 `resetTimerAndMoves()`만 호출 (다음 `handleLanding`에서 activate)
+
+### 검증 결과
+- **컴파일 성공** ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | move/rotate/자동낙하 시 공중 탈출 시 deactivate 호출 추가 |
+
+---
+
 ## v0.1.18 (2026-08-15) - **LockDelayManager 상태 관리 리팩토링 + 공중 잠금 버그 수정**
 
 ### 1. LockDelayManager 상태 관리 클래스로 리팩토링

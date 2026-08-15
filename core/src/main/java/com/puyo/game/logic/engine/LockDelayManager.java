@@ -19,24 +19,26 @@ public class LockDelayManager {
     /** 락 딜레이 활성화 (바닥에 닿음) */
     public void activate() {
         active = true;
-        timer = 0f;
-        moves = 0;
+        resetTimerAndMoveVars();
         LogUtil.debug("LockDelay", "activate: active=true, timer=0, moves=0");
     }
 
     /** 락 딜레이 비활성화 (잠금/스폰/분리) */
     public void deactivate() {
         active = false;
-        timer = 0f;
-        moves = 0;
+        resetTimerAndMoveVars();
         LogUtil.debug("LockDelay", "deactivate: active=false, timer=0, moves=0");
     }
 
     /** 타이머와 이동 횟수만 리셋 (active 유지, 공중 이동/자동낙하 시) */
     public void resetTimerAndMoves() {
+        resetTimerAndMoveVars();
+        LogUtil.debug("LockDelay", "resetTimerAndMoves: timer=0, moves=0 (active=" + active + ")");
+    }
+
+    private void resetTimerAndMoveVars() {
         timer = 0f;
         moves = 0;
-        LogUtil.debug("LockDelay", "resetTimerAndMoves: timer=0, moves=0 (active=" + active + ")");
     }
 
     /** 시간 경과 기록 (매 프레임 호출) */

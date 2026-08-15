@@ -74,6 +74,7 @@
 | **FallType 단순화**| **SEPARATION + FLOATING → FALLING**                                  | **완료** | v0.1.16, enum/메서드/분기 로직 정리                                   |
 | **파라미터 제거**  | **updateFallingAnimation, collectAndPlaceCompletedFalling 단순화**    | **완료** | v0.1.16, 타입 필터링 불필요 제거                                      |
 | **GamePhase 이름 변경** | **CHAIN_POP_WAIT→CHAIN_POP_ANIMATION, CHAIN_GRAVITY→CHAIN_FLOATING_CHECK** | **완료** | v0.1.16, Phase 역할 명확화로 가독성 개선                                |
+| **버그 수정**      | **공중 락딜레이 비활성화 버그 수정**                                 | **완료** | v0.1.19 (2026-08-15), 이동/자동낙하 시 공중 탈출 시 deactivate 호출 |
 
 ---
 

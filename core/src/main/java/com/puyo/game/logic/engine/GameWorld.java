@@ -95,7 +95,12 @@ public class GameWorld {
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
             if (lockDelayManager.isActive()) {
-                lockDelayManager.recordMove();
+                // 공중으로 빠져나오면 락딜레이 비활성화
+                if (canFall()) {
+                    lockDelayManager.deactivate();
+                } else {
+                    lockDelayManager.recordMove();
+                }
             }
             return true;
         }
@@ -109,7 +114,12 @@ public class GameWorld {
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
             if (lockDelayManager.isActive()) {
-                lockDelayManager.recordMove();
+                // 공중으로 빠져나오면 락딜레이 비활성화
+                if (canFall()) {
+                    lockDelayManager.deactivate();
+                } else {
+                    lockDelayManager.recordMove();
+                }
             }
             return true;
         }
@@ -131,7 +141,12 @@ public class GameWorld {
             }
         }
         if (lockDelayManager.isActive()) {
-            lockDelayManager.recordMove();
+            // 회전 후 공중으로 빠져나오면 락딜레이 비활성화
+            if (canFall()) {
+                lockDelayManager.deactivate();
+            } else {
+                lockDelayManager.recordMove();
+            }
         }
     }
 
@@ -214,10 +229,17 @@ public class GameWorld {
             fallTimer = 0f;
             if (canFall()) {
                 currentPair.moveDown();
-                // Tsu 규칙: 공중에서 이동 시 락딜레이 리셋
+                // Tsu 규칙: 공중에서 이동 시 락딜레이 리셋/비활성화
                 if (lockDelayManager.isActive()) {
-                    lockDelayManager.resetTimerAndMoves();
-                    LogUtil.debug("GameWorld", "Air move: LockDelay resetTimerAndMoves");
+                    if (canFall()) {
+                        // 여전히 공중이면 락딜레이 비활성화
+                        lockDelayManager.deactivate();
+                        LogUtil.debug("GameWorld", "Air move: LockDelay deactivate (still in air)");
+                    } else {
+                        // 바닥에 닿으면 리셋만 (다음 handleLanding에서 activate)
+                        lockDelayManager.resetTimerAndMoves();
+                        LogUtil.debug("GameWorld", "Air move: LockDelay resetTimerAndMoves");
+                    }
                 }
             } else {
                 // 바닥에 닿음
