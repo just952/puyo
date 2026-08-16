@@ -608,6 +608,31 @@ public class GameWorld {
         LogUtil.debug("GameWorld", "Phase: -> CHAIN_FINDING (chain init)");
     }
 
+    /** 소프트 드롭: 한 칸 내리고 착지 시 즉시 잠금 (락딜레이 우회) */
+    public boolean softDrop() {
+        if (currentPair == null) return false;
+
+        // FALLING_AUTO, LOCK_DELAY에서만 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
+            return false;
+        }
+
+        if (canFall()) {
+            currentPair.moveDown();
+            // 공중 상태면 락딜레이 비활성화
+            if (lockDelayManager.isActive()) {
+                lockDelayManager.deactivate();
+            }
+            return true; // 이동함
+        } else {
+            // 착지 → 즉시 잠금 (락딜레이 없음)
+            lockPiece();
+            startChainFinding();
+            LogUtil.debug("GameWorld", "softDrop landed -> immediate lock, Phase: CHAIN_FINDING");
+            return false; // 이동 못함(착지함)
+        }
+    }
+
     // --- Getters ---
 
     public boolean isGameOver() {

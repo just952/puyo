@@ -112,11 +112,11 @@ public class PlayScreen extends BaseScreen {
         // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
         if (inputHandler != null) {
             // 현재 Phase 확인
-            com.puyo.game.logic.engine.GameWorld.GamePhase phase = gameWorld.getGamePhase();
+            GameWorld.GamePhase phase = gameWorld.getGamePhase();
             
             // FALLING_AUTO, LOCK_DELAY에서만 조작 허용
-            boolean allowInput = (phase == com.puyo.game.logic.engine.GameWorld.GamePhase.FALLING_AUTO 
-                               || phase == com.puyo.game.logic.engine.GameWorld.GamePhase.LOCK_DELAY);
+            boolean allowInput = (phase == GameWorld.GamePhase.FALLING_AUTO 
+                               || phase == GameWorld.GamePhase.LOCK_DELAY);
 
             // 회전
             if (allowInput && inputHandler.isRotatePressed()) {
@@ -135,14 +135,9 @@ public class PlayScreen extends BaseScreen {
                 }
             }
 
-            // 소프트 드롭 - Phase 체크 추가 + 락딜레이 중이면 move 기록
+            // 소프트 드롭 - GameWorld.softDrop() 위임 (착지 시 즉시 잠금, 락딜레이 우회)
             if (allowInput && inputHandler.isDropPressed()) {
-                if (gameWorld.canFall() && gameWorld.getCurrentPair() != null) {
-                    gameWorld.getCurrentPair().moveDown();
-                    if (phase == com.puyo.game.logic.engine.GameWorld.GamePhase.LOCK_DELAY) {
-                        gameWorld.recordLockDelayMove();
-                    }
-                }
+                gameWorld.softDrop();
             }
 
             // 하드 드롭

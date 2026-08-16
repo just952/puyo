@@ -33,11 +33,10 @@ public class InputHandler implements InputProcessor {
     private static final int DAS_DELAY_FRAMES = 16; // 초기 지연: ~0.27초 (16프레임)
     private static final int ARR_INTERVAL_FRAMES = 2; // 반복 주기: 2프레임마다 (초당 30회)
 
-    // DAS/ARR 추적용 상태
-    private int leftHeldFrames = 0;
-    private int rightHeldFrames = 0;
-    private boolean leftRepeatTriggered = false;
-    private boolean rightRepeatTriggered = false;
+    // DAS/ARR 추적용 상태 (단일 카운터로 통합)
+    private int heldFrames = 0;
+    private boolean repeatTriggered = false;
+    private boolean anyPressed = false;
 
     public InputHandler() {
         // 기본 생성자 (데스크톱용)
@@ -67,6 +66,9 @@ public class InputHandler implements InputProcessor {
     public boolean keyDown(int keycode) {
         if (isMobile)
             return false; // 모바일에서는 키보드 입력 무시
+
+        // 방향키/드롭키가 눌리면 anyPressed = true
+        anyPressed = true;
 
         switch (keycode) {
             case Input.Keys.LEFT:
@@ -109,28 +111,32 @@ public class InputHandler implements InputProcessor {
             case Input.Keys.LEFT:
             case Input.Keys.A:
                 leftPressed = false;
-                return true;
+                break;
             case Input.Keys.RIGHT:
             case Input.Keys.D:
                 rightPressed = false;
-                return true;
+                break;
             case Input.Keys.UP:
             case Input.Keys.W:
             case Input.Keys.X:
             case Input.Keys.NUM_1:
                 rotatePressed = false;
-                return true;
+                break;
             case Input.Keys.DOWN:
             case Input.Keys.S:
                 dropPressed = false;
-                return true;
+                break;
             case Input.Keys.SPACE:
             case Input.Keys.ENTER:
                 hardDropPressed = false;
-                return true;
+                break;
             default:
                 return false;
         }
+
+        // 방향키/드롭키 중 하나라도 남아있으면 anyPressed 유지
+        anyPressed = leftPressed || rightPressed || dropPressed;
+        return true;
     }
 
     @Override
@@ -198,50 +204,23 @@ public class InputHandler implements InputProcessor {
 
     /**
      * DAS (Delayed Auto Shift) / ARR (Auto Repeat Rate) 업데이트
-     * - 키 누름 즉시 1회 이동 (첫 프레임)
-     * - DAS_DELAY_FRAMES 이후부터 ARR_INTERVAL_FRAMES 간격으로 반복 이동
+     * - 아무 방향키/드롭키가 눌리면 공유 카운터 증가
+     * - 첫 프레임 즉시 repeatTriggered = true
+     * - DAS_DELAY_FRAMES 이후부터 ARR_INTERVAL_FRAMES 간격으로 반복
      */
     private void updateDasArr() {
-        // 왼쪽 키 처리
-        if (leftPressed) {
-            leftHeldFrames++;
-            if (leftHeldFrames == 1) {
-                // 첫 프레임: 즉시 이동 트리거 (getMoveDirection에서 처리)
-                leftRepeatTriggered = true;
-            } else if (leftHeldFrames > DAS_DELAY_FRAMES) {
-                // DAS 지연 후: ARR 주기로 반복 트리거
-                if ((leftHeldFrames - DAS_DELAY_FRAMES) % ARR_INTERVAL_FRAMES == 0) {
-                    leftRepeatTriggered = true;
-                } else {
-                    leftRepeatTriggered = false;
-                }
+        if (anyPressed) {
+            heldFrames++;
+            if (heldFrames == 1) {
+                repeatTriggered = true;  // 첫 프레임 즉시
+            } else if (heldFrames > DAS_DELAY_FRAMES) {
+                repeatTriggered = ((heldFrames - DAS_DELAY_FRAMES) % ARR_INTERVAL_FRAMES == 0);
             } else {
-                // DAS 지연 중: 반복 안 함
-                leftRepeatTriggered = false;
+                repeatTriggered = false;  // DAS 지연 중
             }
         } else {
-            // 키 뗌: 카운터 리셋
-            leftHeldFrames = 0;
-            leftRepeatTriggered = false;
-        }
-
-        // 오른쪽 키 처리
-        if (rightPressed) {
-            rightHeldFrames++;
-            if (rightHeldFrames == 1) {
-                rightRepeatTriggered = true;
-            } else if (rightHeldFrames > DAS_DELAY_FRAMES) {
-                if ((rightHeldFrames - DAS_DELAY_FRAMES) % ARR_INTERVAL_FRAMES == 0) {
-                    rightRepeatTriggered = true;
-                } else {
-                    rightRepeatTriggered = false;
-                }
-            } else {
-                rightRepeatTriggered = false;
-            }
-        } else {
-            rightHeldFrames = 0;
-            rightRepeatTriggered = false;
+            heldFrames = 0;
+            repeatTriggered = false;
         }
     }
 
@@ -262,12 +241,12 @@ public class InputHandler implements InputProcessor {
         }
 
         // 왼쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
-        if (leftPressed && leftRepeatTriggered) {
+        if (leftPressed && repeatTriggered) {
             return -1;
         }
 
         // 오른쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
-        if (rightPressed && rightRepeatTriggered) {
+        if (rightPressed && repeatTriggered) {
             return 1;
         }
 
@@ -285,13 +264,13 @@ public class InputHandler implements InputProcessor {
     }
 
     /**
-     * 소프트 드롭 키가 눌려 있는지 확인 (홀드 감지)
+     * 소프트 드롭 키가 눌려 있는지 확인 (DAS/ARR 적용)
      */
     public boolean isDropPressed() {
         if (isMobile && touchController != null) {
             return touchController.isDropPressed();
         }
-        return dropPressed;
+        return dropPressed && repeatTriggered;
     }
 
     /**
