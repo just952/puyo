@@ -295,20 +295,6 @@ public class PlayScreen extends BaseScreen {
                 GameViewport.Single.NEXT_PREVIEW_X,
                 GameViewport.Single.NEXT_PREVIEW_Y + GameViewport.CELL_SIZE + 20);
 
-        // Game Over
-        if (gameWorld.isGameOver()) {
-            // 타이틀 폰트 (48px) 사용
-            BitmapFont titleFont = fontManager.getTitleFont(48);
-            titleFont.getData().setScale(1f);
-            String msg = "GAME OVER";
-            float w = titleFont.draw(batch, msg, 0, 0).width;
-            titleFont.draw(batch, msg,
-                    GameViewport.VIRTUAL_WIDTH / 2f - w / 2f, GameViewport.VIRTUAL_HEIGHT / 2f + 50);
-
-            uiFont.draw(batch, "Press ENTER to restart",
-                    GameViewport.VIRTUAL_WIDTH / 2f - 100, GameViewport.VIRTUAL_HEIGHT / 2f - 20);
-        }
-
         // Story mode info
         if (mode == GameMode.NORMAL && storyManager != null) {
             StageData current = storyManager.getCurrentStage();
@@ -322,6 +308,72 @@ public class PlayScreen extends BaseScreen {
         }
 
         uiFont.getData().setScale(1f);
+        batch.end();
+
+        // Game Over 팝업 (배치 후 렌더링하여 최상단에 표시)
+        if (gameWorld.isGameOver()) {
+            drawGameOverPopup();
+        }
+    }
+
+    /**
+     * 게임 오버 레이어 팝업 렌더링
+     * 반투명 오버레이 + 중앙 흰색 팝업 박스 + 텍스트
+     */
+    private void drawGameOverPopup() {
+        // 1. 반투명 전체 화면 오버레이
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.7f); // 검은색 70% 투명도
+        shapeRenderer.rect(0, 0, GameViewport.VIRTUAL_WIDTH, GameViewport.VIRTUAL_HEIGHT);
+        shapeRenderer.end();
+
+        // 2. 중앙 팝업 박스 (흰색 둥근 사각형 느낌)
+        float popupWidth = 400f;
+        float popupHeight = 220f;
+        float popupX = (GameViewport.VIRTUAL_WIDTH - popupWidth) / 2f;
+        float popupY = (GameViewport.VIRTUAL_HEIGHT - popupHeight) / 2f;
+
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(1f, 1f, 1f, 0.95f); // 흰색 95% 불투명도
+        shapeRenderer.rect(popupX, popupY, popupWidth, popupHeight);
+        shapeRenderer.end();
+
+        // 팝업 테두리
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 1f); // 어두운 회색 테두리
+        shapeRenderer.rect(popupX, popupY, popupWidth, popupHeight);
+        shapeRenderer.end();
+
+        // 3. 팝업 내부 텍스트
+        batch.begin();
+
+        BitmapFont titleFont = fontManager.getTitleFont(48);
+        titleFont.getData().setScale(1f);
+        titleFont.setColor(Color.RED);
+
+        String gameOverText = "GAME OVER";
+        float textWidth = titleFont.draw(batch, gameOverText, 0, 0).width;
+        titleFont.draw(batch, gameOverText,
+                GameViewport.VIRTUAL_WIDTH / 2f - textWidth / 2f,
+                popupY + popupHeight - 50);
+
+        BitmapFont uiFont2 = fontManager.getUIFont(24);
+        uiFont2.getData().setScale(1f);
+        uiFont2.setColor(Color.BLACK);
+
+        String restartText = "Touch or Press ENTER to Restart";
+        float restartWidth = uiFont2.draw(batch, restartText, 0, 0).width;
+        uiFont2.draw(batch, restartText,
+                GameViewport.VIRTUAL_WIDTH / 2f - restartWidth / 2f,
+                popupY + 60);
+
+        // 점수 표시
+        String scoreText = "Final Score: " + gameWorld.getScore();
+        float scoreWidth = uiFont2.draw(batch, scoreText, 0, 0).width;
+        uiFont2.draw(batch, scoreText,
+                GameViewport.VIRTUAL_WIDTH / 2f - scoreWidth / 2f,
+                popupY + 110);
+
         batch.end();
     }
 

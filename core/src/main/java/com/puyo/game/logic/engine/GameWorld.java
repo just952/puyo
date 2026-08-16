@@ -262,6 +262,13 @@ public class GameWorld {
     private void handleSpawning() {
         spawnNewPair();
         spawnNextPair();
+        // 게임 오버 체크: 스폰 위치에 배치 불가능하면 게임 오버
+        if (!board.canPlace(currentPair)) {
+            gameOver = true;
+            gamePhase = GamePhase.GAME_OVER;
+            LogUtil.info("GameWorld", "GAME OVER: Cannot place new pair at spawn");
+            return;
+        }
         fallTimer = 0f;
         chainManager.startNewChain();
         fallingPuyos.clear();
