@@ -28,11 +28,13 @@ public class GameWorld {
     private float fallInterval = 0.5f; // 초당 셀 낙하 속도 (레벨별 조정 가능)
 
     // ==========================================
-    // 통합된 게임 상태 머신
+    // 통합된 게임 상태 머신 (단순화됨)
     // ==========================================
-    private enum GamePhase {
+    public enum GamePhase {
         SPAWNING,           // 새 조각 생성/위치 설정
-        FALLING,            // 일반 낙하 (이동/회전/락딜레이 포함)
+        FALLING_AUTO,       // 자동 낙하 (0.5초 간격, 이동/회전 입력 허용)
+        LOCK_DELAY,         // 락 딜레이 (착지 후 0.5초/15회 이동, 입력 허용)
+        SEPARATION,         // 락딜레이 종료 후 분리 체크 + 실행
         FALLING_ANIMATION,  // 분리/부유 뿌요 낙하 애니메이션
         CHAIN_FINDING,      // 연쇄: 매치 탐색
         CHAIN_POP_ANIMATION, // 연쇄: 팝 애니메이션 재생 중
@@ -90,8 +92,13 @@ public class GameWorld {
 
     /** 왼쪽 이동 */
     public boolean moveLeft() {
-        if (currentPair == null || gamePhase != GamePhase.FALLING)
+        if (currentPair == null) return false;
+        
+        // FALLING_AUTO, LOCK_DELAY에서만 이동 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return false;
+        }
+        
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
             if (lockDelayManager.isActive()) {
@@ -109,12 +116,17 @@ public class GameWorld {
 
     /** 오른쪽 이동 */
     public boolean moveRight() {
-        if (currentPair == null || gamePhase != GamePhase.FALLING)
+        if (currentPair == null) return false;
+        
+        // FALLING_AUTO, LOCK_DELAY에서만 이동 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return false;
+        }
+        
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
             if (lockDelayManager.isActive()) {
-                // 공중으로 빠져나오면 락딜레이 비활성화
+                // 공중으로 빠져나가면 락딜레이 비활성화
                 if (canFall()) {
                     lockDelayManager.deactivate();
                 } else {
@@ -128,8 +140,13 @@ public class GameWorld {
 
     /** 시계방향 회전 (벽 킥 포함) */
     public void rotateClockwise() {
-        if (currentPair == null || gamePhase != GamePhase.FALLING)
+        if (currentPair == null) return;
+        
+        // FALLING_AUTO, LOCK_DELAY에서만 회전 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return;
+        }
+        
         currentPair.rotateClockwise();
         if (!board.canPlace(currentPair)) {
             if (board.canMoveLeft(currentPair)) {
@@ -141,7 +158,7 @@ public class GameWorld {
             }
         }
         if (lockDelayManager.isActive()) {
-            // 회전 후 공중으로 빠져나오면 락딜레이 비활성화
+            // 회전 후 공중으로 빠져나가면 락딜레이 비활성화
             if (canFall()) {
                 lockDelayManager.deactivate();
             } else {
@@ -152,12 +169,29 @@ public class GameWorld {
 
     /** 하드 드롭 */
     public void hardDrop() {
-        if (currentPair == null || gamePhase != GamePhase.FALLING)
+        if (currentPair == null) return;
+        
+        // FALLING_AUTO, LOCK_DELAY에서만 하드 드롭 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return;
+        }
+        
         while (canFall()) {
             currentPair.moveDown();
         }
         lockPiece();
+    }
+
+    /** 소프트 드롭 / 락딜레이 중 이동 기록용 */
+    public void recordLockDelayMove() {
+        if (lockDelayManager.isActive()) {
+            lockDelayManager.recordMove();
+        }
+    }
+
+    /** 현재 게임 페이즈 반환 (PlayScreen 등에서 입력 제어용) */
+    public GamePhase getGamePhase() {
+        return gamePhase;
     }
 
     /** 메인 업데이트 루프 - 단일 switch로 모든 상태 처리 */
@@ -170,8 +204,16 @@ public class GameWorld {
                 handleSpawning();
                 break;
             }
-            case FALLING: {
-                handleFalling(delta);
+            case FALLING_AUTO: {
+                handleFallingAuto(delta);
+                break;
+            }
+            case LOCK_DELAY: {
+                handleLockDelay(delta);
+                break;
+            }
+            case SEPARATION: {
+                handleSeparation();
                 break;
             }
             case FALLING_ANIMATION: {
@@ -207,69 +249,78 @@ public class GameWorld {
         currentGroups = null;
         fallingPuyos.clear();
         fallingAnimationTimer = 0f;
-        gamePhase = GamePhase.FALLING;
-        LogUtil.debug("GameWorld", "Phase: SPAWNING -> FALLING, new pair spawned");
+        gamePhase = GamePhase.FALLING_AUTO;
+        LogUtil.debug("GameWorld", "Phase: SPAWNING -> FALLING_AUTO, new pair spawned");
     }
 
-    private void handleFalling(float delta) {
-        // 락딜레이 타이머 업데이트 및 체크
-        if (lockDelayManager.isActive()) {
-            lockDelayManager.recordTime(delta);
-
-            if (lockDelayManager.shouldLock()) {
-                LogUtil.debug("GameWorld", "LockDelay shouldLock triggered lockPiece");
-                lockPiece();
-                return;
-            }
-        }
-
-        // 자동 낙하 타이머
+    /**
+     * 자동 낙하 처리 (0.5초 간격)
+     * 착지 시 락딜레이 활성화 후 LOCK_DELAY로 전이
+     */
+    private void handleFallingAuto(float delta) {
         fallTimer += delta;
         if (fallTimer >= fallInterval) {
             fallTimer = 0f;
             if (canFall()) {
                 currentPair.moveDown();
-                // Tsu 규칙: 공중에서 이동 시 락딜레이 리셋/비활성화
-                if (lockDelayManager.isActive()) {
-                    if (canFall()) {
-                        // 여전히 공중이면 락딜레이 비활성화
-                        lockDelayManager.deactivate();
-                        LogUtil.debug("GameWorld", "Air move: LockDelay deactivate (still in air)");
-                    } else {
-                        // 바닥에 닿으면 리셋만 (다음 handleLanding에서 activate)
-                        lockDelayManager.resetTimerAndMoves();
-                        LogUtil.debug("GameWorld", "Air move: LockDelay resetTimerAndMoves");
-                    }
-                }
+                // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
             } else {
-                // 바닥에 닿음
-                handleLanding();
+                // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
+                lockDelayManager.activate();
+                gamePhase = GamePhase.LOCK_DELAY;
+                LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
             }
         }
     }
 
-    private void handleLanding() {
-        // 분리 가능한지 확인
+    /**
+     * 락 딜레이 단계 처리
+     * - 시간/이동횟수 초과 시 SEPARATION으로
+     * - 공중 이탈 시 FALLING_AUTO로 복귀
+     * - 사용자 입력은 moveLeft/Right/rotate/softDrop에서 recordMove() 호출
+     */
+    private void handleLockDelay(float delta) {
+        lockDelayManager.recordTime(delta);
+
+        if (lockDelayManager.shouldLock()) {
+            LogUtil.debug("GameWorld", "LockDelay expired -> SEPARATION");
+            gamePhase = GamePhase.SEPARATION;
+            return;
+        }
+
+        // 공중 이탈 시 락딜레이 해제 → 자동 낙하로
+        if (canFall()) {
+            lockDelayManager.deactivate();
+            gamePhase = GamePhase.FALLING_AUTO;
+            LogUtil.debug("GameWorld", "Phase: LOCK_DELAY -> FALLING_AUTO (back in air)");
+        }
+        // 사용자 입력(moveLeft/Right/rotate/softDrop) 시 recordMove() 호출됨
+    }
+
+    /**
+     * 분리 체크 + 실행 (통합 단계)
+     * 락딜레이 종료 후 호출됨
+     */
+    private void handleSeparation() {
         if (currentPair != null && separationManager.canSeparate(currentPair, board)) {
+            // 분리 가능: 실행
             SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
             if (sepResult.separated) {
-                // 막힌 쪽 즉시 잠금
-                LogUtil.debug("GameWorld", "Placing blocked puyo at (" + sepResult.blockedPuyo.getX() + "," + sepResult.blockedPuyo.getY()
-                        + ") color=" + sepResult.blockedPuyo.getColor());
                 board.placePuyo(sepResult.blockedPuyo);
-
-                // 자유로운 쪽 단일 뿌요로 자동 낙하 시작
-                LogUtil.debug("GameWorld", "Adding free puyo to separating: (" + sepResult.freePuyo.getX() + "," + sepResult.freePuyo.getY()
-                        + ") color=" + sepResult.freePuyo.getColor());
                 addFallingPuyo(sepResult.freePuyo, FallingPuyo.FallType.FALLING);
                 fallingAnimationTimer = 0f;
+                lockDelayManager.deactivate();
+                currentPair = null;
                 gamePhase = GamePhase.FALLING_ANIMATION;
-                LogUtil.debug("GameWorld", "Phase: FALLING -> FALLING_ANIMATION (FALLING)");
+                LogUtil.debug("GameWorld", "Phase: SEPARATION -> FALLING_ANIMATION (separated)");
             } else {
-                lockDelayManager.activate();
+                LogUtil.info("GameWorld", "SEPARATION: canSeparate true but separate() failed -> lockPiece");
+                lockPiece();
             }
         } else {
-            lockDelayManager.activate();
+            // 분리 불가: 일반 잠금 → 연쇄 탐색
+            LogUtil.debug("GameWorld", "SEPARATION: no separation -> lockPiece -> CHAIN_FINDING");
+            lockPiece();
         }
     }
 
@@ -278,7 +329,7 @@ public class GameWorld {
     }
 
     // ==========================================
-    // 애니메이션 로직 (GameWorld 내장화)
+    // 애니메이션 로직 (기존 유지)
     // ==========================================
 
     /**

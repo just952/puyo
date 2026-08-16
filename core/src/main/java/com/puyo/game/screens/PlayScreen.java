@@ -111,30 +111,42 @@ public class PlayScreen extends BaseScreen {
 
         // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
         if (inputHandler != null) {
-            // 회전 체크를 inputHandler.update()보다 먼저 수행 (엣지 감지용)
-            if (inputHandler.isRotatePressed()) {
+            // 현재 Phase 확인
+            com.puyo.game.logic.engine.GameWorld.GamePhase phase = gameWorld.getGamePhase();
+            
+            // FALLING_AUTO, LOCK_DELAY에서만 조작 허용
+            boolean allowInput = (phase == com.puyo.game.logic.engine.GameWorld.GamePhase.FALLING_AUTO 
+                               || phase == com.puyo.game.logic.engine.GameWorld.GamePhase.LOCK_DELAY);
+
+            // 회전
+            if (allowInput && inputHandler.isRotatePressed()) {
                 gameWorld.rotateClockwise();
             }
 
             inputHandler.update();
 
             // 좌우 이동
-            int moveDir = inputHandler.getMoveDirection();
-            if (moveDir < 0) {
-                gameWorld.moveLeft();
-            } else if (moveDir > 0) {
-                gameWorld.moveRight();
+            if (allowInput) {
+                int moveDir = inputHandler.getMoveDirection();
+                if (moveDir < 0) {
+                    gameWorld.moveLeft();
+                } else if (moveDir > 0) {
+                    gameWorld.moveRight();
+                }
             }
 
-            // 소프트 드롭
-            if (inputHandler.isDropPressed()) {
+            // 소프트 드롭 - Phase 체크 추가 + 락딜레이 중이면 move 기록
+            if (allowInput && inputHandler.isDropPressed()) {
                 if (gameWorld.canFall() && gameWorld.getCurrentPair() != null) {
                     gameWorld.getCurrentPair().moveDown();
+                    if (phase == com.puyo.game.logic.engine.GameWorld.GamePhase.LOCK_DELAY) {
+                        gameWorld.recordLockDelayMove();
+                    }
                 }
             }
 
             // 하드 드롭
-            if (inputHandler.isHardDropPressed()) {
+            if (allowInput && inputHandler.isHardDropPressed()) {
                 gameWorld.hardDrop();
             }
         }
