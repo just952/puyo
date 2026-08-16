@@ -28,6 +28,9 @@ public class GameWorld {
     private float fallTimer = 0f;
     private float fallInterval = 0.5f; // 초당 셀 낙하 속도 (레벨별 조정 가능)
 
+    /** 새 조각이 방금 스폰되었는지 여부 (한 프레임만 true, DAS 리셋용) */
+    private boolean justSpawned = false;
+
     // ==========================================
     // 통합된 게임 상태 머신 (단순화됨)
     // ==========================================
@@ -75,6 +78,7 @@ public class GameWorld {
         }
         pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.HEIGHT);
         lockDelayManager.deactivate();
+        justSpawned = true; // 새 조각 스폰 알림 (DAS 리셋용, 한 프레임 후 자동 해제)
     }
 
     /** 다음 쌍을 스폰 (미리보기용) */
@@ -198,8 +202,18 @@ public class GameWorld {
         return gamePhase;
     }
 
+    /** 새 조각이 방금 스폰되었는지 여부 (한 프레임만 true, DAS 리셋용) */
+    public boolean isJustSpawned() {
+        return justSpawned;
+    }
+
     /** 메인 업데이트 루프 - 단일 switch로 모든 상태 처리 */
     public void update(float delta) {
+        // justSpawned 플래그 클리어 (한 프레임만 유지)
+        if (justSpawned) {
+            justSpawned = false;
+        }
+
         if (gameOver)
             return;
 

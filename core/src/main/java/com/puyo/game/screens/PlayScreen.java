@@ -111,6 +111,11 @@ public class PlayScreen extends BaseScreen {
 
         // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
         if (inputHandler != null) {
+            // 새 조각 스폰 시 DAS/ARR 리셋 (키를 누른 채로 있어도 첫 프레임 즉시 이동 보장)
+            if (gameWorld.isJustSpawned()) {
+                inputHandler.resetDasArr();
+            }
+
             // 현재 Phase 확인
             GameWorld.GamePhase phase = gameWorld.getGamePhase();
             

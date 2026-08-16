@@ -284,6 +284,17 @@ public class InputHandler implements InputProcessor {
     }
 
     /**
+     * DAS/ARR 상태 리셋 (새 조각 스폰 시 호출)
+     * 키가 눌려 있어도 heldFrames, repeatTriggered만 초기화하여
+     * 첫 프레임 즉시 이동 + DAS 지연 재시작 보장
+     */
+    public void resetDasArr() {
+        heldFrames = 0;
+        repeatTriggered = false;
+        // anyPressed는 현재 키 상태 반영이므로 유지
+    }
+
+    /**
      * 리소스 해제
      */
     public void dispose() {
