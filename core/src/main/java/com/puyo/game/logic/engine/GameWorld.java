@@ -31,16 +31,17 @@ public class GameWorld {
     // 통합된 게임 상태 머신 (단순화됨)
     // ==========================================
     public enum GamePhase {
-        SPAWNING,           // 새 조각 생성/위치 설정
-        FALLING_AUTO,       // 자동 낙하 (0.5초 간격, 이동/회전 입력 허용)
-        LOCK_DELAY,         // 락 딜레이 (착지 후 0.5초/15회 이동, 입력 허용)
-        SEPARATION,         // 락딜레이 종료 후 분리 체크 + 실행
-        FALLING_ANIMATION,  // 분리/부유 뿌요 낙하 애니메이션
-        CHAIN_FINDING,      // 연쇄: 매치 탐색
+        SPAWNING, // 새 조각 생성/위치 설정
+        FALLING_AUTO, // 자동 낙하 (0.5초 간격, 이동/회전 입력 허용)
+        LOCK_DELAY, // 락 딜레이 (착지 후 0.5초/15회 이동, 입력 허용)
+        SEPARATION, // 락딜레이 종료 후 분리 체크 + 실행
+        FALLING_ANIMATION, // 분리/부유 뿌요 낙하 애니메이션
+        CHAIN_FINDING, // 연쇄: 매치 탐색
         CHAIN_POP_ANIMATION, // 연쇄: 팝 애니메이션 재생 중
         CHAIN_FLOATING_CHECK, // 연쇄: 부유 뿌요 체크 후 낙하 준비
         GAME_OVER
     }
+
     private GamePhase gamePhase = GamePhase.SPAWNING;
 
     // 애니메이션 상태 (GameWorld에서 직접 관리)
@@ -92,13 +93,14 @@ public class GameWorld {
 
     /** 왼쪽 이동 */
     public boolean moveLeft() {
-        if (currentPair == null) return false;
-        
+        if (currentPair == null)
+            return false;
+
         // FALLING_AUTO, LOCK_DELAY에서만 이동 허용
         if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return false;
         }
-        
+
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
             if (lockDelayManager.isActive()) {
@@ -116,13 +118,14 @@ public class GameWorld {
 
     /** 오른쪽 이동 */
     public boolean moveRight() {
-        if (currentPair == null) return false;
-        
+        if (currentPair == null)
+            return false;
+
         // FALLING_AUTO, LOCK_DELAY에서만 이동 허용
         if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return false;
         }
-        
+
         if (board.canMoveRight(currentPair)) {
             currentPair.moveRight();
             if (lockDelayManager.isActive()) {
@@ -140,13 +143,14 @@ public class GameWorld {
 
     /** 시계방향 회전 (벽 킥 포함) */
     public void rotateClockwise() {
-        if (currentPair == null) return;
-        
+        if (currentPair == null)
+            return;
+
         // FALLING_AUTO, LOCK_DELAY에서만 회전 허용
         if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return;
         }
-        
+
         currentPair.rotateClockwise();
         if (!board.canPlace(currentPair)) {
             if (board.canMoveLeft(currentPair)) {
@@ -169,17 +173,20 @@ public class GameWorld {
 
     /** 하드 드롭 */
     public void hardDrop() {
-        if (currentPair == null) return;
-        
+        if (currentPair == null)
+            return;
+
         // FALLING_AUTO, LOCK_DELAY에서만 하드 드롭 허용
         if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
             return;
         }
-        
+
         while (canFall()) {
             currentPair.moveDown();
         }
         lockPiece();
+        startChainFinding();
+        LogUtil.debug("GameWorld", "Phase: HARD_DROP -> CHAIN_FINDING");
     }
 
     /** 소프트 드롭 / 락딜레이 중 이동 기록용 */
@@ -316,11 +323,13 @@ public class GameWorld {
             } else {
                 LogUtil.info("GameWorld", "SEPARATION: canSeparate true but separate() failed -> lockPiece");
                 lockPiece();
+                startChainFinding();
             }
         } else {
             // 분리 불가: 일반 잠금 → 연쇄 탐색
             LogUtil.debug("GameWorld", "SEPARATION: no separation -> lockPiece -> CHAIN_FINDING");
             lockPiece();
+            startChainFinding();
         }
     }
 
@@ -334,6 +343,7 @@ public class GameWorld {
 
     /**
      * 팝 애니메이션 업데이트
+     * 
      * @return 모든 팝 완료 여부
      */
     private boolean updatePopAnimation(float delta) {
@@ -351,6 +361,7 @@ public class GameWorld {
 
     /**
      * 팝 완료된 CHAIN_POP 엔트리 수집 및 리스트에서 제거
+     * 
      * @return 보드에서 제거할 뿌요들
      */
     private List<Puyo> collectAndClearChainPop() {
@@ -363,15 +374,18 @@ public class GameWorld {
             }
         }
         if (!poppedPuyos.isEmpty()) {
-            LogUtil.debug("GameWorld", "collectAndClearChainPop: " + poppedPuyos.size() + " puyos, listSize before=" + fallingPuyos.size());
+            LogUtil.debug("GameWorld", "collectAndClearChainPop: " + poppedPuyos.size() + " puyos, listSize before="
+                    + fallingPuyos.size());
             fallingPuyos.removeAll(toRemove);
-            LogUtil.debug("GameWorld", "collectAndClearChainPop: removed CHAIN_POP, listSize after=" + fallingPuyos.size());
+            LogUtil.debug("GameWorld",
+                    "collectAndClearChainPop: removed CHAIN_POP, listSize after=" + fallingPuyos.size());
         }
         return poppedPuyos;
     }
 
     /**
      * 통합된 낙하 애니메이션 업데이트 (FALLING 타입 전체 대상)
+     * 
      * @param delta 프레임 시간
      * @return 아직 낙하 중이면 true, 완료면 false
      */
@@ -440,7 +454,8 @@ public class GameWorld {
      * 낙하 애니메이션 완료된 뿌요들 수집 및 보드에 배치
      */
     private void collectAndPlaceCompletedFalling() {
-        if (fallingPuyos.isEmpty()) return;
+        if (fallingPuyos.isEmpty())
+            return;
         for (FallingPuyo fp : fallingPuyos) {
             board.placePuyo(fp.puyo);
         }
@@ -522,7 +537,8 @@ public class GameWorld {
         // 새 연쇄 단계 시작
         chainCount++;
         int removed = currentGroups.stream().mapToInt(List::size).sum();
-        LogUtil.debug("GameWorld", "New chain step: chainCount=" + chainCount + ", groups=" + currentGroups.size() + ", removed=" + removed);
+        LogUtil.debug("GameWorld", "New chain step: chainCount=" + chainCount + ", groups=" + currentGroups.size()
+                + ", removed=" + removed);
 
         // 팝 애니메이션 시작
         for (List<Puyo> group : currentGroups) {
@@ -574,7 +590,7 @@ public class GameWorld {
         }
     }
 
-    /** 현재 조각 잠금 및 연쇄 처리 시작 */
+    /** 현재 조각 잠금 (보드에 배치) */
     private void lockPiece() {
         if (currentPair == null)
             return;
@@ -587,12 +603,15 @@ public class GameWorld {
 
         lockDelayManager.deactivate();
         currentPair = null;
+        LogUtil.debug("GameWorld", "lockPiece completed");
+    }
 
-        // 연쇄 시작
+    /** 연쇄 찾기 단계 초기화 및 전이 */
+    private void startChainFinding() {
         chainCount = 0;
         currentGroups = null;
         gamePhase = GamePhase.CHAIN_FINDING;
-        LogUtil.debug("GameWorld", "lockPiece -> CHAIN_FINDING");
+        LogUtil.debug("GameWorld", "Phase: -> CHAIN_FINDING (chain init)");
     }
 
     // --- Getters ---
@@ -615,7 +634,7 @@ public class GameWorld {
 
     /**
      * @deprecated FallType이 FALLING으로 통합됨. {@link #getFallingPuyos()} 사용 권장.
-     * 호환용: 낙하 중인 단일 뿌요 반환 (첫 번째 FALLING 타입)
+     *             호환용: 낙하 중인 단일 뿌요 반환 (첫 번째 FALLING 타입)
      */
     @Deprecated
     public Puyo getFallingSinglePuyo() {
