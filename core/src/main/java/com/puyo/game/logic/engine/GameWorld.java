@@ -608,7 +608,7 @@ public class GameWorld {
         LogUtil.debug("GameWorld", "Phase: -> CHAIN_FINDING (chain init)");
     }
 
-    /** 소프트 드롭: 한 칸 내리고 착지 시 즉시 잠금 (락딜레이 우회) */
+    /** 소프트 드롭: 한 칸 내리고 착지 시 락딜레이 우회하여 SEPARATION으로 전이 */
     public boolean softDrop() {
         if (currentPair == null) return false;
 
@@ -625,10 +625,10 @@ public class GameWorld {
             }
             return true; // 이동함
         } else {
-            // 착지 → 즉시 잠금 (락딜레이 없음)
-            lockPiece();
-            startChainFinding();
-            LogUtil.debug("GameWorld", "softDrop landed -> immediate lock, Phase: CHAIN_FINDING");
+            // 착지 → 락딜레이 우회하고 즉시 SEPARATION으로 전이 (분리 체크 수행)
+            lockDelayManager.deactivate();
+            gamePhase = GamePhase.SEPARATION;
+            LogUtil.debug("GameWorld", "softDrop landed -> SEPARATION (bypass lock delay)");
             return false; // 이동 못함(착지함)
         }
     }
