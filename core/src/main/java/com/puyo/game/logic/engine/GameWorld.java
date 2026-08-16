@@ -19,6 +19,7 @@ public class GameWorld {
     private final PuyoPairGenerator pairGenerator;
     private final SeparationManager separationManager;
     private final LockDelayManager lockDelayManager = new LockDelayManager();
+    private final ChainManager chainManager = new ChainManager();
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
@@ -48,10 +49,6 @@ public class GameWorld {
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
     private float fallingAnimationTimer = 0f;
     private static final float FALLING_ANIMATION_INTERVAL = 0.05f;
-
-    // 연쇄 상태
-    private List<List<Puyo>> currentGroups = null;
-    private int chainCount = 0;
 
     public GameWorld() {
         this(new Board());
@@ -252,8 +249,7 @@ public class GameWorld {
         spawnNewPair();
         spawnNextPair();
         fallTimer = 0f;
-        chainCount = 0;
-        currentGroups = null;
+        chainManager.startNewChain();
         fallingPuyos.clear();
         fallingAnimationTimer = 0f;
         gamePhase = GamePhase.FALLING_AUTO;
@@ -525,23 +521,22 @@ public class GameWorld {
     }
 
     private void handleChainFinding() {
-        currentGroups = MatchFinder.findAllMatchingGroups(board);
+        boolean found = chainManager.findChains(board);
 
-        if (currentGroups.isEmpty()) {
+        if (!found) {
             // 연쇄 종료
-            LogUtil.debug("GameWorld", "Chain ended. chainCount=" + chainCount);
+            LogUtil.debug("GameWorld", "Chain ended. chainCount=" + chainManager.getChainCount());
             gamePhase = GamePhase.SPAWNING;
             return;
         }
 
         // 새 연쇄 단계 시작
-        chainCount++;
-        int removed = currentGroups.stream().mapToInt(List::size).sum();
-        LogUtil.debug("GameWorld", "New chain step: chainCount=" + chainCount + ", groups=" + currentGroups.size()
+        int removed = chainManager.getCurrentGroups().stream().mapToInt(List::size).sum();
+        LogUtil.debug("GameWorld", "New chain step: chainCount=" + chainManager.getChainCount() + ", groups=" + chainManager.getCurrentGroups().size()
                 + ", removed=" + removed);
 
         // 팝 애니메이션 시작
-        for (List<Puyo> group : currentGroups) {
+        for (List<Puyo> group : chainManager.getCurrentGroups()) {
             for (Puyo puyo : group) {
                 if (!puyo.isPopping()) {
                     puyo.startPop();
@@ -608,8 +603,7 @@ public class GameWorld {
 
     /** 연쇄 찾기 단계 초기화 및 전이 */
     private void startChainFinding() {
-        chainCount = 0;
-        currentGroups = null;
+        chainManager.startNewChain();
         gamePhase = GamePhase.CHAIN_FINDING;
         LogUtil.debug("GameWorld", "Phase: -> CHAIN_FINDING (chain init)");
     }
@@ -660,7 +654,7 @@ public class GameWorld {
     }
 
     public int getCurrentChain() {
-        return chainCount;
+        return chainManager.getChainCount();
     }
 
     public void dispose() {
