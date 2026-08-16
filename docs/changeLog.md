@@ -4,10 +4,59 @@
 
 ---
 
+## v0.1.20 (2026-08-16) - **FALLING 페이즈 3단계 분리 (FALLING_AUTO / LOCK_DELAY / SEPARATION)**
+
+### 배경
+- 기존 단일 `FALLING` 페이즈가 낙하 + 락딜레이 + 착지 처리를 모두 담당하여 책임이 모호함
+- 공중 고정 버그 등 상태 관리 복잡도 증가
+
+### 해결
+1. **GamePhase enum 3단계로 분리** (public으로 변경하여 외부 조회 가능)
+   - `FALLING_AUTO`: 자동 중력 낙하 (0.5초 간격), 이동/회전/하드드롭 입력 허용
+   - `LOCK_DELAY`: 착지 후 락 딜레이 (0.5초/15회 이동), 이동/회전/소프트드롭 입력 허용
+   - `SEPARATION`: 락딜레이 종료 후 분리 체크 + 실행, 입력 차단
+
+2. **입력 제어 중앙화**
+   - `moveLeft/Right`, `rotateClockwise`, `hardDrop`: `FALLING_AUTO` && `LOCK_DELAY`에서만 허용 (메서드 레벨 가드)
+   - `recordLockDelayMove()` 신규 추가: 락딜레이 중 이동 카운트용
+   - `getGamePhase()` 신규 추가: PlayScreen 등에서 입력 제어용
+
+3. **핸들러 메서드 분리**
+   - `handleFallingAuto(delta)`: 자동 낙하만 처리, 착지 시 `lockDelayManager.activate()` + `LOCK_DELAY` 전이
+   - `handleLockDelay(delta)`: 타이머/이동수 체크 → 초과시 `SEPARATION`, 공중 이탈시 `deactivate()` + `FALLING_AUTO` 복귀
+   - `handleSeparation()`: 분리 가능시 실행 → `FALLING_ANIMATION`, 불가시 `lockPiece()` → `CHAIN_FINDING`
+
+4. **자동 낙하 중 락딜레이 로직 완전 제거** - 공중에서는 락딜레이 건드리지 않음
+
+5. **PlayScreen 입력 처리 개선**
+   - `gameWorld.getGamePhase()`로 현재 페이즈 조회
+   - `allowInput = (FALLING_AUTO || LOCK_DELAY)` 조건으로 입력 일괄 제어
+   - 소프트 드롭 시 `LOCK_DELAY`면 `recordLockDelayMove()` 호출
+   - 하드 드롭도 `allowInput` 체크 추가
+
+### 아키텍처 개선점
+- **단일 책임 원칙**: 각 페이즈가 명확한 역할만 담당
+- **상태 전이 명시적**: `FALLING_AUTO` → `LOCK_DELAY` → `SEPARATION` → (분리시 `FALLING_ANIMATION` / 미분리시 `CHAIN_FINDING`)
+- **입력 제어 중앙화**: PlayScreen이 페이즈 보고 판단, GameWorld는 메서드 레벨에서 가드
+- **공중 이탈 처리 명확화**: `LOCK_DELAY` 중 `canFall()` 되면 즉시 `deactivate()` + `FALLING_AUTO` 복귀
+- **이전 v0.1.19 공중 고정 버그 근본 원인 구조적 해결**
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **게임플레이 로직 구조 개선** ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 대폭 수정 | GamePhase 3단계 분리, 핸들러 분리, 입력 가드, 신규 메서드 추가 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | 수정 | 페이즈 기반 입력 제어, recordLockDelayMove 연동 |
+
+---
+
 ## v0.1.19 (2026-08-15) - **공중 락딜레이 비활성화 버그 수정 (이동/자동낙하 시)**
 
 ### 문제
-- 바닥에 닿아 락딜레이가 활성화된 상태에서 옆으로 움직여 공중으로 빠져나오면 `active=true`가 유지됨
+- 바닥에 닿아 락딜레이가 활성화된 상태에서 옆으로 움직여 공중으로 빠져나가면 `active=true`가 유지됨
 - 자동낙하로 한 칸 내려간 후 여전히 공중인데 `resetTimerAndMoves()`만 호출되어 `active=true` 유지
 - 타이머가 0.5초 누적되어 공중에서 잠금 발생 (`shouldLock` 트리거)
 
@@ -325,6 +374,7 @@
 - `:core:compileJava` / `:core:test` (60개 테스트 통과) / `:desktop:run` (2분 54초 크래시 없는 실행) 성공
 - 연쇄 팝 → 부유 뿌요 낙하 → 중력 → 배치 모든 단계 정상 작동
 - 이중 제거 버그 해결, 보드 상태 깨짐 없음
+- 매니저 클래스 분리 완료 (SRP 준수)
 
 ### 변경 파일
 
@@ -352,8 +402,6 @@
 - 매니저 클래스 분리 완료 (SRP 준수)
 
 ---
-
-## v0.1.11 (2026-08-09) - **연쇄 후 기둥 낙하 동시 애니메이션 + 깜빡임 해결 + 낙하 속도 통일**
 
 ## v0.1.11 (2026-08-09) - **연쇄 후 기둥 낙하 동시 애니메이션 + 깜빡임 해결 + 낙하 속도 통일**
 
@@ -391,8 +439,6 @@
 ---
 
 ## v0.1.10 (2026-08-09) - **팝(Pop) 애니메이션 구현 + 연쇄 처리 시스템 통합**
-
-REPLACE
 
 ### 추가
 
@@ -789,7 +835,7 @@ REPLACE
 - **StoryModeManager.loadStages()** - Java ClassLoader 폴백 추가로 헤드리스 테스트 리소스 로딩 가능
 - **MenuLoader** - Gdx.files.classpath() → internal() 폴백 추가
 - **GameTest** - GL 컨텍스트 없는 순수 로직 테스트로 재작성 (6개 테스트)
-- **테스트 리소스 복사** - src/test/resources/data/menus/\*.json, data/story/stages.json 복사
+- **테스트 리소스 복사** - src/test/resources/data/menus/*.json, data/story/stages.json 복사
 
 ### 변경 파일
 
@@ -797,7 +843,7 @@ REPLACE
 | ------------------------------------------------------------ | ----------- | ------------------------------------- |
 | core/src/main/java/com/puyo/game/story/StoryModeManager.java | 수정        | ClassLoader 폴백 추가, JSON 래퍼 파싱 |
 | core/src/test/java/com/puyo/game/GameTest.java               | 전체 재작성 | GL 없는 순수 로직 테스트 6개          |
-| core/src/test/resources/data/menus/\*.json (4개)             | 신규        | 테스트용 메뉴 JSON 복사               |
+| core/src/test/resources/data/menus/*.json (4개)             | 신규        | 테스트용 메뉴 JSON 복사               |
 | core/src/test/resources/data/story/stages.json               | 신규        | 스토리 스테이지 데이터 복사           |
 | core/src/main/java/com/puyo/game/menus/MenuLoader.java       | 수정        | classpath -> internal 폴백            |
 

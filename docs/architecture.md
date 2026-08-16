@@ -98,23 +98,70 @@ puyo/
 | **엔트리 포인트** | `PuyoGame` (core), `AndroidLauncher` (android), `DesktopLauncher` (desktop) | 플랫폼별 초기화                            |
 | **게임 루프**     | `GameWorld`                                                                 | 업데이트/렌더링 분리, 고정 타임스텝(1/60s) |
 | **상태 관리**     | `Screen` 기반 (LibGDX)                                                      | Loading → Menu → Play/StorySelect          |
-| **렌더링**        | `FitViewport` + `OrthographicCamera`                                        | 가상 해상도 960x1600, 자동 스케일링        |
+| **렌더링**        | `FitViewport` + `OrthographicCamera`                                        | 가상 해상도 1600x960, 자동 스케일링        |
 | **데이터**        | JSON + `Json` (LibGDX)                                                      | 메뉴, 스테이지 데이터 외부화               |
 | **리소스**        | `AssetManager` (예정)                                                       | 텍스처/사운드/폰트 통합 관리               |
 
 ---
-## 엔진 모듈 구조 (v0.1.15~)
+
+## 엔진 모듈 구조 (v0.1.20~)
 
 | 클래스 | 책임 | 비고 |
 |--------|------|------|
-| `GameWorld` | **메인 상태 머신** (오케스트레이터) | 게임 루프, 보드, 페어, 연쇄 처리, 락 딜레이, 분리, 스폰, 팝/낙하 애니메이션 등 전체 상태 관리 |
+| `GameWorld` | **메인 상태 머신** (오케스트레이터) | 게임 루프, 보드, 페어, 연쇄 처리, 락 딜레이, 분리, 스폰, 팝/낙하 애니메이션 등 전체 상태 관리. **GamePhase enum 11단계로 세분화** (`FALLING_AUTO`, `LOCK_DELAY`, `SEPARATION` 추가) |
 | `SeparationManager` | 가로 쌍 분리 로직 | `SeparationResult` 반환, Board 조작 안 함 |
 | `GravityEngine` | 중력 적용 (stateless) | `applyGravity(Board)` 파라미터 전달 |
 | `MatchFinder` | 매칭 그룹 탐색 | static 메서드만, stateless 유틸리티 |
-| `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한 |
+| `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한. stateful 클래스 (`activate`, `deactivate`, `resetTimerAndMoves`, `recordTime`, `recordMove`, `shouldLock`) |
 | `PuyoPairGenerator` | 랜덤 PuyoPair 생성 | 스폰 위치 설정 포함 |
 
+**주요 변경 (v0.1.20)**: `GamePhase.FALLING`을 3단계로 분리 (`FALLING_AUTO`, `LOCK_DELAY`, `SEPARATION`). 입력 허용 페이즈 명시화 (`FALLING_AUTO` && `LOCK_DELAY`만 허용). `getGamePhase()`, `recordLockDelayMove()` 추가로 PlayScreen 입력 제어 중앙화. 자동 낙하 중 락딜레이 로직 완전 제거로 상태 관리 단순화.
+
 **주요 변경 (v0.1.15)**: `FallingAnimationManager` 클래스 삭제 → 로직을 `GameWorld` 내부에 private 메서드로 통합 (`updatePopAnimation`, `updateSeparationFalling`, `updateFloatingFalling`, `collectAndClearChainPop`, `collectCompletedFalling`, `canFallInColumn`). `FallingAnimationManager.FallingPuyo` 중첩 클래스 → 별도 파일 `FallingPuyo.java`로 단일화. `float[]` 래퍼 패턴 제거로 타이머 버그(프리징) 해결. 단일 `GamePhase` enum으로 모든 Phase 처리.
+
+---
+
+## GamePhase 상태 머신 상세 (v0.1.20~)
+
+```java
+public enum GamePhase {
+    SPAWNING,           // 새 조각 생성/위치 설정
+    FALLING_AUTO,       // 자동 낙하 (0.5초 간격, 이동/회전/하드드롭 입력 허용)
+    LOCK_DELAY,         // 락 딜레이 (착지 후 0.5초/15회 이동, 이동/회전/소프트드롭 입력 허용)
+    SEPARATION,         // 락딜레이 종료 후 분리 체크 + 실행 (입력 차단)
+    FALLING_ANIMATION,  // 분리/부유 뿌요 낙하 애니메이션 (입력 차단)
+    CHAIN_FINDING,      // 연쇄: 매치 탐색
+    CHAIN_POP_ANIMATION, // 연쇄: 팝 애니메이션 재생 중
+    CHAIN_FLOATING_CHECK, // 연쇄: 부유 뿌요 체크
+    GAME_OVER           // 게임 오버
+}
+```
+
+### 상태 전이 플로우
+
+```
+SPAWNING 
+    → FALLING_AUTO (자동 낙하 시작)
+        → LOCK_DELAY (착지 시 activate())
+            → SEPARATION (타이머/이동수 초과 시 shouldLock())
+                → FALLING_ANIMATION (분리 가능 시)
+                → CHAIN_FINDING (분리 불가 시 lockPiece())
+            → FALLING_AUTO (공중 이탈 시 deactivate() + 복귀)
+        → FALLING_AUTO (이동/회전으로 공중 이탈 시 deactivate() + 복귀)
+    → FALLING_ANIMATION (분리/연쇄 낙하 중)
+        → CHAIN_FINDING (낙하 완료 시)
+    → CHAIN_FINDING → CHAIN_POP_ANIMATION → CHAIN_FLOATING_CHECK → (매치 시) CHAIN_FINDING / (매치 없음) SPAWNING
+    → GAME_OVER
+```
+
+### 입력 허용 매트릭스
+
+| 입력 액션 | FALLING_AUTO | LOCK_DELAY | SEPARATION | FALLING_ANIMATION | 기타 |
+|-----------|--------------|------------|------------|-------------------|------|
+| 좌/우 이동 | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 회전 | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 하드 드롭 | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 소프트 드롭 | ✅ | ✅ (recordLockDelayMove) | ❌ | ❌ | ❌ |
 
 ---
 
@@ -217,7 +264,7 @@ public class TouchController implements InputProcessor, Disposable {
 // 풀스크린 몰입 모드 (네비게이션 바/상태 바 숨김)
 getWindow().getDecorView().setSystemUiVisibility(
     View.SYSTEM_UI_FLAG_FULLSCREEN
-    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+    | View.SYSTEM_UI_FLAG_HIDE_NEVIGATION
     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -234,21 +281,13 @@ getWindow().getDecorView().setSystemUiVisibility(
 
 ## 데스크톱 런처 (v0.2.0~)
 
-````java
+```java
 // desktop/src/main/java/com/puyo/game/DesktopLauncher.java
 Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
 config.setWindowedMode(1600, 960);  // 가로 고정
 config.setResizable(true);  // 비율 유지 리사이즈
 config.setForegroundFPS(60);
-```inal float BOARD_OFFSET_Y = 320f; // 상단 여백
-
-    public static FitViewport createViewport() {
-        OrthographicCamera camera = new OrthographicCamera();
-        camera.setToOrtho(false, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
-        return new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, camera);
-    }
-}
-````
+```
 
 ### 적용된 화면들
 
@@ -473,9 +512,11 @@ public void render() {
 PlayScreen.render(delta)
 ├── update(delta)          // 입력 처리 + 게임 로직
 │   ├── InputHandler 처리
+│   │   ├── 현재 Phase 조회: gameWorld.getGamePhase()
+│   │   ├── allowInput = (FALLING_AUTO || LOCK_DELAY)
 │   │   ├── isRotatePressed() → gameWorld.rotateClockwise()
 │   │   ├── getMoveDirection() → gameWorld.moveLeft/Right()
-│   │   ├── isDropPressed() → currentPair.moveDown()
+│   │   ├── isDropPressed() → currentPair.moveDown() + recordLockDelayMove()
 │   │   └── isHardDropPressed() → gameWorld.hardDrop()
 │   └── gameWorld.update(delta)  // 핵심 게임 로직
 │
@@ -487,7 +528,7 @@ PlayScreen.render(delta)
     └── drawUI()           // 점수, 연쇄, 스테이지 등
 ```
 
-### 4. GameWorld.update(delta) - 핵심 게임 루프
+### 4. GameWorld.update(delta) - 핵심 게임 루프 (v0.1.20~)
 
 ```java
 public void update(float delta) {
@@ -495,45 +536,98 @@ public void update(float delta) {
 
     // 1. 통합된 낙하/팝 처리 (분리/연쇄 모두) - 최우선, 조작 불가
     if (!fallingPuyos.isEmpty()) {
-        updateFalling(delta);  // 매 프레임 팝 애니메이션, 0.05초 간격 분리 낙하
+        updateFallingAnimation(delta);
         return;
     }
 
-    // 2. 일반 쌍 뿌요 낙하 처리
+    // 2. 단일 switch로 모든 상태 처리
+    switch (gamePhase) {
+        case SPAWNING:
+            handleSpawning();
+            break;
+        case FALLING_AUTO:
+            handleFallingAuto(delta);
+            break;
+        case LOCK_DELAY:
+            handleLockDelay(delta);
+            break;
+        case SEPARATION:
+            handleSeparation();
+            break;
+        case FALLING_ANIMATION:
+            handleFallingAnimation(delta);
+            break;
+        case CHAIN_FINDING:
+            handleChainFinding();
+            break;
+        case CHAIN_POP_ANIMATION:
+            handleChainPopAnimation(delta);
+            break;
+        case CHAIN_FLOATING_CHECK:
+            handleChainFloatingCheck();
+            break;
+    }
+}
+```
+
+### handleFallingAuto (자동 낙하만 담당)
+
+```java
+private void handleFallingAuto(float delta) {
     fallTimer += delta;
-    if (fallTimer >= fallInterval) {  // 0.5초마다
+    if (fallTimer >= fallInterval) {
         fallTimer = 0f;
         if (canFall()) {
             currentPair.moveDown();
-            resetLockDelay();
+            // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
         } else {
-            // 바닥에 닿음 - 가로 상태에서 분리 가능한지 확인
-            if (isHorizontalAndCanSeparate()) {
-                separatePair();  // 한 쪽 잠금, 다른 쪽 단일 뿌요로 분리
-            } else {
-                // 기존 락 딜레이 로직
-                if (!lockDelayActive) {
-                    lockDelayActive = true;
-                    lockDelayTimer = 0f;
-                } else {
-                    lockDelayTimer += delta;
-                    if (lockDelayTimer >= LOCK_DELAY_TIME) {
-                        if (currentPair != null) {
-                            lockPiece();  // 새로운 연쇄/애니메이션 시스템 사용
-                        }
-                    }
-                }
-            }
+            // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
+            lockDelayManager.activate();
+            gamePhase = GamePhase.LOCK_DELAY;
         }
     }
+}
+```
 
-    if (lockDelayActive) {
-        lockDelayTimer += delta;
-        if (lockDelayTimer >= LOCK_DELAY_TIME) {
-            if (currentPair != null) {
-                lockPiece();
-            }
+### handleLockDelay (락 딜레이 단계 전담)
+
+```java
+private void handleLockDelay(float delta) {
+    lockDelayManager.recordTime(delta);
+
+    if (lockDelayManager.shouldLock()) {
+        gamePhase = GamePhase.SEPARATION;
+        return;
+    }
+
+    // 공중 이탈 시 락딜레이 해제 → 자동 낙하로
+    if (canFall()) {
+        lockDelayManager.deactivate();
+        gamePhase = GamePhase.FALLING_AUTO;
+    }
+    // 사용자 입력(moveLeft/Right/rotate/softDrop) 시 recordMove() 호출됨
+}
+```
+
+### handleSeparation (분리 체크 + 실행)
+
+```java
+private void handleSeparation() {
+    if (currentPair != null && separationManager.canSeparate(currentPair, board)) {
+        SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
+        if (sepResult.separated) {
+            board.placePuyo(sepResult.blockedPuyo);
+            addFallingPuyo(sepResult.freePuyo, FallingPuyo.FallType.FALLING);
+            fallingAnimationTimer = 0f;
+            lockDelayManager.deactivate();
+            currentPair = null;
+            gamePhase = GamePhase.FALLING_ANIMATION;
+        } else {
+            lockPiece();
         }
+    } else {
+        // 분리 불가: 일반 잠금 → 연쇄 탐색
+        lockPiece();
     }
 }
 ```
@@ -606,10 +700,10 @@ if (inputHandler.isEnterPressed()) {
 | --------------- | ---------------------------------------------------------------------------- |
 | **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `update()` + `render()`            |
 | **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어                      |
-| **입력 처리**   | `InputHandler`가 키보드/터치 통합, `update()`에서 엣지 감지                  |
-| **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유               |
-| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.08s)   |
-| **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙)                   |
+| **입력 처리**   | `InputHandler`가 키보드/터치 통합, `update()`에서 엣지 감지, **페이즈 기반 허용 제어** |
+| **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유, **GamePhase 11단계** |
+| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.05s)   |
+| **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙), **stateful Manager** |
 | **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복                          |
 | **렌더링**      | `ShapeRenderer` + `SpriteBatch`, `FitViewport`로 가상 해상도(1600×960) 유지  |
 | **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑)                                 |
