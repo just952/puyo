@@ -46,6 +46,7 @@ puyo/
 │   │   │   │   ├── MatchFinder.java      # 매칭 그룹 탐색 (static 메서드)
 │   │   │   │   ├── SeparationManager.java # 가로 쌍 분리 로직
 │   │   │   │   ├── LockDelayManager.java  # 락 딜레이 타이머/이동 카운트
+│   │   │   │   ├── ChainManager.java      # 연쇄 상태 관리 (chainCount, currentGroups)
 │   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
 │   │   │   └── model/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
@@ -104,7 +105,7 @@ puyo/
 
 ---
 
-## 엔진 모듈 구조 (v0.1.20~)
+## 엔진 모듈 구조 (v0.1.21~)
 
 | 클래스 | 책임 | 비고 |
 |--------|------|------|
@@ -113,7 +114,14 @@ puyo/
 | `GravityEngine` | 중력 적용 (stateless) | `applyGravity(Board)` 파라미터 전달 |
 | `MatchFinder` | 매칭 그룹 탐색 | static 메서드만, stateless 유틸리티 |
 | `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한. stateful 클래스 (`activate`, `deactivate`, `resetTimerAndMoves`, `recordTime`, `recordMove`, `shouldLock`) |
+| `ChainManager` | 연쇄 상태 관리 (chainCount, currentGroups) | `LockDelayManager` 패턴 적용. `startNewChain`, `findChains`, `getCurrentGroups`, `getChainCount`, `clearCurrentGroups`, `isChaining`, `isChainEnded` |
 | `PuyoPairGenerator` | 랜덤 PuyoPair 생성 | 스폰 위치 설정 포함 |
+
+**주요 변경 (v0.1.21)**: 
+- `softDrop()` 착지 시 `SEPARATION` 페이즈 경유 (락딜레이 우회하되 분리 체크 수행)
+- `InputHandler` DAS/ARR 단일 카운터(`heldFrames`, `repeatTriggered`, `anyPressed`)로 통합
+- `ChainManager` 신규 생성으로 연쇄 상태 캡슐화
+- `lockPiece()`에서 단계 전이 분리 → `startChainFinding()` 명시적 호출
 
 **주요 변경 (v0.1.20)**: `GamePhase.FALLING`을 3단계로 분리 (`FALLING_AUTO`, `LOCK_DELAY`, `SEPARATION`). 입력 허용 페이즈 명시화 (`FALLING_AUTO` && `LOCK_DELAY`만 허용). `getGamePhase()`, `recordLockDelayMove()` 추가로 PlayScreen 입력 제어 중앙화. 자동 낙하 중 락딜레이 로직 완전 제거로 상태 관리 단순화.
 
@@ -132,7 +140,7 @@ public enum GamePhase {
     FALLING_ANIMATION,  // 분리/부유 뿌요 낙하 애니메이션 (입력 차단)
     CHAIN_FINDING,      // 연쇄: 매치 탐색
     CHAIN_POP_ANIMATION, // 연쇄: 팝 애니메이션 재생 중
-    CHAIN_FLOATING_CHECK, // 연쇄: 부유 뿌요 체크
+    CHAIN_FLOATING_CHECK, // 연쇄: 부유 뿌요 체크 후 낙하 준비
     GAME_OVER           // 게임 오버
 }
 ```
@@ -229,6 +237,7 @@ public class InputHandler {
     // PC 키보드 / 모바일 터치 통합 인터페이스
     // - isMobile 플래그로 분기
     // - 공통 조회 메서드: getMoveDirection(), isRotatePressed(), isDropPressed(), isHardDropPressed()
+    // - DAS/ARR: 단일 카운터(heldFrames, repeatTriggered, anyPressed)로 통합
 }
 
 // core/src/main/java/com/puyo/game/input/TouchController.java (모바일 전용)
@@ -561,10 +570,10 @@ public void update(float delta) {
             handleChainFinding();
             break;
         case CHAIN_POP_ANIMATION:
-            handleChainPopAnimation(delta);
+            handlePopAnimation(delta);
             break;
         case CHAIN_FLOATING_CHECK:
-            handleChainFloatingCheck();
+            handleFloatingCheck();
             break;
     }
 }
@@ -584,6 +593,7 @@ private void handleFallingAuto(float delta) {
             // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
             lockDelayManager.activate();
             gamePhase = GamePhase.LOCK_DELAY;
+            LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
         }
     }
 }
@@ -596,6 +606,7 @@ private void handleLockDelay(float delta) {
     lockDelayManager.recordTime(delta);
 
     if (lockDelayManager.shouldLock()) {
+        LogUtil.debug("GameWorld", "LockDelay expired -> SEPARATION");
         gamePhase = GamePhase.SEPARATION;
         return;
     }
@@ -604,6 +615,7 @@ private void handleLockDelay(float delta) {
     if (canFall()) {
         lockDelayManager.deactivate();
         gamePhase = GamePhase.FALLING_AUTO;
+        LogUtil.debug("GameWorld", "Phase: LOCK_DELAY -> FALLING_AUTO (back in air)");
     }
     // 사용자 입력(moveLeft/Right/rotate/softDrop) 시 recordMove() 호출됨
 }
@@ -614,6 +626,7 @@ private void handleLockDelay(float delta) {
 ```java
 private void handleSeparation() {
     if (currentPair != null && separationManager.canSeparate(currentPair, board)) {
+        // 분리 가능: 실행
         SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
         if (sepResult.separated) {
             board.placePuyo(sepResult.blockedPuyo);
@@ -622,12 +635,17 @@ private void handleSeparation() {
             lockDelayManager.deactivate();
             currentPair = null;
             gamePhase = GamePhase.FALLING_ANIMATION;
+            LogUtil.debug("GameWorld", "Phase: SEPARATION -> FALLING_ANIMATION (separated)");
         } else {
+            LogUtil.info("GameWorld", "SEPARATION: canSeparate true but separate() failed -> lockPiece");
             lockPiece();
+            startChainFinding();
         }
     } else {
         // 분리 불가: 일반 잠금 → 연쇄 탐색
+        LogUtil.debug("GameWorld", "SEPARATION: no separation -> lockPiece -> CHAIN_FINDING");
         lockPiece();
+        startChainFinding();
     }
 }
 ```
@@ -638,15 +656,16 @@ private void handleSeparation() {
 // 키보드 (PC) - InputHandler
 keyDown/keyUp → 상태 플래그 설정
 update() → 이전 프레임 상태 저장 (엣지 감지용)
+updateDasArr() → 단일 카운터로 DAS/ARR 처리 (anyPressed 기준)
 
 // 터치 (모바일) - TouchController implements InputProcessor
 touchDown/Up/Dragged → 버튼 영역별 플래그 설정
 정규화 좌표(0~1) 사용으로 해상도 독립적
 
 // 공통 조회 메서드 (InputHandler)
-getMoveDirection()  // -1, 0, 1
+getMoveDirection()  // -1, 0, 1 (repeatTriggered + left/rightPressed)
 isRotatePressed()   // 엣지 감지 (한 번만 true)
-isDropPressed()     // 홀드 감지
+isDropPressed()     // 홀드 감지 (repeatTriggered + dropPressed)
 isHardDropPressed() // 엣지 감지
 ```
 

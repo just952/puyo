@@ -4,6 +4,56 @@
 
 ---
 
+## v0.1.21 (2026-08-16) - **소프트 드롭 SEPARATION 경유 수정 + InputHandler DAS/ARR 단일 카운터 통합 + ChainManager 신규**
+
+### 배경
+- v0.1.20에서 소프트 드롭 착지 시 `CHAIN_FINDING`으로 바로 전이되어 분리 체크가 누락됨
+- InputHandler의 키별 DAS/ARR 상태 변수가 중복되어 유지보수 어려움
+- 연쇄 상태(chainCount, currentGroups)가 GameWorld에 분산되어 있었음
+
+### 해결
+1. **소프트 드롭 착지 시 SEPARATION 페이즈 경유** (`GameWorld.softDrop()`)
+   - 락딜레이 대기 시간은 우회하되(`lockDelayManager.deactivate()`), 분리 체크는 수행하도록 `SEPARATION`으로 전이
+   - `update()` 루프에서 `handleSeparation()` 호출 → `canSeparate()` 체크 후 분리 실행 또는 일반 잠금
+
+2. **InputHandler DAS/ARR 단일 카운터로 통합**
+   - **기존**: `leftHeldFrames`, `rightHeldFrames`, `dropHeldFrames`, `leftRepeatTriggered`, `rightRepeatTriggered`, `dropRepeatTriggered` (키별 6개 변수)
+   - **변경**: `heldFrames`, `repeatTriggered`, `anyPressed` (단일 3개 변수)
+   - `keyDown()` 진입 시 `anyPressed = true` 한 번만 설정
+   - `keyUp()` 종료 시 `anyPressed = leftPressed || rightPressed || dropPressed` 재계산
+   - `updateDasArr()`는 `anyPressed`만 보고 공통 처리
+   - `getMoveDirection()`, `isDropPressed()`는 `repeatTriggered` + 해당 키 조합으로 판단
+
+3. **ChainManager 클래스 신규 생성** (`LockDelayManager` 패턴 적용)
+   - `chainCount`, `currentGroups` 상태 캡슐화
+   - `startNewChain()`, `findChains()`, `getCurrentGroups()`, `getChainCount()`, `clearCurrentGroups()`, `isChaining()`, `isChainEnded()` 제공
+   - GameWorld는 연쇄 로직 위임만 담당
+
+4. **lockPiece() 단계 전이 분리** → `startChainFinding()` 추출
+   - `lockPiece()`: 보드 배치 + 락딜레이 비활성화만 담당
+   - `startChainFinding()`: `chainManager.startNewChain()` + `gamePhase = CHAIN_FINDING`
+   - 하드 드롭(`hardDrop()`)과 분리 불가 시(`handleSeparation()`)에서 명시적 호출
+
+### 아키텍처 개선점
+- **단일 책임 원칙 강화**: GameWorld는 오케스트레이션만, 매니저들은 도메인 로직 캡슐화
+- **상태 전이 명시적**: 호출부에서 `startChainFinding()` 호출로 전이 의도 명확
+- **입력 처리 단순화**: DAS/ARR 로직이 키 개수에 비례하지 않고 O(1)로 동작
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **소프트 드롭**: 착지 시 분리 체크 수행됨 ✅
+- **InputHandler**: 좌우/드롭 동시 입력, DAS/ARR 정상 작동 ✅
+- **연쇄 처리**: ChainManager 위임으로 정상 작동 ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | softDrop() SEPARATION 전이, lockPiece()/startChainFinding() 분리, ChainManager 사용 |
+| `core/src/main/java/com/puyo/game/input/InputHandler.java` | 대폭 수정 | DAS/ARR 단일 카운터 통합, keyDown/keyUp anyPressed 정리 |
+| `core/src/main/java/com/puyo/game/logic/engine/ChainManager.java` | **신규** | 연쇄 상태 관리 클래스 (LockDelayManager 패턴) |
+
+---
+
 ## v0.1.20 (2026-08-16) - **FALLING 페이즈 3단계 분리 (FALLING_AUTO / LOCK_DELAY / SEPARATION)**
 
 ### 배경
@@ -285,6 +335,38 @@
 | `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java` | 수정 | 부유 추가 로그 추가 |
 | `core/src/main/java/com/puyo/game/logic/model/Board.java` | 수정 | 부유 탐색 상세 로그 추가 |
 | 테스트 6개 파일 | 삭제 | 결합도 높은 테스트 제거 |
+
+### 검증 결과
+
+- `:core:compileJava` / `:core:test` (60개 테스트 통과) / `:desktop:run` (2분 54초 크래시 없는 실행) 성공
+- 연쇄 팝 → 부유 뿌요 낙하 → 중력 → 배치 모든 단계 정상 작동
+- 이중 제거 버그 해결, 보드 상태 깨짐 없음
+- 매니저 클래스 분리 완료 (SRP 준수)
+
+### 변경 파일
+
+| 파일                                                                             | 변경 유형 | 설명                                                   |
+| -------------------------------------------------------------------------------- | --------- | ------------------------------------------------------ |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingAnimationManager.java`     | 신규/수정 | 팝/낙하 전담, 원본 좌표 보존, 즉시 보드 제거           |
+| `core/src/main/java/com/puyo/game/logic/engine/SeparationManager.java`           | 신규      | 쌍 분리 로직 전담                                      |
+| `core/src/main/java/com/puyo/game/logic/engine/ChainProcessor.java`              | 신규/수정 | 연쇄 처리 전담, MatchFinder static 사용                |
+| `core/src/main/java/com/puyo/game/logic/engine/MatchFinder.java`                 | 수정      | 모든 메서드 static, stateless 유틸리티                 |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java`                 | 신규      | 엔진 내부용 낙하 뿌요 모델                             |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java`                   | 대폭 수정 | 매니저 위임, 중복 로직 제거, 콜백 주석 수정            |
+| `core/src/main/java/com/puyo/game/logic/engine/LockDelayManager.java`            | 신규      | 락 딜레이 관리 전담                                    |
+| `core/src/main/java/com/puyo/game/logic/engine/GravityEngine.java`               | 신규      | 중력 적용 전담                                         |
+| `core/src/main/java/com/puyo/game/logic/engine/PuyoPairGenerator.java`           | 신규      | 다음 쌍 생성 전담                                      |
+| `core/src/main/java/com/puyo/game/logic/engine/FallingPuyo.java`                 | 신규      | 엔진 내부용 낙하 모델 (FallType, 원본 좌표)            |
+| `core/src/test/java/com/puyo/game/logic/engine/FallingAnimationManagerTest.java` | 수정      | Board 파라미터 추가                                    |
+| `core/src/test/java/com/puyo/game/logic/engine/ChainProcessorTest.java`          | 수정      | 동기식 processChain 복원                               |
+| `core/src/main/java/com/puyo/game/logic/engine/GravityEngineTest.java`           | 삭제      | main 패키지 중복 테스트 삭제 (test 패키지에 정상 존재) |
+
+### 검증 결과
+
+- `:core:compileJava` / `:core:test` (60개 테스트 통과) / `:desktop:run` (2분 54초 크래시 없는 실행) 성공
+- 연쇄 팝 → 부유 뿌요 낙하 → 중력 → 배치 모든 단계 정상 작동
+- 이중 제거 버그 해결, 보드 상태 깨짐 없음
+- 매니저 클래스 분리 완료 (SRP 준수)
 
 ---
 
@@ -687,7 +769,7 @@
 
 - `:core:compileJava` / `:desktop:compileJava` / `:android:compileDebugJavaWithJavac` 모두 성공
 - `:core:test` 6/6 테스트 통과
-- 데스크톱 앱 실행 확인 - 메인 메뉴 → 스토리 선택 → 게임 화면(ENDLESS) 정상 진입
+- 데스크톲 앱 실행 확인 - 메인 메뉴 → 스토리 선택 → 게임 화면(ENDLESS) 정상 진입
 
 ### 커밋
 
