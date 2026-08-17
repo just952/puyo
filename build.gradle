@@ -67,9 +67,9 @@ project(":desktop") {
 
     application {
         mainClass = "com.puyo.game.DesktopLauncher"
-        // JVM 시스템 프로퍼티 전달 (puyo.env 등)
+        // JVM 시스템 프로퍼티 전달 (game.env 통일)
         applicationDefaultJvmArgs = [
-            "-Dpuyo.env=${System.getProperty('puyo.env', 'development')}"
+            "-Dgame.env=${System.getProperty('game.env', 'development')}"
         ]
     }
 

@@ -27,17 +27,17 @@
    // Production (PRD/Android): classpath만 (읽기 전용)
    // Development (Desktop): local 우선 → classpath → 생성
    ```
-   - 시스템 프로퍼티 `puyo.env=production|prd` 로 제어
+   - 시스템 프로퍼티 `game.env=production|prd` 로 제어
    - 안드로이드는 자동 감지하여 프로덕션 모드
 
 4. **Gradle 빌드 설정 추가** (desktop/build.gradle → root build.gradle)
-   - `applicationDefaultJvmArgs = ["-Dpuyo.env=${System.getProperty('puyo.env', 'development')}"]`
+   - `applicationDefaultJvmArgs = ["-Dgame.env=${System.getProperty('game.env', 'development')}"]`
 
 ### 실행 방법
 | 모드 | 명령어 | 로그 |
 |------|--------|------|
 | 개발 (핫리로드) | `./gradlew :desktop:run` | `Loaded atlas from local: assets/puyo_atlas.atlas` |
-| 프로덕션 테스트 | `./gradlew :desktop:run "-Dpuyo.env=production"` | `Loaded atlas from classpath (production): assets/puyo_atlas.atlas` |
+| 프로덕션 테스트 | `./gradlew :desktop:run "-Dgame.env=production"` | `Loaded atlas from classpath (production): assets/puyo_atlas.atlas` |
 | 안드로이드 | 자동 | classpath만 사용 |
 
 ### 검증 결과

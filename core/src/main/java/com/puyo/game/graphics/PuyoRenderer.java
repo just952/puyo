@@ -52,7 +52,7 @@ public class PuyoRenderer implements Disposable {
     /**
      * 프로덕션 환경 여부 판단
      * - 안드로이드: 무조건 프로덕션
-     * - 데스크톱: 시스템 프로퍼티 puyo.env=production|prd 면 프로덕션
+     * - 데스크톱: 시스템 프로퍼티 game.env=production|prd 면 프로덕션
      */
     private boolean isProductionEnvironment() {
         // 안드로이드는 무조건 프로덕션
@@ -60,7 +60,7 @@ public class PuyoRenderer implements Disposable {
             return true;
         }
         // 데스크톱: 시스템 프로퍼티로 제어 (기본값 development)
-        String env = System.getProperty("puyo.env", "development");
+        String env = System.getProperty("game.env", "development");
         return "production".equalsIgnoreCase(env) || "prd".equalsIgnoreCase(env);
     }
 
