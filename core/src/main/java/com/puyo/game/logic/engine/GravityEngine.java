@@ -23,7 +23,7 @@ public class GravityEngine {
     public boolean applyGravity(Board board) {
         boolean moved = false;
         int width = Board.WIDTH;
-        int height = Board.HEIGHT;
+        int height = Board.TOTAL_HEIGHT;
 
         LogUtil.debug("GravityEngine", "=== applyGravity START ===");
         LogUtil.debug("GravityEngine", "Board before gravity:\n" + board.toString());

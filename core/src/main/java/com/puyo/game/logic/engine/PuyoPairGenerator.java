@@ -35,10 +35,12 @@ public class PuyoPairGenerator {
 
     /**
      * 생성된 쌍을 스폰 위치(상단 중앙)에 배치
+     * fieldHeight는 Board.TOTAL_HEIGHT(14)를 전달받음
+     * 스폰 위치: y = TOTAL_HEIGHT - 2 = 12 (히든 영역 상단)
      */
     public void positionAtSpawn(PuyoPair pair, int fieldWidth, int fieldHeight) {
         int startX = (fieldWidth / 2) - 1;
-        int startY = fieldHeight - 1;
+        int startY = fieldHeight - 2;  // 히든 영역 상단(y=12)에서 스폰
         pair.setPosition(startX, startY);
     }
 }

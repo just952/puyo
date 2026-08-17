@@ -76,7 +76,7 @@ public class GameWorld {
         } else {
             currentPair = pairGenerator.generate();
         }
-        pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.HEIGHT);
+        pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.TOTAL_HEIGHT);
         lockDelayManager.deactivate();
         justSpawned = true; // 새 조각 스폰 알림 (DAS 리셋용, 한 프레임 후 자동 해제)
     }

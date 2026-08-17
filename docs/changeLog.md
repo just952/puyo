@@ -613,7 +613,46 @@
 
 ---
 
-## v0.1.8 (2026-08-08) - **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림**
+## v0.1.22 (2026-08-17) - **히든 보드 영역(14행) 확장 적용 + 고스트 뿌요 충돌 무시 버그 수정**
+
+### 배경
+- v0.1.8에서 "화면 위쪽(y≥12) 뿌요 충돌 무시(고스트 뿌요)"로 구현했으나, **원작(뿌요뿌요 통)과 다름**
+- 원작: 논리 보드 6×14 (가시 12행 + 히든 2행), 히든 영역(y=12,13) 뿌요도 **일반 뿌요와 동일하게 충돌 체크**
+- 현재: `HEIGHT=12`만 있어 히든 영역 없음, 스폰 위치 y=11, 게임 오버 판단도 y=11 기준
+
+### 해결
+1. **Board.java: 논리 보드 6×14로 확장**
+   - `TOTAL_HEIGHT = 14` (`HEIGHT=12` + `HIDDEN_ROWS=2`) 상수 추가
+   - `grid` 배열 `[WIDTH][TOTAL_HEIGHT]`로 확장
+   - `isInside()` 경계 체크를 `TOTAL_HEIGHT` 기준으로 변경
+   - `isInsideVisible(x, y)` 신규: 렌더링/게임오버용 가시 영역만 체크 (`y < HEIGHT`)
+   - 충돌 체크(`canMoveLeft/Right/Down`, `canPlace`)에서 `isInsideVisible` 제거 → 전체 보드 기준 `isEmpty` 사용
+   - `applyGravity`, `getAllFloatingPuyos`, `getHeightAtColumn`, `isTopOut` 루프 범위 `TOTAL_HEIGHT`로 확장
+
+2. **PuyoPairGenerator.java: 스폰 위치 히든 영역 상단(y=12)으로 변경**
+   - `positionAtSpawn()`에서 `startY = fieldHeight - 2` (TOTAL_HEIGHT=14 → y=12)
+
+3. **GameWorld.java: 스폰 시 Board.TOTAL_HEIGHT 전달**
+   - `spawnNewPair()`에서 `Board.TOTAL_HEIGHT` 사용
+
+4. **design.md 기본 규칙 수정**: "고스트 뿌요" 항목 → "히든 영역 충돌"로 정정
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 대폭 수정 | TOTAL_HEIGHT=14 확장, 충돌 체크 전체 보드 기준, 관련 메서드 루프 범위 수정 |
+| `core/src/main/java/com/puyo/game/logic/engine/PuyoPairGenerator.java` | 수정 | 스폰 위치 y=12로 변경 |
+| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | spawnNewPair에서 Board.TOTAL_HEIGHT 전달 |
+| `docs/design.md` | 수정 | 기본 규칙: 보드 6×14, 히든 영역 충돌 설명 추가 |
+
+### 검증 결과
+- **컴파일 성공** ✅
+- 히든 영역(y=12,13) 뿌요가 이동/회전/낙하 방해 정상 작동
+- 스폰 위치 y=12, 게임 오버 판단 정확히 y=13 상단 기준
+
+---
+
+## v0.1.8 (2026-08-08) - **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림** ⚠️ **버그 있음 - v0.1.22에서 수정됨**
 
 ### 추가
 
@@ -623,11 +662,12 @@
    - ARR_INTERVAL_FRAMES = 2프레임마다 1칸씩 반복 이동 (초당 30회)
    - 키 떼면 카운터 완전 리셋, 좌우 동시 누름 시 상쇄
 
-2. **화면 밖(위쪽) 뿌요 고스트 충돌 무시** (`Board.java`)
+2. **화면 밖(위쪽) 뿌요 고스트 충돌 무시** (`Board.java`) ⚠️ **원작과 다름 - v0.1.22에서 수정**
    - `isInsideVisible(Puyo p)` 헬퍼 메서드 추가: `p.getY() < HEIGHT`만 체크
    - `canMoveLeft`, `canMoveRight`, `canMoveDown`, `canPlace` 모두 적용
    - 스폰 시 right 뿌요가 y=12(화면 밖)에 있어도 left 뿌요만으로 좌우 이동 가능
-   - 원작 뿌요뿌요와 동일: 필드 상단에서 좌우로 피할 수 있음
+   - **잘못된 주장**: "원작 뿌요뿌요와 동일: 필드 상단에서 좌우로 피할 수 있음"
+   - **실제 원작**: 히든 영역(y=12,13) 뿌요도 일반 충돌 체크함
 
 ### 변경 파일
 

@@ -26,7 +26,7 @@ public class MatchFinder {
      * @return 매칭된 그룹들의 리스트 (각 그룹은 Puyo 리스트)
      */
     public static List<List<Puyo>> findAllMatchingGroups(Board board) {
-        boolean[][] visited = new boolean[Board.WIDTH][Board.HEIGHT];
+        boolean[][] visited = new boolean[Board.WIDTH][Board.TOTAL_HEIGHT];
         List<List<Puyo>> groups = new ArrayList<>();
 
         LogUtil.debug("MatchFinder", "=== findAllMatchingGroups START ===");
@@ -34,7 +34,7 @@ public class MatchFinder {
         LogUtil.debug("MatchFinder", "Called from stack trace: " + Thread.currentThread().getStackTrace()[2].getClassName() + "." + Thread.currentThread().getStackTrace()[2].getMethodName() + "()");
 
         for (int x = 0; x < Board.WIDTH; x++) {
-            for (int y = 0; y < Board.HEIGHT; y++) {
+            for (int y = 0; y < Board.TOTAL_HEIGHT; y++) {
                 Puyo puyo = board.getPuyoAt(x, y);
                 if (puyo != null && !visited[x][y] &&
                         puyo.getColor() != PuyoColor.OJAMA &&
