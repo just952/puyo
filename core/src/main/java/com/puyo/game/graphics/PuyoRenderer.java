@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Disposable;
+import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.config.GameViewport;
 
@@ -18,19 +19,35 @@ import com.puyo.game.config.GameViewport;
  * 
  * 추후 실제 아트 에셋(아틀라스 PNG + .atlas 파일)로 교체 가능하도록
  * TextureRegion 기반 인터페이스 유지.
+ * 
+ * 하이브리드 모드 지원:
+ * - 디자이너 모드: 15가지 연결 상태 각각 별도 이미지 (red_up, red_down, ...)
+ * - 프로그래머 모드: 기본 뿌요 + 방향별 오버레이 4개로 런타임 합성
  */
 public class PuyoRenderer implements Disposable {
     private static final int PUYO_SIZE = 64; // 아틀라스 내 개별 뿌요 텍스처 크기 (2의 거듭제곱)
     private static final int ATLAS_PADDING = 2;
     private static final int COLORS = 7; // RED, GREEN, BLUE, YELLOW, PURPLE, OJAMA, HARD
-    private static final int VARIANTS = 3; // 기본, 하이라이트링, 팝용(작은것)
+    
+    // 프로그래머 모드 변형: 기본, 하이라이트, 팝, 오버레이_상, 오버레이_하, 오버레이_좌, 오버레이_우
+    private static final int PROGRAMMER_VARIANTS = 7;
+    // 디자이너 모드: 15가지 연결 상태 + 단일 (NONE)
+    private static final int DESIGNER_STATES = 16;
 
     private static final String ATLAS_PATH = "assets/puyo_atlas.atlas";
     private static final String ATLAS_PNG_NAME = "puyo_atlas.png";
 
     private TextureAtlas textureAtlas;
     private Texture atlasTexture; // 직접 생성 시 사용
+    
+    // 하이브리드 모드 지원 필드
+    private boolean designerMode = false;
+    private TextureRegion[][][] designerRegions; // [color][connectState][0]
+    private TextureRegion[][] programmerRegions; // [color][variant] - 7개
+    
+    // 기존 호환용 (디자이너 모드일 때 designerRegions[color][0][0] 참조)
     private TextureRegion[][] regions; // [color][variant]
+    
     private boolean disposed = false;
 
     public PuyoRenderer() {
@@ -162,10 +179,10 @@ public class PuyoRenderer implements Disposable {
         sb.append("repeat: none\n");
 
         String[] colorNames = {"red", "green", "blue", "yellow", "purple", "ojama", "hard"};
-        String[] variantNames = {"", "_highlight", "_pop"};
+        String[] variantNames = {"", "_highlight", "_pop", "_overlay_up", "_overlay_down", "_overlay_left", "_overlay_right"};
 
         for (int colorIdx = 0; colorIdx < COLORS; colorIdx++) {
-            for (int variant = 0; variant < VARIANTS; variant++) {
+            for (int variant = 0; variant < PROGRAMMER_VARIANTS; variant++) {
                 String name = colorNames[colorIdx] + variantNames[variant];
                 int x = ATLAS_PADDING + variant * (PUYO_SIZE + ATLAS_PADDING);
                 int y = ATLAS_PADDING + colorIdx * (PUYO_SIZE + ATLAS_PADDING);
@@ -184,31 +201,92 @@ public class PuyoRenderer implements Disposable {
     }
 
     /**
-     * TextureAtlas에서 regions 배열 초기화
+     * TextureAtlas에서 regions 배열 초기화 (하이브리드 모드 지원)
      */
     private void initRegionsFromAtlas() {
-        String[] colorNames = {"red", "green", "blue", "yellow", "purple", "ojama", "hard"};
-        String[] variantNames = {"", "_highlight", "_pop"};
-
-        regions = new TextureRegion[COLORS][VARIANTS];
+        // 디자이너 모드 감지: 15가지 연결 상태 이미지 존재 여부 확인
+        designerMode = checkDesignerMode();
+        
+        if (designerMode) {
+            initDesignerRegions();
+        } else {
+            initProgrammerRegions();
+        }
+        
+        // 기존 호환용 regions도 설정 (기본 변형만)
+        regions = new TextureRegion[COLORS][3];
         for (int colorIdx = 0; colorIdx < COLORS; colorIdx++) {
-            for (int variant = 0; variant < VARIANTS; variant++) {
+            if (designerMode) {
+                regions[colorIdx][0] = designerRegions[colorIdx][0][0]; // single
+            } else {
+                regions[colorIdx][0] = programmerRegions[colorIdx][0]; // base
+                regions[colorIdx][1] = programmerRegions[colorIdx][1]; // highlight
+                regions[colorIdx][2] = programmerRegions[colorIdx][2]; // pop
+            }
+        }
+    }
+    
+    /**
+     * 디자이너 모드 감지: red_up, red_down 등 4방향 기본 연결 이미지 존재 여부
+     */
+    private boolean checkDesignerMode() {
+        String[] testNames = {"red_up", "red_down", "red_left", "red_right"};
+        for (String name : testNames) {
+            if (textureAtlas.findRegion(name) == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * 디자이너 모드 regions 초기화: 15가지 연결 상태 + single
+     */
+    private void initDesignerRegions() {
+        designerRegions = new TextureRegion[COLORS][DESIGNER_STATES][1];
+        String[] colorNames = {"red", "green", "blue", "yellow", "purple", "ojama", "hard"};
+        String[] stateNames = {"", "up", "down", "left", "right", "up_down", "left_right", 
+                              "up_right", "up_left", "down_right", "down_left",
+                              "up_left_right", "down_left_right", "up_down_right", "up_down_left", "all"};
+        
+        for (int colorIdx = 0; colorIdx < COLORS; colorIdx++) {
+            for (int state = 0; state < DESIGNER_STATES; state++) {
+                String name = colorNames[colorIdx] + (state == 0 ? "_single" : "_" + stateNames[state]);
+                TextureRegion region = textureAtlas.findRegion(name);
+                // 누락된 상태는 single로 폴백
+                designerRegions[colorIdx][state][0] = region != null ? region : textureAtlas.findRegion(colorNames[colorIdx] + "_single");
+            }
+        }
+        Gdx.app.log("PuyoRenderer", "Designer mode enabled: 15 connection states per color");
+    }
+    
+    /**
+     * 프로그래머 모드 regions 초기화: 기본 3개 + 오버레이 4개 = 7개
+     */
+    private void initProgrammerRegions() {
+        programmerRegions = new TextureRegion[COLORS][PROGRAMMER_VARIANTS];
+        String[] colorNames = {"red", "green", "blue", "yellow", "purple", "ojama", "hard"};
+        String[] variantNames = {"", "_highlight", "_pop", "_overlay_up", "_overlay_down", "_overlay_left", "_overlay_right"};
+        
+        for (int colorIdx = 0; colorIdx < COLORS; colorIdx++) {
+            for (int variant = 0; variant < PROGRAMMER_VARIANTS; variant++) {
                 String name = colorNames[colorIdx] + variantNames[variant];
                 TextureRegion region = textureAtlas.findRegion(name);
-                if (region != null) {
-                    regions[colorIdx][variant] = region;
-                } else {
+                programmerRegions[colorIdx][variant] = region;
+                if (region == null) {
                     Gdx.app.error("PuyoRenderer", "Region not found: " + name);
                 }
             }
         }
+        Gdx.app.log("PuyoRenderer", "Programmer mode: base + 4 overlay variants per color");
     }
 
     /**
      * 아틀라스 다시 그려서 PNG 저장 (최초 저장용)
+     * 7개 변형 모두 저장 (기본 3개 + 오버레이 4개)
      */
     private void regenerateAndSavePng(String pngPath) {
-        int atlasWidth = (PUYO_SIZE + ATLAS_PADDING) * VARIANTS + ATLAS_PADDING;
+        int atlasWidth = (PUYO_SIZE + ATLAS_PADDING) * PROGRAMMER_VARIANTS + ATLAS_PADDING;
         int atlasHeight = (PUYO_SIZE + ATLAS_PADDING) * COLORS + ATLAS_PADDING;
 
         Pixmap pixmap = new Pixmap(atlasWidth, atlasHeight, Pixmap.Format.RGBA8888);
@@ -224,9 +302,20 @@ public class PuyoRenderer implements Disposable {
             Color baseColor = puyoColors[colorIdx];
             int y = ATLAS_PADDING + colorIdx * (PUYO_SIZE + ATLAS_PADDING);
 
+            // Variant 0: 기본 뿌요
             drawPuyoVariant(pixmap, ATLAS_PADDING, y, PUYO_SIZE, baseColor, true, false);
+
+            // Variant 1: 하이라이트 링 강조 버전
             drawPuyoVariant(pixmap, ATLAS_PADDING + (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, true, true);
+
+            // Variant 2: 팝 애니메이션용 작은 뿌요
             drawPuyoVariant(pixmap, ATLAS_PADDING + 2 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, true, false);
+
+            // Variant 3-6: 연결 오버레이 4개 (반투명 글로우 - 방향별)
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 3 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.UP);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 4 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.DOWN);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 5 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.LEFT);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 6 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.RIGHT);
         }
 
         com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.local(pngPath), pixmap);
@@ -235,11 +324,11 @@ public class PuyoRenderer implements Disposable {
 
     /**
      * 프로그래머용 플레이스홀더 아틀라스 생성.
-     * 각 색상별로: 기본 원, 하이라이트 링 포함, 작은 크기(팝 애니메이션용) 3가지 변형 생성.
+     * 각 색상별로: 기본 원, 하이라이트 링 포함, 팝용, 연결 오버레이 4개(상/하/좌/우) = 7가지 변형 생성.
      * 추후 TexturePacker로 만든 실제 아틀라스로 교체 예정.
      */
     private void generateAtlas() {
-        int atlasWidth = (PUYO_SIZE + ATLAS_PADDING) * VARIANTS + ATLAS_PADDING;
+        int atlasWidth = (PUYO_SIZE + ATLAS_PADDING) * PROGRAMMER_VARIANTS + ATLAS_PADDING;
         int atlasHeight = (PUYO_SIZE + ATLAS_PADDING) * COLORS + ATLAS_PADDING;
 
         Pixmap pixmap = new Pixmap(atlasWidth, atlasHeight, Pixmap.Format.RGBA8888);
@@ -269,23 +358,32 @@ public class PuyoRenderer implements Disposable {
 
             // Variant 2: 팝 애니메이션용 작은 뿌요 (기본과 동일, 스케일로 크기 조절)
             drawPuyoVariant(pixmap, ATLAS_PADDING + 2 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, true, false);
+
+            // Variant 3-6: 연결 오버레이 4개 (반투명 글로우 - 방향별)
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 3 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.UP);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 4 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.DOWN);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 5 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.LEFT);
+            drawConnectOverlay(pixmap, ATLAS_PADDING + 6 * (PUYO_SIZE + ATLAS_PADDING), y, PUYO_SIZE, baseColor, PuyoConnectState.RIGHT);
         }
 
         atlasTexture = new Texture(pixmap);
         atlasTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         pixmap.dispose();
 
-        // TextureRegion 배열 생성
-        regions = new TextureRegion[COLORS][VARIANTS];
+        // TextureRegion 배열 생성 (기존 호환용 regions)
+        regions = new TextureRegion[COLORS][PROGRAMMER_VARIANTS];
         for (int colorIdx = 0; colorIdx < COLORS; colorIdx++) {
-            for (int variant = 0; variant < VARIANTS; variant++) {
+            for (int variant = 0; variant < PROGRAMMER_VARIANTS; variant++) {
                 int x = ATLAS_PADDING + variant * (PUYO_SIZE + ATLAS_PADDING);
                 int y = ATLAS_PADDING + colorIdx * (PUYO_SIZE + ATLAS_PADDING);
                 regions[colorIdx][variant] = new TextureRegion(atlasTexture, x, y, PUYO_SIZE, PUYO_SIZE);
             }
         }
 
-        Gdx.app.log("PuyoRenderer", "Generated placeholder atlas: " + atlasWidth + "x" + atlasHeight);
+        // programmerRegions도 동일하게 설정
+        programmerRegions = regions;
+
+        Gdx.app.log("PuyoRenderer", "Generated placeholder atlas: " + atlasWidth + "x" + atlasHeight + " (7 variants per color)");
     }
 
     /**
@@ -333,6 +431,135 @@ public class PuyoRenderer implements Disposable {
             // 중앙 작은 하이라이트 점
             pixmap.setColor(Color.WHITE);
             pixmap.fillCircle(centerX - 3, centerY + 4, 3);
+        }
+    }
+    
+    /**
+     * 연결 오버레이 그리기 (단순 직사각형만)
+     * 자신의 스프라이트 영역 내에서만 그림: 뿌요 가장자리(innerRadius)에서 스프라이트 경계까지
+     * 캡(반원) 없음 - 직사각형만으로 깔끔하게 연결
+     */
+    private void drawConnectOverlay(Pixmap pixmap, int x, int y, int size, Color baseColor, PuyoConnectState direction) {
+        // 연결 색상 (원본 색상 유지, 알파 0.85)
+        Color bridgeColor = new Color(baseColor);
+        bridgeColor.a = 0.85f;
+        
+        int centerX = x + size / 2;
+        int centerY = y + size / 2;
+        int radius = size / 2 - 2;
+        int innerRadius = radius - 4;
+        
+        // 다리 두께: 뿌요 내부 반지름의 70%
+        int bridgeThickness = (int)(innerRadius * 0.7f);
+        int halfThickness = bridgeThickness / 2;
+        
+        // 다리 길이: 뿌요 내부 가장자리에서 스프라이트 경계까지
+        int bridgeLength = (size / 2) - innerRadius; // 64픽셀 기준 6픽셀
+        if (bridgeLength < 4) bridgeLength = 4;
+        
+        pixmap.setColor(bridgeColor);
+        
+        switch (direction) {
+            case UP: {
+                // 위쪽(화면상 위): 뿌요 위쪽 가장자리부터 스프라이트 상단까지
+                int startY = centerY - innerRadius;  // 뿌요 위쪽 가장자리
+                int endY = y;  // 스프라이트 상단 경계
+                int actualLength = startY - endY;
+                
+                // 단순 직사각형만 (캡 없음)
+                pixmap.fillRectangle(
+                    centerX - halfThickness,
+                    endY,
+                    bridgeThickness,
+                    actualLength
+                );
+                
+                // 하이라이트 (좌측 밝은 선)
+                Color highlightColor = new Color(baseColor).lerp(Color.WHITE, 0.4f);
+                highlightColor.a = 0.6f;
+                pixmap.setColor(highlightColor);
+                pixmap.fillRectangle(
+                    centerX - halfThickness + 1,
+                    endY + 2,
+                    Math.max(1, halfThickness / 3),
+                    Math.max(1, actualLength - 4)
+                );
+                break;
+            }
+            case DOWN: {
+                // 아래쪽: 뿌요 아래쪽 가장자리부터 스프라이트 하단까지
+                int startY = centerY + innerRadius;
+                int endY = y + size;
+                int actualLength = endY - startY;
+                
+                pixmap.fillRectangle(
+                    centerX - halfThickness,
+                    startY,
+                    bridgeThickness,
+                    actualLength
+                );
+                
+                Color highlightColor = new Color(baseColor).lerp(Color.WHITE, 0.4f);
+                highlightColor.a = 0.6f;
+                pixmap.setColor(highlightColor);
+                pixmap.fillRectangle(
+                    centerX - halfThickness + 1,
+                    startY + 2,
+                    Math.max(1, halfThickness / 3),
+                    Math.max(1, actualLength - 4)
+                );
+                break;
+            }
+            case LEFT: {
+                // 왼쪽: 뿌요 왼쪽 가장자리부터 스프라이트 좌측까지
+                int startX = centerX - innerRadius;
+                int endX = x;
+                int actualLength = startX - endX;
+                
+                pixmap.fillRectangle(
+                    endX,
+                    centerY - halfThickness,
+                    actualLength,
+                    bridgeThickness
+                );
+                
+                Color highlightColor = new Color(baseColor).lerp(Color.WHITE, 0.4f);
+                highlightColor.a = 0.6f;
+                pixmap.setColor(highlightColor);
+                pixmap.fillRectangle(
+                    endX + 2,
+                    centerY - halfThickness + 1,
+                    Math.max(1, actualLength - 4),
+                    Math.max(1, halfThickness / 3)
+                );
+                break;
+            }
+            case RIGHT: {
+                // 오른쪽: 뿌요 오른쪽 가장자리부터 스프라이트 우측까지
+                int startX = centerX + innerRadius;
+                int endX = x + size;
+                int actualLength = endX - startX;
+                
+                pixmap.fillRectangle(
+                    startX,
+                    centerY - halfThickness,
+                    actualLength,
+                    bridgeThickness
+                );
+                
+                Color highlightColor = new Color(baseColor).lerp(Color.WHITE, 0.4f);
+                highlightColor.a = 0.6f;
+                pixmap.setColor(highlightColor);
+                pixmap.fillRectangle(
+                    startX + 2,
+                    centerY - halfThickness + 1,
+                    Math.max(1, actualLength - 4),
+                    Math.max(1, halfThickness / 3)
+                );
+                break;
+            }
+            default:
+                return;
         }
     }
 
@@ -399,6 +626,67 @@ public class PuyoRenderer implements Disposable {
             return textureAtlas.getTextures().first();
         }
         return atlasTexture;
+    }
+    
+    /**
+     * 연결된 뿌요 그리기 (하이브리드 모드 지원)
+     * 디자이너 모드: 15가지 상태별 완성 이미지 사용
+     * 프로그래머 모드: 기본 뿌요 + 방향별 오버레이 4개 합성
+     * 
+     * @param batch SpriteBatch
+     * @param board 게임 보드 (인접 뿌요 체크용)
+     * @param gridX 보드 X 좌표 (0-5)
+     * @param gridY 보드 Y 좌표 (0-13)
+     * @param color 뿌요 색상
+     * @param screenX 화면 X 좌표
+     * @param screenY 화면 Y 좌표
+     * @param cellSize 한 칸 크기
+     * @param scale 스케일 (팝 애니메이션용)
+     */
+    public void drawConnected(SpriteBatch batch, Board board, int gridX, int gridY, 
+                              PuyoColor color, float screenX, float screenY, float cellSize, float scale) {
+        if (disposed || color == null || board == null) return;
+        
+        int colorIdx = color.ordinal();
+        if (colorIdx < 0 || colorIdx >= COLORS) return;
+        
+        if (scale <= 0) return;
+        
+        if (designerMode) {
+            // 디자이너 모드: 완성된 15가지 상태 이미지 사용
+            PuyoConnectState state = PuyoConnectState.fromBoard(board, gridX, gridY, color);
+            TextureRegion region = designerRegions[colorIdx][state.ordinal()][0];
+            drawRegion(batch, region, screenX, screenY, cellSize, scale);
+        } else {
+            // 프로그래머 모드: 기본 + 오버레이 합성
+            // 1. 기본 뿌요 그리기
+            TextureRegion baseRegion = programmerRegions[colorIdx][0];
+            drawRegion(batch, baseRegion, screenX, screenY, cellSize, scale);
+            
+            // 2. 4방향 체크하여 오버레이 그리기
+            if (board.hasSameColorAt(gridX, gridY + 1, color)) {
+                drawRegion(batch, programmerRegions[colorIdx][3], screenX, screenY, cellSize, scale); // overlay_up
+            }
+            if (board.hasSameColorAt(gridX, gridY - 1, color)) {
+                drawRegion(batch, programmerRegions[colorIdx][4], screenX, screenY, cellSize, scale); // overlay_down
+            }
+            if (board.hasSameColorAt(gridX - 1, gridY, color)) {
+                drawRegion(batch, programmerRegions[colorIdx][5], screenX, screenY, cellSize, scale); // overlay_left
+            }
+            if (board.hasSameColorAt(gridX + 1, gridY, color)) {
+                drawRegion(batch, programmerRegions[colorIdx][6], screenX, screenY, cellSize, scale); // overlay_right
+            }
+        }
+    }
+    
+    /**
+     * 공통 영역 그리기 헬퍼
+     */
+    private void drawRegion(SpriteBatch batch, TextureRegion region, float x, float y, float cellSize, float scale) {
+        if (region == null) return;
+        float drawSize = cellSize * scale;
+        float offset = (cellSize - drawSize) / 2f;
+        batch.draw(region, x + offset, y + offset, drawSize, drawSize);
     }
 
     @Override

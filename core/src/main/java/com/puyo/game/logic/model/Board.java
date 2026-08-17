@@ -107,6 +107,15 @@ public class Board {
     }
 
     /**
+     * 지정된 위치에 같은 색상의 살아있는 뿌요가 있는지 확인
+     * 연결 렌더링용
+     */
+    public boolean hasSameColorAt(int x, int y, PuyoColor color) {
+        Puyo p = getPuyoAt(x, y);
+        return p != null && p.isAlive() && p.getColor() == color;
+    }
+
+    /**
      * Checks if the given pair can be placed at its current position.
      * Checks all puyos against the full logical board (TOTAL_HEIGHT=14).
      *

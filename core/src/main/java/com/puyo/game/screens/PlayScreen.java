@@ -183,15 +183,18 @@ public class PlayScreen extends BaseScreen {
 
         shapeRenderer.end();
 
-        // Draw placed puyos
+        // Draw placed puyos with connection effects
         Board board = gameWorld.getBoard();
         batch.begin();
         for (int y = 0; y < Board.HEIGHT; y++) {
             for (int x = 0; x < Board.WIDTH; x++) {
                 Puyo puyo = board.getPuyoAt(x, y);
                 if (puyo != null) {
-                    drawPuyo(puyo, GameViewport.Single.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE,
-                            GameViewport.Single.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE);
+                    // 연결 효과 포함 그리기
+                    puyoRenderer.drawConnected(batch, board, x, y, puyo.getColor(),
+                            GameViewport.Single.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE,
+                            GameViewport.Single.BOARD_OFFSET_Y + y * GameViewport.CELL_SIZE,
+                            GameViewport.CELL_SIZE, puyo.getPopScale());
                 }
             }
         }
