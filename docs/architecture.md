@@ -175,6 +175,34 @@ SPAWNING
 
 ## 렌더링 아키텍처 (v0.2.0~)
 
+### 텍스처 아틀라스 시스템 (v0.1.22~)
+
+```java
+// core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java
+public class PuyoRenderer implements Disposable {
+    // 7색 × 3변형 = 21개 스프라이트를 단일 아틀라스에 통합
+    // PuyoColor: RED, GREEN, BLUE, YELLOW, PURPLE, OJAMA, HARD
+    // Variant: 기본, 하이라이트링, 팝용
+    
+    // 환경별 로드 전략
+    // - Production (PRD/Android): classpath만 (core/resources/assets/)
+    // - Development (Desktop): local 우선 → classpath → 생성
+}
+```
+
+**아틀라스 파일 구조:**
+```
+core/src/main/resources/assets/
+├── puyo_atlas.png      # 200×464, 7색 × 3변형 (64×64 each, 2px padding)
+└── puyo_atlas.atlas    # libGDX TextureAtlas 포맷 메타데이터
+```
+
+**장점:**
+- 드로우콜 감소: 수십 개 뿌요 → 1회 SpriteBatch로 배치 처리
+- 메모리 효율: 단일 텍스처 바인딩
+- 확장성: 아티스트 교체 시 PNG만 교체하면 됨
+- 표준 포맷: TexturePacker로 생성 가능
+
 ### 가상 해상도 시스템 (가로 고정 1600×960)
 
 ```java

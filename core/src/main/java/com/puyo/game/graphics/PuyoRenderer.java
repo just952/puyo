@@ -34,14 +34,50 @@ public class PuyoRenderer implements Disposable {
     private boolean disposed = false;
 
     public PuyoRenderer() {
-        // 1순위: classpath에서 로드 (core/resources/assets, 배포용)
-        // 2순위: 로컬 파일에서 로드 (데스크톱 개발용, 핫리로드)
-        // 3순위: 생성 후 로컬 저장 (최초 실행 시)
-        if (!loadFromClasspath()) {
+        // 환경에 따른 로드 전략 분기
+        if (isProductionEnvironment()) {
+            // PRD/안드로이드: classpath만 사용 (읽기 전용, 배포용)
+            loadFromClasspathOrThrow();
+        } else {
+            // DEV/데스크톱: local 우선 (핫리로드), 없으면 classpath, 없으면 생성
             if (!loadFromLocal()) {
-                generateAtlas();
-                saveToLocal(); // 개발 환경에서만 저장
+                if (!loadFromClasspath()) {
+                    generateAtlas();
+                    saveToLocal();
+                }
             }
+        }
+    }
+
+    /**
+     * 프로덕션 환경 여부 판단
+     * - 안드로이드: 무조건 프로덕션
+     * - 데스크톱: 시스템 프로퍼티 puyo.env=production|prd 면 프로덕션
+     */
+    private boolean isProductionEnvironment() {
+        // 안드로이드는 무조건 프로덕션
+        if (Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android) {
+            return true;
+        }
+        // 데스크톱: 시스템 프로퍼티로 제어 (기본값 development)
+        String env = System.getProperty("puyo.env", "development");
+        return "production".equalsIgnoreCase(env) || "prd".equalsIgnoreCase(env);
+    }
+
+    /**
+     * Classpath에서 로드 (실패 시 예외 발생 - 프로덕션용)
+     */
+    private void loadFromClasspathOrThrow() {
+        try {
+            if (!Gdx.files.internal(ATLAS_PATH).exists()) {
+                throw new IllegalStateException("Production atlas not found in classpath: " + ATLAS_PATH);
+            }
+            textureAtlas = new TextureAtlas(Gdx.files.internal(ATLAS_PATH));
+            initRegionsFromAtlas();
+            Gdx.app.log("PuyoRenderer", "Loaded atlas from classpath (production): " + ATLAS_PATH);
+        } catch (Exception e) {
+            Gdx.app.error("PuyoRenderer", "Failed to load production atlas", e);
+            throw new RuntimeException("Production atlas load failed", e);
         }
     }
 

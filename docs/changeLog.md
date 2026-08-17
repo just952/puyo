@@ -4,6 +4,59 @@
 
 ---
 
+## v0.1.22 (2026-08-17) - **텍스처 아틀라스 시스템 구축 + 환경별 로드 전략 (PRD/DEV 분기)**
+
+### 배경
+- ShapeRenderer.circle()으로 매 프레임 원을 그리는 방식은 드로우콜이 많아 비효율적
+- 아틀라스 파일이 desktop/assets/에만 있어 android 모듈에서 공유 불가
+- 개발 시 핫리로드(이미지 수정→즉시 반영) 지원 필요
+
+### 해결
+1. **PuyoRenderer 신규 생성** - SpriteBatch + 텍스처 아틀라스 기반 렌더링
+   - 7색 × 3변형(기본/하이라이트/팝) = 21개 스프라이트를 단일 200×464 아틀라스에 통합
+   - 런타임 Pixmap 생성 → 파일 저장 → 이후 실행 시 로드
+   - 팝 애니메이션 스케일(0~1) 지원
+
+2. **아틀라스 파일 core 모듈 공통 리소스로 이동**
+   - `core/src/main/resources/assets/puyo_atlas.png`
+   - `core/src/main/resources/assets/puyo_atlas.atlas`
+   - desktop, android 모두 classpath에서 접근 가능
+
+3. **환경별 로드 전략 분기**
+   ```java
+   // Production (PRD/Android): classpath만 (읽기 전용)
+   // Development (Desktop): local 우선 → classpath → 생성
+   ```
+   - 시스템 프로퍼티 `puyo.env=production|prd` 로 제어
+   - 안드로이드는 자동 감지하여 프로덕션 모드
+
+4. **Gradle 빌드 설정 추가** (desktop/build.gradle → root build.gradle)
+   - `applicationDefaultJvmArgs = ["-Dpuyo.env=${System.getProperty('puyo.env', 'development')}"]`
+
+### 실행 방법
+| 모드 | 명령어 | 로그 |
+|------|--------|------|
+| 개발 (핫리로드) | `./gradlew :desktop:run` | `Loaded atlas from local: assets/puyo_atlas.atlas` |
+| 프로덕션 테스트 | `./gradlew :desktop:run "-Dpuyo.env=production"` | `Loaded atlas from classpath (production): assets/puyo_atlas.atlas` |
+| 안드로이드 | 자동 | classpath만 사용 |
+
+### 검증 결과
+- 개발 모드: 로컬 파일 로드 (핫리로드 작동) ✅
+- 프로덕션 모드: classpath 로드 (desktop/assets 없어도 작동) ✅
+- 안드로이드: 자동 프로덕션 모드 감지 ✅
+- BUILD SUCCESSFUL ✅
+- 게임 플레이 정상 (연쇄, 분리, 락딜레이, 팝 애니메이션) ✅
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java` | **신규** | 텍스처 아틀라스 렌더러, 환경별 로드 전략 |
+| `core/src/main/resources/assets/puyo_atlas.png` | **신규** | 아틀라스 이미지 (200×464) |
+| `core/src/main/resources/assets/puyo_atlas.atlas` | **신규** | 아틀라스 메타데이터 (libGDX 포맷) |
+| `build.gradle` | 수정 | desktop 모듈 JVM 아규먼트 전달 추가 |
+
+---
+
 ## v0.1.21 (2026-08-16) - **소프트 드롭 SEPARATION 경유 수정 + InputHandler DAS/ARR 단일 카운터 통합 + ChainManager 신규**
 
 ### 배경

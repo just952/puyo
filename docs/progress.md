@@ -79,6 +79,8 @@
 | **소프트 드롭 수정** | **착지 시 SEPARATION 페이즈 경유 (락딜레이 우회하되 분리 체크)**     | **완료** | v0.1.21 (2026-08-16), 분리 가능 시 실행, 불가 시 일반 잠금            |
 | **InputHandler 리팩토링** | **DAS/ARR 단일 카운터 통합 (6개→3개 변수)**                       | **완료** | v0.1.21 (2026-08-16), anyPressed 플래그로 키 개수 무관 O(1) 처리     |
 | **ChainManager 신규** | **연쇄 상태 캡슐화 (LockDelayManager 패턴)**                          | **완료** | v0.1.21 (2026-08-16), chainCount/currentGroups 관리                  |
+| | **텍스처 아틀라스 전환** | **ShapeRenderer → SpriteBatch + 텍스처 아틀라스**                   | **완료** | v0.1.22 (2026-08-17), 런타임 생성→파일 저장/로드, core/assets 이동   |
+| | **아틀라스 환경별 로드** | **PRD=classpath, DEV=local 우선 (핫리로드)**                        | **완료** | v0.1.22 (2026-08-17), -Dpuyo.env=production 으로 제어                 |
 
 ---
 

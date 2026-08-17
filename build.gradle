@@ -67,6 +67,10 @@ project(":desktop") {
 
     application {
         mainClass = "com.puyo.game.DesktopLauncher"
+        // JVM 시스템 프로퍼티 전달 (puyo.env 등)
+        applicationDefaultJvmArgs = [
+            "-Dpuyo.env=${System.getProperty('puyo.env', 'development')}"
+        ]
     }
 
     dependencies {
