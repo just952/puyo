@@ -20,6 +20,7 @@ import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.story.StageData;
 import com.puyo.game.config.GameViewport;
 import com.puyo.game.graphics.FontManager;
+import com.puyo.game.graphics.PuyoRenderer;
 import com.puyo.game.input.InputHandler;
 import com.puyo.game.input.TouchController;
 
@@ -32,6 +33,7 @@ public class PlayScreen extends BaseScreen {
     private ShapeRenderer shapeRenderer;
     private SpriteBatch batch;
     private final FontManager fontManager;
+    private final PuyoRenderer puyoRenderer;
     private InputHandler inputHandler;
 
     public PlayScreen(PuyoGame game, GameMode mode) {
@@ -45,6 +47,7 @@ public class PlayScreen extends BaseScreen {
         this.storyManager = (mode == GameMode.NORMAL) ? new StoryModeManager(storyStageIndex) : null;
         this.gameWorld = new GameWorld();
         this.fontManager = FontManager.getInstance();
+        this.puyoRenderer = new PuyoRenderer();
     }
 
     @Override
@@ -249,26 +252,14 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawPuyo(Puyo puyo, float x, float y) {
-        Color color = getColorForPuyo(puyo.getColor());
         float scale = puyo.getPopScale(); // 팝 애니메이션 스케일 적용
-        float radius = (GameViewport.CELL_SIZE / 2f - 2) * scale;
-
+        
         // 스케일이 0이면 그리지 않음 (완전히 사라짐)
-        if (radius <= 0)
+        if (scale <= 0)
             return;
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(color);
-        shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f,
-                radius);
-        shapeRenderer.end();
-
-        // Draw highlight
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(Color.WHITE);
-        shapeRenderer.circle(x + GameViewport.CELL_SIZE / 2f, y + GameViewport.CELL_SIZE / 2f,
-                radius);
-        shapeRenderer.end();
+        // PuyoRenderer를 사용하여 SpriteBatch로 그리기
+        puyoRenderer.draw(batch, puyo.getColor(), x, y, GameViewport.CELL_SIZE, scale);
     }
 
     private void drawUI() {
@@ -422,6 +413,8 @@ public class PlayScreen extends BaseScreen {
             shapeRenderer.dispose();
         if (batch != null)
             batch.dispose();
+        if (puyoRenderer != null)
+            puyoRenderer.dispose();
         // 폰트는 FontManager가 관리하므로 여기서 dispose 하지 않음
     }
 }

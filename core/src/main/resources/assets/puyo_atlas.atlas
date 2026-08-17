@@ -1,0 +1,151 @@
+puyo_atlas.png
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+red
+  rotate: false
+  xy: 2, 2
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+red_highlight
+  rotate: false
+  xy: 68, 2
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+red_pop
+  rotate: false
+  xy: 134, 2
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+green
+  rotate: false
+  xy: 2, 68
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+green_highlight
+  rotate: false
+  xy: 68, 68
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+green_pop
+  rotate: false
+  xy: 134, 68
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+blue
+  rotate: false
+  xy: 2, 134
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+blue_highlight
+  rotate: false
+  xy: 68, 134
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+blue_pop
+  rotate: false
+  xy: 134, 134
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+yellow
+  rotate: false
+  xy: 2, 200
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+yellow_highlight
+  rotate: false
+  xy: 68, 200
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+yellow_pop
+  rotate: false
+  xy: 134, 200
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+purple
+  rotate: false
+  xy: 2, 266
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+purple_highlight
+  rotate: false
+  xy: 68, 266
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+purple_pop
+  rotate: false
+  xy: 134, 266
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+ojama
+  rotate: false
+  xy: 2, 332
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+ojama_highlight
+  rotate: false
+  xy: 68, 332
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+ojama_pop
+  rotate: false
+  xy: 134, 332
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+hard
+  rotate: false
+  xy: 2, 398
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+hard_highlight
+  rotate: false
+  xy: 68, 398
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
+hard_pop
+  rotate: false
+  xy: 134, 398
+  size: 64, 64
+  orig: 64, 64
+  offset: 0, 0
+  index: -1
