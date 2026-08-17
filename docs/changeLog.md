@@ -4,6 +4,131 @@
 
 ---
 
+## v0.1.23 (2026-08-17) - **뿌요 연결 효과 시스템 구축 + 아틀라스 방향 매핑 수정 + 연결 다리 캡 제거**
+
+### 배경
+- 텍스처 아틀라스 시스템(v0.1.22) 구축 후, 인접한 동일 색상 뿌요 간 시각적 연결 효과 필요
+- 기존 아틀라스(7색 × 3변형 = 21개)로는 연결 상태 표현 불가
+- 프로그래머 모드(기본+오버레이)와 디자이너 모드(15가지 완성형) 하이브리드 지원 필요
+
+### 해결
+1. **PuyoConnectState enum 신규 생성** - 16가지 연결 상태(NONE + 15가지 방향 조합)를 비트마스크로 표현
+   - `fromBoard(Board, x, y, color)` 정적 메서드로 렌더링 시점 자동 계산
+   - Puyo 클래스에 상태 저장하지 않음 (단일 책임 유지)
+
+2. **Board.java 확장** - `hasSameColorAt(x, y, color)` 메서드 추가로 인접 뿌요 색상 체크
+
+3. **PuyoRenderer 하이브리드 모드 지원** - 아틀라스 내용 자동 감지하여 모드 전환
+   - **디자이너 모드**: `red_up`, `red_down` 등 15가지 완성형 이미지 사용
+   - **프로그래머 모드**: 기본 뿌요 + 방향별 오버레이 4개(UP/DOWN/LEFT/RIGHT) 런타임 합성
+   - `initRegionsFromAtlas()`에서 `checkDesignerMode()`로 자동 감지
+
+4. **아틀라스 생성 확대** - `generateAtlas()` 7개 변형/색상 생성 (기본3 + 오버레이4)
+   - `drawConnectOverlay()`: 뿌요 내부 가장자리(innerRadius)에서 스프라이트 경계까지 직사각형 다리 그리기
+   - 두께: `innerRadius * 0.7f` (70%), 하이라이트 추가
+
+5. **연결 렌더링 `drawConnected()`** - 하이브리드 분기 처리
+   - 디자이너 모드: 완성된 15가지 상태 이미지 바로 사용
+   - 프로그래머 모드: 기본 뿌요 + 4방향 오버레이 합성
+
+6. **아틀라스 방향 매핑 수정** - Pixmap 좌표계(0,0=좌상단) 기준 UP/DOWN/LEFT/RIGHT 정정
+   - UP: 뿌요 위쪽 가장자리(centerY - innerRadius) → 스프라이트 상단(y=0)
+   - DOWN: 뿌요 아래쪽 가장자리(centerY + innerRadius) → 스프라이트 하단(y+size)
+   - LEFT/RIGHT 동일하게 수정
+
+7. **연결 다리 캡(반원) 제거** - 직사각형만으로 단순화
+   - 캡 제거로 스프라이트 경계 침범 문제 자동 해결
+   - 두 스프라이트가 중간에서 직사각형으로 자연스럽게 연결
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **단위 테스트**: 6/6 통과 ✅
+- **데스크톱 실행**: 4분+ 크래시 없음 ✅
+- **연쇄 시스템**: chainCount=2 정상 작동 ✅
+- **아틀라스 메타데이터**: 방향 이름이 시각적 방향과 일치 ✅
+  - `red_overlay_up` → 위쪽 연결 다리 이미지
+  - `red_overlay_down` → 아래쪽 연결 다리 이미지
+  - `red_overlay_left` → 왼쪽 연결 다리 이미지
+  - `red_overlay_right` → 오른쪽 연결 다리 이미지
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/graphics/PuyoConnectState.java` | **신규** | 16가지 연결 상태 비트마스크 Enum |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 수정 | `hasSameColorAt(x, y, color)` 메서드 추가 |
+| `core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java` | 대폭 수정 | 하이브리드 모드, `drawConnectOverlay()` 캡 없는 직사각형, 방향 매핑 수정 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | 수정 | `drawBoard()`에서 `drawConnected()` 호출 |
+| `desktop/assets/puyo_atlas.*` | 재생성 | 464x464 (7 variants/color) 자동 재생성 |
+
+---
+
+## v0.1.22 (2026-08-17) - **히든 보드 영역(14행) 확장 적용 + 고스트 뿌요 충돌 무시 버그 수정**
+# Puyo Puyo 2 - 변경 이력 (ChangeLog)
+
+## 버전별 변경 이력
+
+---
+
+## v0.1.23 (2026-08-17) - **뿌요 연결 효과 시스템 구축 + 아틀라스 방향 매핑 수정 + 연결 다리 캡 제거**
+
+### 배경
+- 텍스처 아틀라스 시스템(v0.1.22) 구축 후, 인접한 동일 색상 뿌요 간 시각적 연결 효과 필요
+- 기존 아틀라스(7색 × 3변형 = 21개)로는 연결 상태 표현 불가
+- 프로그래머 모드(기본+오버레이)와 디자이너 모드(15가지 완성형) 하이브리드 지원 필요
+
+### 해결
+1. **PuyoConnectState enum 신규 생성** - 16가지 연결 상태(NONE + 15가지 방향 조합)를 비트마스크로 표현
+   - `fromBoard(Board, x, y, color)` 정적 메서드로 렌더링 시점 자동 계산
+   - Puyo 클래스에 상태 저장하지 않음 (단일 책임 유지)
+
+2. **Board.java 확장** - `hasSameColorAt(x, y, color)` 메서드 추가로 인접 뿌요 색상 체크
+
+3. **PuyoRenderer 하이브리드 모드 지원** - 아틀라스 내용 자동 감지하여 모드 전환
+   - **디자이너 모드**: `red_up`, `red_down` 등 15가지 완성형 이미지 사용
+   - **프로그래머 모드**: 기본 뿌요 + 방향별 오버레이 4개(UP/DOWN/LEFT/RIGHT) 런타임 합성
+   - `initRegionsFromAtlas()`에서 `checkDesignerMode()`로 자동 감지
+
+4. **아틀라스 생성 확대** - `generateAtlas()` 7개 변형/색상 생성 (기본3 + 오버레이4)
+   - `drawConnectOverlay()`: 뿌요 내부 가장자리(innerRadius)에서 스프라이트 경계까지 직사각형 다리 그리기
+   - 두께: `innerRadius * 0.7f` (70%), 하이라이트 추가
+
+5. **연결 렌더링 `drawConnected()`** - 하이브리드 분기 처리
+   - 디자이너 모드: 완성된 15가지 상태 이미지 바로 사용
+   - 프로그래머 모드: 기본 뿌요 + 4방향 오버레이 합성
+
+6. **아틀라스 방향 매핑 수정** - Pixmap 좌표계(0,0=좌상단) 기준 UP/DOWN/LEFT/RIGHT 정정
+   - UP: 뿌요 위쪽 가장자리(centerY - innerRadius) → 스프라이트 상단(y=0)
+   - DOWN: 뿌요 아래쪽 가장자리(centerY + innerRadius) → 스프라이트 하단(y+size)
+   - LEFT/RIGHT 동일하게 수정
+
+7. **연결 다리 캡(반원) 제거** - 직사각형만으로 단순화
+   - 캡 제거로 스프라이트 경계 침범 문제 자동 해결
+   - 두 스프라이트가 중간에서 직사각형으로 자연스럽게 연결
+
+### 검증 결과
+- **컴파일 성공** ✅
+- **단위 테스트**: 6/6 통과 ✅
+- **데스크톱 실행**: 4분+ 크래시 없음 ✅
+- **연쇄 시스템**: chainCount=2 정상 작동 ✅
+- **아틀라스 메타데이터**: 방향 이름이 시각적 방향과 일치 ✅
+  - `red_overlay_up` → 위쪽 연결 다리 이미지
+  - `red_overlay_down` → 아래쪽 연결 다리 이미지
+  - `red_overlay_left` → 왼쪽 연결 다리 이미지
+  - `red_overlay_right` → 오른쪽 연결 다리 이미지
+
+### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `core/src/main/java/com/puyo/game/graphics/PuyoConnectState.java` | **신규** | 16가지 연결 상태 비트마스크 Enum |
+| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 수정 | `hasSameColorAt(x, y, color)` 메서드 추가 |
+| `core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java` | 대폭 수정 | 하이브리드 모드, `drawConnectOverlay()` 캡 없는 직사각형, 방향 매핑 수정 |
+| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | 수정 | `drawBoard()`에서 `drawConnected()` 호출 |
+| `desktop/assets/puyo_atlas.*` | 재생성 | 464x464 (7 variants/color) 자동 재생성 |
+
+---
+
+## v0.1.22 (2026-08-17) - **히든 보드 영역(14행) 확장 적용 + 고스트 뿌요 충돌 무시 버그 수정**
+
 ## v0.1.22 (2026-08-17) - **텍스처 아틀라스 시스템 구축 + 환경별 로드 전략 (PRD/DEV 분기)**
 
 ### 배경

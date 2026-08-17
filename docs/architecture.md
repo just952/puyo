@@ -180,9 +180,14 @@ SPAWNING
 ```java
 // core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java
 public class PuyoRenderer implements Disposable {
-    // 7색 × 3변형 = 21개 스프라이트를 단일 아틀라스에 통합
+    // 7색 × 7변형 = 49개 스프라이트를 단일 아틀라스에 통합 (v0.1.23~)
     // PuyoColor: RED, GREEN, BLUE, YELLOW, PURPLE, OJAMA, HARD
-    // Variant: 기본, 하이라이트링, 팝용
+    // Variant (프로그래머 모드): 기본, 하이라이트링, 팝용, 오버레이_상/하/좌/우 (7개)
+    // 연결 상태 (디자이너 모드): 16가지 (NONE + 15가지 방향 조합)
+    
+    // 하이브리드 모드 지원
+    // - 디자이너 모드: 아틀라스에 15가지 완성형 이미지 존재 시 자동 감지 (red_up, red_down, red_up_down 등)
+    // - 프로그래머 모드: 기본 뿌요 + 방향별 오버레이 4개 런타임 합성
     
     // 환경별 로드 전략
     // - Production (PRD/Android): classpath만 (core/resources/assets/)
@@ -193,7 +198,7 @@ public class PuyoRenderer implements Disposable {
 **아틀라스 파일 구조:**
 ```
 core/src/main/resources/assets/
-├── puyo_atlas.png      # 200×464, 7색 × 3변형 (64×64 each, 2px padding)
+├── puyo_atlas.png      # 464×464, 7색 × 7변형 (64×64 each, 2px padding) v0.1.23~
 └── puyo_atlas.atlas    # libGDX TextureAtlas 포맷 메타데이터
 ```
 
@@ -202,6 +207,7 @@ core/src/main/resources/assets/
 - 메모리 효율: 단일 텍스처 바인딩
 - 확장성: 아티스트 교체 시 PNG만 교체하면 됨
 - 표준 포맷: TexturePacker로 생성 가능
+- **하이브리드 지원**: 프로그래머 아트 → 디자이너 에셋 코드 수정 없이 교체 가능
 
 ### 가상 해상도 시스템 (가로 고정 1600×960)
 

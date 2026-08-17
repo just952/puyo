@@ -81,6 +81,9 @@
 | **ChainManager 신규** | **연쇄 상태 캡슐화 (LockDelayManager 패턴)**                          | **완료** | v0.1.21 (2026-08-16), chainCount/currentGroups 관리                  |
 | | **텍스처 아틀라스 전환** | **ShapeRenderer → SpriteBatch + 텍스처 아틀라스**                   | **완료** | v0.1.22 (2026-08-17), 런타임 생성→파일 저장/로드, core/assets 이동   |
 | | **아틀라스 환경별 로드** | **PRD=classpath, DEV=local 우선 (핫리로드)**                        | **완료** | v0.1.22 (2026-08-17), -Dpuyo.env=production 으로 제어                 |
+| **연결 효과 시스템** | **PuyoConnectState enum, 인접 동일색 감지, SpriteBatch 합성 렌더링**  | **완료** | v0.1.23 (2026-08-17), 15가지 연결 상태, 캡 없는 직사각형 다리        |
+| | **아틀라스 방향 매핑 수정** | **overlay_up/down/left/right 시각적 방향과 일치**                   | **완료** | v0.1.23 (2026-08-17), Pixmap 좌표계 기준 UP/DOWN/LEFT/RIGHT 정정      |
+| | **연결 다리 캡 제거** | **캡(반원) 제거, 직사각형만으로 단순화**                              | **완료** | v0.1.23 (2026-08-17), 두 스프라이트 중간에서 자연스럽게 연결           |
 
 ---
 
