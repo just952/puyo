@@ -30,7 +30,7 @@ public class InputHandler implements InputProcessor {
 
     // DAS (Delayed Auto Shift) / ARR (Auto Repeat Rate) 설정
     // 60fps 기준 프레임 단위
-    private static final int DAS_DELAY_FRAMES = 16; // 초기 지연: ~0.27초 (16프레임)
+    private static final int DAS_DELAY_FRAMES = 10; // 초기 지연: ~0.27초 (16프레임)
     private static final int ARR_INTERVAL_FRAMES = 2; // 반복 주기: 2프레임마다 (초당 30회)
 
     // DAS/ARR 추적용 상태 (단일 카운터로 통합)
