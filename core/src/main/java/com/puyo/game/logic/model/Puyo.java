@@ -5,6 +5,7 @@ public class Puyo {
     private int x;
     private int y;
     private boolean alive = true;
+    private boolean inMiddle = false;
 
     // 애니메이션 상태
     private enum PopState {
@@ -20,6 +21,7 @@ public class Puyo {
         this.color = color;
         this.x = x;
         this.y = y;
+        this.inMiddle=false;
     }
 
     public PuyoColor getColor() {
@@ -105,7 +107,13 @@ public class Puyo {
      * 단일 뿌요 아래로 이동 (분리 낙하용)
      */
     public void moveDown() {
-        this.y--;
+        if ( inMiddle ) this.y--;
+
+        inMiddle=!inMiddle;
+    }
+
+    public boolean getInMiddle() {
+        return inMiddle;
     }
 
     @Override

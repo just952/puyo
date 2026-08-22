@@ -33,7 +33,9 @@ puyo/
 │   │   │   ├── ConfigManager.java        # 설정 관리 (JSON 기반)
 │   │   │   └── GameViewport.java         # 가상 해상도 1600x960, FitViewport 팩토리
 │   │   ├── graphics/
-│   │   │   └── FontManager.java          # FreeTypeFontGenerator 한글 폰트 관리
+│   │   │   ├── FontManager.java          # FreeTypeFontGenerator 한글 폰트 관리
+│   │   │   ├── PuyoConnectState.java     # 뿌요 연결 상태 enum (v0.1.23~)
+│   │   │   └── PuyoRenderer.java         # SpriteBatch + 아틀라스 렌더러 (v0.1.22~)
 │   │   ├── input/
 │   │   │   ├── InputHandler.java         # 키보드/터치 통합 입력 처리
 │   │   │   └── TouchController.java      # 모바일 4버튼 터치 컨트롤러
@@ -50,7 +52,7 @@ puyo/
 │   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
 │   │   │   └── model/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
-│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, 팝 애니메이션)
+│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, 팝 애니메이션, inMiddle 반칸 상태 v0.1.24~)
 │   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
 │   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
 │   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)
@@ -105,7 +107,7 @@ puyo/
 
 ---
 
-## 엔진 모듈 구조 (v0.1.21~)
+## 엔진 모듈 구조 (v0.1.24~)
 
 | 클래스 | 책임 | 비고 |
 |--------|------|------|
@@ -116,6 +118,8 @@ puyo/
 | `LockDelayManager` | 락 딜레이 타이머/이동 카운트 | Tsu 규칙: 0.5초, 15회 이동 제한. stateful 클래스 (`activate`, `deactivate`, `resetTimerAndMoves`, `recordTime`, `recordMove`, `shouldLock`) |
 | `ChainManager` | 연쇄 상태 관리 (chainCount, currentGroups) | `LockDelayManager` 패턴 적용. `startNewChain`, `findChains`, `getCurrentGroups`, `getChainCount`, `clearCurrentGroups`, `isChaining`, `isChainEnded` |
 | `PuyoPairGenerator` | 랜덤 PuyoPair 생성 | 스폰 위치 설정 포함 |
+
+**주요 변경 (v0.1.24)**: **반칸 단위 부드러운 낙하 구현** - `Puyo.inMiddle` 토글 방식으로 모든 낙하 경로(자동/소프트/하드/분리/부유) 자동 적용, 아키텍처 변경 최소화 (3파일만 수정)
 
 **주요 변경 (v0.1.21)**: 
 - `softDrop()` 착지 시 `SEPARATION` 페이즈 경유 (락딜레이 우회하되 분리 체크 수행)
@@ -170,6 +174,119 @@ SPAWNING
 | 회전 | ✅ | ✅ | ❌ | ❌ | ❌ |
 | 하드 드롭 | ✅ | ✅ | ❌ | ❌ | ❌ |
 | 소프트 드롭 | ✅ | ✅ (recordLockDelayMove) | ❌ | ❌ | ❌ |
+
+---
+
+## 반칸 단위 부드러운 낙하 아키텍처 (v0.1.24~)
+
+### 핵심 설계: Puyo 모델 중심의 상태 캡슐화
+
+```java
+// core/src/main/java/com/puyo/game/logic/model/Puyo.java
+public class Puyo {
+    private boolean inMiddle = false;  // 반칸 상태 플래그
+    
+    /**
+     * 아래로 이동 (분리 낙하용)
+     * 정수칸 ↔ 반칸 자동 토글
+     */
+    public void moveDown() {
+        if (inMiddle) this.y--;  // 반칸 상태에서만 실제 y 감소
+        inMiddle = !inMiddle;    // 매 호출마다 토글
+    }
+    
+    public boolean getInMiddle() {
+        return inMiddle;
+    }
+}
+```
+
+### 작동 원리
+
+```
+스폰(y=12, inMiddle=false) - 정수칸
+  ↓ moveDown() 1회 호출
+y=12, inMiddle=true  - 시각적 위치 11.5 (반칸 아래)
+  ↓ moveDown() 2회 호출  
+y=11, inMiddle=false - 시각적 위치 11.0 (정수칸 착지)
+  ↓ ... 반복
+```
+
+- **짝수 번 `moveDown()` 호출 후 항상 `inMiddle=false`로 정수칸 착지 보장**
+- 스폰 위치(y=12)에서 바닥(y=0)까지 12칸 = 24회 호출 → `inMiddle=false`
+- 어떤 정수 높이에서 착지해도 이동 횟수는 항상 짝수 → **`inMiddle=false` 확정**
+
+### 자동 적용되는 낙하 경로 (GameWorld 무수정)
+
+| 낙하 경로 | 메서드 | moveDown() 호출 | 비고 |
+|-----------|--------|-----------------|------|
+| 기본 자동 낙하 | `handleFallingAuto()` | `currentPair.moveDown()` | 0.5초마다 1회 |
+| 소프트 드롭 | `softDrop()` | `currentPair.moveDown()` | 키 홀드 시 매 프레임 |
+| 하드 드롭 | `hardDrop()` | `while(canFall()) moveDown()` | 루프로 즉시 바닥까지 |
+| 분리/부유 낙하 | `updateFallingAnimation()` | `fp.puyo.moveDown()` | 0.05초마다 열 단위 |
+
+### 충돌 체크 확장 (Board.java)
+
+```java
+// core/src/main/java/com/puyo/game/logic/model/Board.java
+public boolean isEmpty(int x, int y, boolean checkBelow) {
+    if (checkBelow) y--;  // 반칸 상태면 아래칸 기준
+    return isInside(x, y) && getPuyoAt(x, y) == null;
+}
+
+// 좌우 이동 시
+public boolean canMoveLeft(PuyoPair pair) {
+    for (Puyo p : pair.getPuyos()) {
+        if (!isEmpty(p.getX() - 1, p.getY(), p.getInMiddle())) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// 회전 시 (벽킥 포함)
+public boolean canPlace(PuyoPair pair) {
+    for (Puyo p : pair.getPuyos()) {
+        if (!isEmpty(p.getX(), p.getY(), p.getInMiddle())) {
+            return false;
+        }
+    }
+    return true;
+}
+```
+
+- **반칸 상태(`inMiddle=true`) 시 아래칸(y-1) 기준 옆면/회전 충돌 체크**
+- 시각적으로 반칸 걸쳐 있을 때 실제 장애물은 한 칸 아래에 있음
+- 정수칸 상태(`inMiddle=false`) 시 기존 로직 그대로 적용
+
+### 렌더링 오프셋 (PlayScreen.java)
+
+```java
+// core/src/main/java/com/puyo/game/screens/PlayScreen.java
+private void drawPuyo(Puyo puyo, float x, float y) {
+    float scale = puyo.getPopScale();
+    if (scale <= 0) return;
+    
+    // 반칸 상태 시 절반 셀 크기만큼 아래로 오프셋
+    float offsetY = puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0;
+    puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, scale);
+}
+```
+
+- **렌더링만 반칸 아래로 그림, 로직 좌표는 정수 유지**
+- 보드에 고정된 뿌요들은 `inMiddle=false`이므로 영향 없음
+- `drawFallingPuyos()`도 동일 로직 적용 (분리/부유 낙하 포함)
+
+### 효과 및 장점
+
+| 측면 | 효과 |
+|------|------|
+| **시각적 품질** | 원작 같은 부드러운 낙하 애니메이션 (1초/1칸) |
+| **조작감** | 반칸 상태에서 좌우/회전 시 자연스러운 충돌 판정 |
+| **아키텍처** | GameWorld/상태머신/매니저 클래스 **무수정** |
+| **코드 변경** | **단 3파일**(Puyo, Board, PlayScreen) 최소 수정 |
+| **확장성** | 분리/부유/연쇄 낙하 모두 자동 적용 |
+| **안전성** | 착지 시점 `inMiddle=false` 보장으로 락딜레이/고정 로직 안전 |
 
 ---
 
@@ -339,7 +456,7 @@ config.setForegroundFPS(60);
 | `LoadingScreen`         | ✅          | ShapeRenderer + 카메라 프로젝션       |
 | `MenuScreen`            | ✅          | ShapeRenderer + 중앙 정렬 텍스트      |
 | `StoryModeSelectScreen` | ✅          | ShapeRenderer + 그리드 레이아웃       |
-| `PlayScreen`            | ✅          | ShapeRenderer + 가상 좌표계 보드/뿌요 |
+| `PlayScreen`            | ✅          | SpriteBatch + 아틀라스 + 반칸 오프셋  |
 
 ---
 
@@ -565,8 +682,8 @@ PlayScreen.render(delta)
 │
 └── render()               // 렌더링
     ├── drawBoard()        // 고정된 뿌요들
-    ├── drawCurrentPair()  // 현재 떨어지는 쌍
-    ├── drawFallingSinglePuyo()  // 분리된 단일 뿌요
+    ├── drawCurrentPair()  // 현재 떨어지는 쌍 (반칸 오프셋 적용)
+    ├── drawFallingPuyos() // 분리/부유 뿌요 (반칸 오프셋 적용)
     ├── drawNextPair()     // 다음 뿌요 프리뷰
     └── drawUI()           // 점수, 연쇄, 스테이지 등
 ```
@@ -621,7 +738,7 @@ private void handleFallingAuto(float delta) {
     if (fallTimer >= fallInterval) {
         fallTimer = 0f;
         if (canFall()) {
-            currentPair.moveDown();
+            currentPair.moveDown();  // → Puyo.moveDown() 경유로 반칸 토글 자동 적용
             // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
         } else {
             // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
@@ -722,8 +839,8 @@ public void render(float delta) {
 
     // 4. 그리기 (백버퍼에 기록)
     drawBoard();              // 고정된 뿌요들
-    drawCurrentPair();        // 현재 떨어지는 쌍
-    drawFallingSinglePuyo();  // 분리된 단일 뿌요
+    drawCurrentPair();        // 현재 떨어지는 쌍 (반칸 오프셋)
+    drawFallingPuyos();       // 분리/부유 뿌요 (반칸 오프셋)
     drawNextPair();           // 다음 뿌요 프리뷰
     drawUI();                 // 점수, 연쇄, 스테이지 등
 
@@ -752,12 +869,13 @@ if (inputHandler.isEnterPressed()) {
 | 구분            | 내용                                                                         |
 | --------------- | ---------------------------------------------------------------------------- |
 | **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `update()` + `render()`            |
-| **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어                      |
+| **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어 (반칸 토글로 1초/1칸) |
 | **입력 처리**   | `InputHandler`가 키보드/터치 통합, `update()`에서 엣지 감지, **페이즈 기반 허용 제어** |
 | **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유, **GamePhase 11단계** |
 | **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.05s)   |
 | **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙), **stateful Manager** |
 | **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복                          |
-| **렌더링**      | `ShapeRenderer` + `SpriteBatch`, `FitViewport`로 가상 해상도(1600×960) 유지  |
+| **반칸 낙하**   | `Puyo.inMiddle` 토글로 모든 낙하 경로 자동 부드러운 이동 (v0.1.24~)          |
+| **렌더링**      | `SpriteBatch` + 아틀라스, `FitViewport`로 가상 해상도(1600×960) 유지         |
 | **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑)                                 |
 | **Screen 전환** | `Game.setScreen()` → hide/dispose → show/initViewport → 다음 프레임부터 적용 |

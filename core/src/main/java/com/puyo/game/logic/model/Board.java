@@ -50,7 +50,8 @@ public class Board {
         }
     }
 
-    public boolean isEmpty(int x, int y) {
+    public boolean isEmpty(int x, int y, boolean checkBelow) {
+        if (checkBelow) y--;
         return isInside(x, y) && getPuyoAt(x, y) == null;
     }
 
@@ -73,7 +74,7 @@ public class Board {
 
     public boolean canMoveLeft(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX() - 1, p.getY())) {
+            if (!isEmpty(p.getX() - 1, p.getY(), p.getInMiddle())) {
                 return false;
             }
         }
@@ -82,7 +83,7 @@ public class Board {
 
     public boolean canMoveRight(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX() + 1, p.getY())) {
+            if (!isEmpty(p.getX() + 1, p.getY(), p.getInMiddle())) {
                 return false;
             }
         }
@@ -91,7 +92,7 @@ public class Board {
 
     public boolean canMoveDown(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX(), p.getY() - 1)) {
+            if (!isEmpty(p.getX(), p.getY(), true)) {
                 return false;
             }
         }
@@ -103,16 +104,7 @@ public class Board {
      * 전체 보드 기준 체크.
      */
     public boolean canMoveDown(Puyo p) {
-        return isEmpty(p.getX(), p.getY() - 1);
-    }
-
-    /**
-     * 지정된 위치에 같은 색상의 살아있는 뿌요가 있는지 확인
-     * 연결 렌더링용
-     */
-    public boolean hasSameColorAt(int x, int y, PuyoColor color) {
-        Puyo p = getPuyoAt(x, y);
-        return p != null && p.isAlive() && p.getColor() == color;
+        return isEmpty(p.getX(), p.getY(), true);
     }
 
     /**
@@ -124,13 +116,23 @@ public class Board {
      */
     public boolean canPlace(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
-            if (!isEmpty(p.getX(), p.getY())) {
+            if (!isEmpty(p.getX(), p.getY(), p.getInMiddle())) {
                 return false;
             }
         }
         return true;
     }
 
+    /**
+     * 지정된 위치에 같은 색상의 살아있는 뿌요가 있는지 확인
+     * 연결 렌더링용
+     */
+    public boolean hasSameColorAt(int x, int y, PuyoColor color) {
+        Puyo p = getPuyoAt(x, y);
+        return p != null && p.isAlive() && p.getColor() == color;
+    }
+
+    @Deprecated
     public void applyGravity() {
         // For each column, let puyos fall down to fill empty spaces below.
         // Use TOTAL_HEIGHT for full logical board

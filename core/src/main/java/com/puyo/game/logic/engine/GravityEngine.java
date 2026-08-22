@@ -20,6 +20,7 @@ public class GravityEngine {
      * @param board 게임 보드
      * @return 뿌요가 움직였는지 여부
      */
+    @Deprecated
     public boolean applyGravity(Board board) {
         boolean moved = false;
         int width = Board.WIDTH;

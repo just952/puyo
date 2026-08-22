@@ -262,7 +262,7 @@ public class PlayScreen extends BaseScreen {
             return;
 
         // PuyoRenderer를 사용하여 SpriteBatch로 그리기
-        puyoRenderer.draw(batch, puyo.getColor(), x, y, GameViewport.CELL_SIZE, scale);
+        puyoRenderer.draw(batch, puyo.getColor(), x, y - (puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0 ) , GameViewport.CELL_SIZE, scale);
     }
 
     private void drawUI() {

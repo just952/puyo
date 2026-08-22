@@ -135,8 +135,10 @@ public class PuyoPair {
     }
 
     public void moveDown() {
-        left.setY(left.getY() - 1);
-        right.setY(right.getY() - 1);
+        //left.setY(left.getY() - 1);
+        //right.setY(right.getY() - 1);
+        left.moveDown();
+        right.moveDown();
     }
 
     /**

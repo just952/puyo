@@ -280,6 +280,8 @@ public class GameWorld {
     /**
      * 자동 낙하 처리 (0.5초 간격)
      * 착지 시 락딜레이 활성화 후 LOCK_DELAY로 전이
+     * fallInterval 도래하면 내려갈 수 있나 검사. 가능하면 한칸 내림. 안되면 lockDalay 시작. 
+     * 즉, 한칸 내린 후에 0.5 후에 lockDelay 시작됨. 
      */
     private void handleFallingAuto(float delta) {
         fallTimer += delta;
