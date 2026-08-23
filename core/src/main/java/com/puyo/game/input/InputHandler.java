@@ -2,10 +2,12 @@ package com.puyo.game.input;
 
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
+import com.puyo.game.config.ConfigManager;
 
 /**
  * 키보드(PC) / 터치(모바일) 통합 입력 처리기.
  * 플랫폼 구분 없이 공통 조회 메서드 제공.
+ * DAS/ARR은 초 단위(float)로 관리하며 GameWorld.FALLING_ANIMATION_INTERVAL(0.025f) 스타일과 통일.
  */
 public class InputHandler implements InputProcessor {
     /** 모바일 환경 여부 (터치 컨트롤러 사용 시 true) */
@@ -28,23 +30,42 @@ public class InputHandler implements InputProcessor {
     private boolean prevDropPressed = false;
     private boolean prevHardDropPressed = false;
 
-    // DAS (Delayed Auto Shift) / ARR (Auto Repeat Rate) 설정
-    // 60fps 기준 프레임 단위
-    private static final int DAS_DELAY_FRAMES = 10; // 초기 지연: ~0.27초 (16프레임)
-    private static final int ARR_INTERVAL_FRAMES = 2; // 반복 주기: 2프레임마다 (초당 30회)
+    // DAS/ARR 설정 (초 단위, ConfigManager에서 로드)
+    private float dasDelayHorizontalSec;
+    private float arrIntervalHorizontalSec;
+    private float dasDelaySoftdropSec;
+    private float arrIntervalSoftdropSec;
 
-    // DAS/ARR 추적용 상태 (단일 카운터로 통합)
-    private int heldFrames = 0;
-    private boolean repeatTriggered = false;
-    private boolean anyPressed = false;
+    // DAS/ARR 추적용 상태 (좌우/소프트드랍 독립 관리)
+    private float horizontalHeldTimeSec = 0f;
+    private float softDropHeldTimeSec = 0f;
+    private boolean horizontalRepeatTriggered = false;
+    private boolean softDropRepeatTriggered = false;
+
+    // 🆕 첫 프레임 즉시 이동 감지용 플래그 (키/터치 눌림 순간 true, updateDasArr에서 처리 후 false)
+    private boolean horizontalFirstFrame = false;
+    private boolean softDropFirstFrame = false;
 
     public InputHandler() {
-        // 기본 생성자 (데스크톱용)
+        // 기본 생성자 (데스크톱용) - 설정 로드
+        loadConfig();
     }
 
     public InputHandler(TouchController touchController) {
         this.touchController = touchController;
         this.isMobile = true;
+        loadConfig();
+    }
+
+    /**
+     * 설정 로드 (ConfigManager에서 DAS/ARR 값 읽기)
+     */
+    private void loadConfig() {
+        ConfigManager.GameConfig config = ConfigManager.getInstance().getConfig();
+        this.dasDelayHorizontalSec = config.das_delay_horizontal_sec;
+        this.arrIntervalHorizontalSec = config.arr_interval_horizontal_sec;
+        this.dasDelaySoftdropSec = config.das_delay_softdrop_sec;
+        this.arrIntervalSoftdropSec = config.arr_interval_softdrop_sec;
     }
 
     /**
@@ -67,17 +88,17 @@ public class InputHandler implements InputProcessor {
         if (isMobile)
             return false; // 모바일에서는 키보드 입력 무시
 
-        // 방향키/드롭키가 눌리면 anyPressed = true
-        anyPressed = true;
-
+        // 방향키/드롭키가 눌리면 anyPressed 개념은 이제 각 키별로 분리됨
         switch (keycode) {
             case Input.Keys.LEFT:
             case Input.Keys.A:
                 leftPressed = true;
+                horizontalFirstFrame = true; // 🆕 첫 프레임 즉시 이동 플래그
                 return true;
             case Input.Keys.RIGHT:
             case Input.Keys.D:
                 rightPressed = true;
+                horizontalFirstFrame = true; // 🆕 첫 프레임 즉시 이동 플래그
                 return true;
             case Input.Keys.UP:
             case Input.Keys.W:
@@ -92,6 +113,7 @@ public class InputHandler implements InputProcessor {
             case Input.Keys.DOWN:
             case Input.Keys.S:
                 dropPressed = true;
+                softDropFirstFrame = true; // 🆕 첫 프레임 즉시 이동 플래그
                 return true;
             case Input.Keys.SPACE:
             case Input.Keys.ENTER:
@@ -134,8 +156,6 @@ public class InputHandler implements InputProcessor {
                 return false;
         }
 
-        // 방향키/드롭키 중 하나라도 남아있으면 anyPressed 유지
-        anyPressed = leftPressed || rightPressed || dropPressed;
         return true;
     }
 
@@ -184,8 +204,10 @@ public class InputHandler implements InputProcessor {
 
     /**
      * 매 프레임 호출하여 이전 상태 업데이트 (엣지 감지용) 및 DAS/ARR 처리
+     * 
+     * @param delta 프레임 시간(초)
      */
-    public void update() {
+    public void update(float delta) {
         prevLeftPressed = leftPressed;
         prevRightPressed = rightPressed;
         prevRotatePressed = rotatePressed;
@@ -194,33 +216,72 @@ public class InputHandler implements InputProcessor {
 
         // DAS/ARR 처리 (데스크톱 키보드만)
         if (!isMobile) {
-            updateDasArr();
+            updateDasArr(delta);
         }
 
         if (isMobile && touchController != null) {
-            touchController.update();
+            touchController.update(delta);
         }
     }
 
     /**
      * DAS (Delayed Auto Shift) / ARR (Auto Repeat Rate) 업데이트
-     * - 아무 방향키/드롭키가 눌리면 공유 카운터 증가
+     * - 좌우 이동 키와 소프트 드랍 키를 독립적으로 관리
      * - 첫 프레임 즉시 repeatTriggered = true
-     * - DAS_DELAY_FRAMES 이후부터 ARR_INTERVAL_FRAMES 간격으로 반복
+     * - DAS 지연 후 ARR 간격으로 반복
+     * 
+     * @param delta 프레임 시간(초)
      */
-    private void updateDasArr() {
-        if (anyPressed) {
-            heldFrames++;
-            if (heldFrames == 1) {
-                repeatTriggered = true;  // 첫 프레임 즉시
-            } else if (heldFrames > DAS_DELAY_FRAMES) {
-                repeatTriggered = ((heldFrames - DAS_DELAY_FRAMES) % ARR_INTERVAL_FRAMES == 0);
+    private void updateDasArr(float delta) {
+        // 좌우 이동 키 체크
+        boolean horizontalPressed = leftPressed || rightPressed;
+
+        if (horizontalPressed) {
+            if (horizontalFirstFrame) {
+                // 🆕 첫 프레임: 즉시 트리거 후 플래그 해제
+                horizontalRepeatTriggered = true;
+                horizontalFirstFrame = false;
+                horizontalHeldTimeSec = 0f; // 타이머 시작
             } else {
-                repeatTriggered = false;  // DAS 지연 중
+                horizontalHeldTimeSec += delta;
+                if (horizontalHeldTimeSec < dasDelayHorizontalSec) {
+                    // DAS 지연 중: 반복 없음
+                    horizontalRepeatTriggered = false;
+                } else {
+                    // DAS 지연 후: ARR 주기로 반복
+                    // (누적시간 - 지연) % 주기 < delta 면 이번 프레임에 트리거
+                    float postDasTime = horizontalHeldTimeSec - dasDelayHorizontalSec;
+                    horizontalRepeatTriggered = (postDasTime % arrIntervalHorizontalSec) < delta;
+                }
             }
         } else {
-            heldFrames = 0;
-            repeatTriggered = false;
+            horizontalHeldTimeSec = 0f;
+            horizontalRepeatTriggered = false;
+            horizontalFirstFrame = false; // 🆕 리셋
+        }
+
+        // 소프트 드랍 키 체크 (독립적)
+        if (dropPressed) {
+            if (softDropFirstFrame) {
+                // 🆕 첫 프레임: 즉시 트리거 후 플래그 해제
+                softDropRepeatTriggered = true;
+                softDropFirstFrame = false;
+                softDropHeldTimeSec = 0f; // 타이머 시작
+            } else {
+                softDropHeldTimeSec += delta;
+                if (softDropHeldTimeSec < dasDelaySoftdropSec) {
+                    // DAS 지연 중: 반복 없음
+                    softDropRepeatTriggered = false;
+                } else {
+                    // DAS 지연 후: ARR 주기로 반복
+                    float postDasTime = softDropHeldTimeSec - dasDelaySoftdropSec;
+                    softDropRepeatTriggered = (postDasTime % arrIntervalSoftdropSec) < delta;
+                }
+            }
+        } else {
+            softDropHeldTimeSec = 0f;
+            softDropRepeatTriggered = false;
+            softDropFirstFrame = false; // 🆕 리셋
         }
     }
 
@@ -241,12 +302,12 @@ public class InputHandler implements InputProcessor {
         }
 
         // 왼쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
-        if (leftPressed && repeatTriggered) {
+        if (leftPressed && horizontalRepeatTriggered) {
             return -1;
         }
 
         // 오른쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
-        if (rightPressed && repeatTriggered) {
+        if (rightPressed && horizontalRepeatTriggered) {
             return 1;
         }
 
@@ -270,7 +331,7 @@ public class InputHandler implements InputProcessor {
         if (isMobile && touchController != null) {
             return touchController.isDropPressed();
         }
-        return dropPressed && repeatTriggered;
+        return dropPressed && softDropRepeatTriggered;
     }
 
     /**
@@ -285,13 +346,16 @@ public class InputHandler implements InputProcessor {
 
     /**
      * DAS/ARR 상태 리셋 (새 조각 스폰 시 호출)
-     * 키가 눌려 있어도 heldFrames, repeatTriggered만 초기화하여
+     * 키가 눌려 있어도 heldTime, repeatTriggered만 초기화하여
      * 첫 프레임 즉시 이동 + DAS 지연 재시작 보장
      */
     public void resetDasArr() {
-        heldFrames = 0;
-        repeatTriggered = false;
-        // anyPressed는 현재 키 상태 반영이므로 유지
+        horizontalHeldTimeSec = 0f;
+        softDropHeldTimeSec = 0f;
+        horizontalRepeatTriggered = false;
+        softDropRepeatTriggered = false;
+        horizontalFirstFrame = false; // 🆕
+        softDropFirstFrame = false;   // 🆕
     }
 
     /**

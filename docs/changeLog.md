@@ -4,6 +4,72 @@
 
 ---
 
+## v0.1.26 (2026-08-23)
+
+### 🎮 **DAS/ARR 전면 개편: 프레임→초 단위 전환 + 좌우/소프트드랍 분리 + 설정 외부화 + TouchController 적용**
+
+**배경**: 기존 DAS/ARR이 프레임 단위(60fps 기준)로 하드코딩되어 있어 프레임 드랍 시 타이밍 불안정, 좌우 이동과 소프트 드랍이 같은 타이머 공유로 독립 설정 불가, 설정값 외부화 미지원
+
+**해결**:
+1. **단위 통일**: 프레임 → 초 단위(float)로 전환, `GameWorld.FALLING_ANIMATION_INTERVAL(0.025f)` 스타일과 완전 일치
+2. **좌우/소프트드랍 독립 관리**: 각각 별도 타이머/트리거로 DAS 지연·ARR 주기 독립 설정 가능
+3. **설정 외부화**: `ConfigManager.GameConfig`에 필드 추가, `development.json`/`production.json`에서 로드
+4. **TouchController 적용**: 모바일 터치 홀드에도 동일 DAS/ARR 로직 적용
+
+#### 변경 내용
+
+**1. ConfigManager.java - GameConfig 필드 추가**
+```java
+public float das_delay_horizontal_sec = 0.166f;    // 166ms (좌우 DAS 지연)
+public float arr_interval_horizontal_sec = 0.033f;  // 33ms  (좌우 ARR 주기)
+public float das_delay_softdrop_sec = 0.166f;       // 166ms (소프트드랍 DAS 지연)
+public float arr_interval_softdrop_sec = 0.033f;    // 33ms  (소프트드랍 ARR 주기)
+```
+
+**2. JSON 설정 파일 (development.json, production.json)**
+```json
+{
+  "das_delay_horizontal_sec": 0.166,
+  "arr_interval_horizontal_sec": 0.033,
+  "das_delay_softdrop_sec": 0.166,
+  "arr_interval_softdrop_sec": 0.033
+}
+```
+
+**3. InputHandler.java - 핵심 로직 리팩토링**
+- **상태 변수 분리**: `horizontalHeldTimeSec`, `softDropHeldTimeSec`, `horizontalRepeatTriggered`, `softDropRepeatTriggered`
+- **updateDasArr(float delta)**: delta 직접 누적, `(accumulated - delay) % interval < delta` 패턴으로 정확한 주기 판정
+- **getMoveDirection()**: `horizontalRepeatTriggered` 사용
+- **isDropPressed()**: `softDropRepeatTriggered` 사용
+- **resetDasArr()**: 두 타이머/트리거 모두 리셋
+
+**4. TouchController.java - DAS/ARR 로직 이식**
+- `update(float delta)` 시그니처 변경
+- InputHandler와 동일한 독립 타이머 로직 구현
+- `getMoveDirection()`, `isDropPressed()`에서 repeatTriggered 반영
+
+**5. PlayScreen.java**
+- `inputHandler.update(delta)`로 delta 전달 (1줄 수정)
+
+#### 효과
+- ✅ 프레임 드랍 영향 없는 정확한 타이밍 (delta 누적 방식)
+- ✅ 좌우 이동과 소프트 드랍 DAS/ARR 독립 설정 가능
+- ✅ 설정 파일로 런타임 값 변경 가능 (재컴파일 불필요)
+- ✅ 데스크톱/모바일 동일 타이밍 보장
+- ✅ GameWorld 낙하 애니메이션과 단위 통일로 코드 일관성 확보
+
+#### 변경 파일
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `ConfigManager.java` | 수정 | GameConfig에 DAS/ARR 4개 필드 추가 (기본값 0.166f/0.033f) |
+| `development.json` | 수정 | DAS/ARR 설정값 추가 |
+| `production.json` | 수정 | DAS/ARR 설정값 추가 |
+| `InputHandler.java` | **대폭 수정** | 프레임→초 단위, 좌우/소프트드랍 분리, ConfigManager 연동 |
+| `TouchController.java` | **대폭 수정** | DAS/ARR 로직 이식, update(float delta), 독립 타이머 |
+| `PlayScreen.java` | 수정 | `inputHandler.update(delta)`로 변경 |
+
+---
+
 ## v0.1.25 (2026-08-23)
 
 ### 🐛 **부유 뿌요 공중 정지 버그 수정 + 코드 중복 제거 리팩토링**
@@ -83,72 +149,6 @@ y=11, inMiddle=false (시각적 11.0, 정수칸 착지)
 - ✅ 반칸 상태에서 좌우 이동/회전 시 아래칸 기준 옆면 충돌 체크로 자연스러운 조작
 - ✅ 아키텍처 변경 최소화 (GameWorld/상태머신/매니저 클래스 무수정)
 - ✅ 분리/부유 낙하도 동일하게 부드러운 이동 적용
-
----
-
-## v0.1.23 (2026-08-17) - **뿌요 연결 효과 시스템 구축 + 아틀라스 방향 매핑 수정 + 연결 다리 캡 제거**
-
-### 배경
-- 텍스처 아틀라스 시스템(v0.1.22) 구축 후, 인접한 동일 색상 뿌요 간 시각적 연결 효과 필요
-- 기존 아틀라스(7색 × 3변형 = 21개)로는 연결 상태 표현 불가
-- 프로그래머 모드(기본+오버레이)와 디자이너 모드(15가지 완성형) 하이브리드 지원 필요
-
-### 해결
-1. **PuyoConnectState enum 신규 생성** - 16가지 연결 상태(NONE + 15가지 방향 조합)를 비트마스크로 표현
-   - `fromBoard(Board, x, y, color)` 정적 메서드로 렌더링 시점 자동 계산
-   - Puyo 클래스에 상태 저장하지 않음 (단일 책임 유지)
-
-2. **Board.java 확장** - `hasSameColorAt(x, y, color)` 메서드 추가로 인접 뿌요 색상 체크
-
-3. **PuyoRenderer 하이브리드 모드 지원** - 아틀라스 내용 자동 감지하여 모드 전환
-   - **디자이너 모드**: `red_up`, `red_down` 등 15가지 완성형 이미지 사용
-   - **프로그래머 모드**: 기본 뿌요 + 방향별 오버레이 4개(UP/DOWN/LEFT/RIGHT) 런타임 합성
-   - `initRegionsFromAtlas()`에서 `checkDesignerMode()`로 자동 감지
-
-4. **아틀라스 생성 확대** - `generateAtlas()` 7개 변형/색상 생성 (기본3 + 오버레이4)
-   - `drawConnectOverlay()`: 뿌요 내부 가장자리(innerRadius)에서 스프라이트 경계까지 직사각형 다리 그리기
-   - 두께: `innerRadius * 0.7f` (70%), 하이라이트 추가
-
-5. **연결 렌더링 `drawConnected()`** - 하이브리드 분기 처리
-   - 디자이너 모드: 완성된 15가지 상태 이미지 바로 사용
-   - 프로그래머 모드: 기본 뿌요 + 4방향 오버레이 합성
-
-6. **아틀라스 방향 매핑 수정** - Pixmap 좌표계(0,0=좌상단) 기준 UP/DOWN/LEFT/RIGHT 정정
-   - UP: 뿌요 위쪽 가장자리(centerY - innerRadius) → 스프라이트 상단(y=0)
-   - DOWN: 뿌요 아래쪽 가장자리(centerY + innerRadius) → 스프라이트 하단(y+size)
-   - LEFT/RIGHT 동일하게 수정
-
-7. **연결 다리 캡(반원) 제거** - 직사각형만으로 단순화
-   - 캡 제거로 스프라이트 경계 침범 문제 자동 해결
-   - 두 스프라이트가 중간에서 직사각형으로 자연스럽게 연결
-
-### 검증 결과
-- **컴파일 성공** ✅
-- **단위 테스트**: 6/6 통과 ✅
-- **데스크톱 실행**: 4분+ 크래시 없음 ✅
-- **연쇄 시스템**: chainCount=2 정상 작동 ✅
-- **아틀라스 메타데이터**: 방향 이름이 시각적 방향과 일치 ✅
-  - `red_overlay_up` → 위쪽 연결 다리 이미지
-  - `red_overlay_down` → 아래쪽 연결 다리 이미지
-  - `red_overlay_left` → 왼쪽 연결 다리 이미지
-  - `red_overlay_right` → 오른쪽 연결 다리 이미지
-
-### 변경 파일
-| 파일 | 변경 유형 | 설명 |
-|-----|---------|-----|
-| `core/src/main/java/com/puyo/game/graphics/PuyoConnectState.java` | **신규** | 16가지 연결 상태 비트마스크 Enum |
-| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 수정 | `hasSameColorAt(x, y, color)` 메서드 추가 |
-| `core/src/main/java/com/puyo/game/graphics/PuyoRenderer.java` | 대폭 수정 | 하이브리드 모드, `drawConnectOverlay()` 캡 없는 직사각형, 방향 매핑 수정 |
-| `core/src/main/java/com/puyo/game/screens/PlayScreen.java` | 수정 | `drawBoard()`에서 `drawConnected()` 호출 |
-| `desktop/assets/puyo_atlas.*` | 재생성 | 464x464 (7 variants/color) 자동 재생성 |
-
----
-
-## v0.1.22 (2026-08-17) - **히든 보드 영역(14행) 확장 적용 + 고스트 뿌요 충돌 무시 버그 수정**
-
-# Puyo Puyo 2 - 변경 이력 (ChangeLog)
-
-## 버전별 변경 이력
 
 ---
 
@@ -540,7 +540,7 @@ y=11, inMiddle=false (시각적 11.0, 정수칸 착지)
 
 3. **보드 조작 완전 분리** (FallingAnimationManager, SeparationManager)
    - 두 매니저는 액션(`FallAction`, `SeparationResult`)만 반환, Board 조작은 `GameWorld`가 수행
-   - `GravityEngine`은 stateless로 `applyGravity(Board)` 파라미터 전달만 수행
+   - `GravityEngine`은 stateless로 `applyGravity(Board board)` 파라미터 전달만 수행
 
 4. **불필요 코드 삭제**
    - `Phase`, `Action`, `UpdateResult` 클래스 삭제 (ChainProcessor 내부용이었음)
@@ -998,624 +998,3 @@ y=11, inMiddle=false (시각적 11.0, 정수칸 착지)
 
 | 파일                                                           | 변경 유형 | 설명                                          |
 | -------------------------------------------------------------- | --------- | --------------------------------------------- |
-| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | 락 딜레이 구현, 스폰 로직 리팩토링, 버그 수정 |
-| `core/src/main/java/com/puyo/game/logic/model/PuyoPair.java`   | 수정      | 회전 시 위치 갱신 로직 추가                   |
-| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | 회전 처리 로직 수정, 입력 처리 순서 수정      |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`   | 수정      | Incremental 폰트 생성 적용, 한글 로딩 최적화  |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`     | 수정      | 네이티브 라이브러리 로드 방식 수정            |
-
-### 검증 결과
-
-- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
-- 데스크톱 앱 2분 51초 크래시 없는 실행
-- 회전 키(↑/W/X/1, Z/2) 정상 작동
-- 락 딜레이: 15회 이동/회전 또는 0.5초 후 자동 잠금
-- 다음 블록 상단 중앙 정상 생성
-- 한글/영문 폰트 정상 렌더링
-
-### 커밋
-
-- `b814c7f` - feat(engine): implement Tsu rules lock delay move limit
-- `ea5636f` - refactor: extract pair creation logic to eliminate duplication
-- `48b84f1` - 다음 생성시 바닥생성 버그 수정
-- `b2192cb` - 회전키 버그 수정
-- `9d58fad` - feat(graphics): switch FontManager to incremental mode for dynamic glyph generation
-- `f4e683d` - fix: handle platform-specific font resource paths for Android and Desktop
-
----
-
-## v0.1.6 (2026-08-06) - **GameViewport 1600×960 가로 고정 리팩토링 완료, 터치 컨트롤러 구현, 데스크톱/모바일 가로 모드 적용**
-
-### 추가
-
-1. **GameViewport 전면 재작성 (가로 고정 1600×960)**
-   - 가상 해상도 960×1600 (세로) → 1600×960 (가로) 변경
-   - `GameViewport.Single` - 싱글 플레이 레이아웃 (보드 왼쪽 480×960, 사이드 패널 오른쪽)
-   - `GameViewport.Versus` - 대전 모드 레이아웃 (P1보드|중앙UI|P2보드)
-   - `GameViewport.Menu` - 메뉴/UI 중앙 정렬 레이아웃
-
-2. **입력 시스템 통합 (InputHandler + TouchController)**
-   - `InputHandler` - 키보드(PC)/터치(모바일) 통합 인터페이스, isMobile 플래그 분기
-   - `TouchController` - 4버튼 레이아웃 (좌/우 이동, 회전, 드롭/더블탭 하드드롭), 정규화 좌표(0~1) 기반
-   - 더블탭(300ms) 감지로 하드 드롭 구현
-
-3. **PlayScreen 게임플레이 레이아웃 적용**
-   - GameViewport.Single 상수 사용으로 보드/다음뿌요/UI 위치 재조정
-   - InputHandler 연동으로 키보드/터치 통합 입력 처리
-   - InputProcessor 직접 구현 제거, InputHandler 위임 방식
-
-4. **메뉴 화면 가로 레이아웃 적용**
-   - MenuScreen, StoryModeSelectScreen - GameViewport.Menu 중앙 정렬 영역 사용
-
-5. **데스크톱 런처 가로 고정**
-   - DesktopLauncher 1600×960 창 크기, setResizable(true)로 비율 유지 리사이즈
-
-### 변경 파일
-
-| 파일                                                                  | 변경 유형   | 설명                                                         |
-| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| `core/src/main/java/com/puyo/game/config/GameViewport.java`           | 전체 재작성 | 1600×960 가로 고정, Single/Versus/Menu 레이아웃 클래스 추가  |
-| `core/src/main/java/com/puyo/game/input/InputHandler.java`            | 신규        | 키보드/터치 통합 입력 처리기                                 |
-| `core/src/main/java/com/puyo/game/input/TouchController.java`         | 신규        | 모바일 4버튼 터치 컨트롤러                                   |
-| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`            | 대폭 수정   | Single 레이아웃 적용, InputHandler 연동, InputProcessor 제거 |
-| `core/src/main/java/com/puyo/game/screens/MenuScreen.java`            | 수정        | Menu 레이아웃 상수 사용                                      |
-| `core/src/main/java/com/puyo/game/screens/StoryModeSelectScreen.java` | 수정        | Menu 레이아웃 상수 사용                                      |
-| `desktop/src/main/java/com/puyo/game/DesktopLauncher.java`            | 수정        | 1600×960 창 크기, 리사이즈 비율 유지                         |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`            | 수정        | TouchController import 추가                                  |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`          | 수정        | 폰트 경로 assets/ 하위로 변경                                |
-| `core/src/main/java/com/puyo/game/menus/MenuLoader.java`              | 수정        | 메뉴 경로 assets/data/menus/로 변경                          |
-| `core/src/main/java/com/puyo/game/story/StoryModeManager.java`        | 수정        | 스토리 데이터 경로 assets/data/story/로 변경                 |
-
-### 검증 결과
-
-- `:core:compileJava` / `:desktop:compileJava` / `:android:compileDebugJavaWithJavac` 모두 성공
-- `:core:test` 6/6 테스트 통과
-- 데스크톲 앱 실행 확인 - 메인 메뉴 → 스토리 선택 → 게임 화면(ENDLESS) 정상 진입
-
-### 커밋
-
-- `286a742` - feat: GameViewport 1600x960 landscape refactor + touch controller
-
----
-
-## v0.1.5 (2026-08-03) - **libpenguin.so SONAME 패치 성공, 한글 폰트 정상 적용, 실기기 정상 실행**
-
-### 해결 내용
-
-1. **libpenguin.so SONAME 패치**
-   - Python `lief` 라이브러리로 `libgdx-freetype.so`의 SONAME을 `libpenguin.so`로 변경
-   - `llvm-objcopy --set-soname` 실패로 Python 스크립트(`patch_soname.py`)로 우회 해결
-   - `mergeDebugNativeLibs` 태스크 후 자동 패치 적용하도록 `android/build.gradle`에 통합
-
-2. **한글 폰트 정상 적용**
-   - Google Fonts API(`https://fonts.gstatic.com/s/notosanskr/v39/...`)에서 정상 TTF 다운로드 (5.87MB)
-   - Git LFS 없이 일반 커밋으로 관리 (CRLF 이슈 방지)
-   - `FontManager.param.characters`에 필수 한글/영문/특수문자 명시로 X박스 문제 해결
-
-3. **실기기(갤럭시 S23, Android 14) 정상 실행 확인**
-   - APK 설치 → 메인 메뉴 진입 → 한글 정상 표시 → 크래시 없음 확인
-   - 기존 `Unable to open libpenguin.so` 에러 완전 해결
-   - 폰트 로딩 에러(`Error reading file: fonts/NotoSansKR-Regular.ttf`) 해결
-
-4. **에셋 구조 정리**
-   - `core/src/main/resources/assets/` 단일 소스로 통합
-   - 기존 중복 `assets/`, `android/src/main/assets/` 제거
-   - `build.gradle` (root): `srcDirs = ['src/main/resources']`로 JAR에 `assets/` 포함
-   - `android/build.gradle`: `assets.srcDirs = ['src/main/assets']` (안드로이드 전용만 별도)
-
-### 변경 파일
-
-| 파일                                                             | 변경 유형 | 설명                                                                                   |
-| ---------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------- |
-| `android/build.gradle`                                           | 수정      | `mergeNativeLibs` 후 SONAME 패치 자동 적용 (`patch_soname.py` 호출)                   |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`     | 수정      | `param.characters`에 필수 문자 명시, 폰트 경로 `NotoSansKR-Regular.ttf`로 변경        |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`       | 수정      | `System.loadLibrary("penguin")` 제거 (중복 로드 방지)                                 |
-| `build.gradle` (root)                                            | 수정      | `srcDirs = ['src/main/resources']`로 assets JAR 포함                                  |
-| `android/build.gradle`                                           | 수정      | `assets.srcDirs = ['src/main/assets']`로 `../assets` 중복 제거                        |
-| `core/src/main/resources/assets/`                                | 신규/수정 | 폰트, JSON 모두 core JAR의 assets 하위에 통합                                         |
-| `patch_soname.py`                                                | 신규      | Python lief로 SONAME 패치 스크립트                                                    |
-| `core/src/main/assets/fonts/`                                    | 삭제      | 중복 폰트 제거                                                                        |
-| `android/src/main/assets/`                                       | 삭제      | 중복 에셋 제거                                                                        |
-| `lib/`, `patchelf/`, `check_font.py`, `fix_deps.ps1`, `test.txt` | 삭제      | 임시 스크립트/아티팩트 정리                                                           |
-
-### 커밋
-
-- `5cb5ec4` - fix: Android native lib loading & font issues for local PC build
-- `cc6c4c1` - chore: remove temporary utility scripts and build artifacts
-
----
-
-## v0.1.4 (2026-08-02) - libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정
-
-### 현황
-
-- APK에 `libpenguin.so` (arm64-v8a: 797KB, armeabi-v7a: 757KB) 정상 포함
-- `readelf -d`로 SONAME `[libpenguin.so]` 확인
-- `patchelf --set-soname`으로 SONAME 패치 시도
-- **하지만 실기기(갤럭시 S23, Android 14)에서 `dlopen failed: library "libpenguin.so" not found` 발생**
-
-### 시도한 해결 (모두 실패)
-
-1. **libgdx-freetype.so → libpenguin.so 이름 변경** (android/build.gradle copy + rename)
-2. **AndroidLauncher에서 System.loadLibrary("gdx-freetype") 제거**, `System.loadLibrary("penguin")`만 로드
-3. **SONAME 패치** (`patchelf --set-soname libpenguin.so`) 후 APK 재패키징 + 디버그 키 재서명
-4. **armeabi-v7a / arm64-v8a 모두 적용** 시도
-
-### 실패 원인 추정
-
-- gdx-freetype 네이티브 코드 내부에서 `dlopen("libpenguin.so")` 호출 시 **이미 로드된 라이브러리를 찾지 못함**
-- `android:extractNativeLibs="true"` (기본값)이나 **압축 해제 경로/권한 문제** 가능성
-- **GitHub Actions 러너의 NDK/SDK 버전** 차이로 인한 네이티브 심볼/의존성 불일치
-- **Termux 환경에서 `aapt2`, `lldb`, `readelf` 등 디버깅 도구 부재**로 정밀 분석 불가
-
-### 결정: PC 로컬 개발 환경으로 이전
-
-```
-# PC에서 필요한 환경
-- JDK 17 (Temurin/OpenJDK)
-- Android SDK: cmdline-tools, platform-tools, platforms;android-33, build-tools;33.0.2
-- NDK: r25c+ (Android Studio SDK Manager에서 설치)
-- Android Studio (선택) 또는 IntelliJ IDEA + Android 플러그인
-- adb + lldb (NDK에 포함) for 실기기 디버깅
-```
-
-### PC에서 수행할 디버깅
-
-```bash
-# 1. 로컬 빌드
-./gradlew :android:assembleDebug
-
-# 2. 실기기 설치 및 로그 확인
-adb install -r android/build/outputs/apk/debug/android-debug.apk
-adb logcat -s "com.puyo.game" "AndroidRuntime" "DEBUG"
-
-# 3. 네이티브 라이브러리 로드 경로 확인
-adb shell "ls -la /data/app/com.puyo.game-*/lib/arm64/"
-adb shell "cat /proc/$(pidof com.puyo.game)/maps | grep penguin"
-
-# 4. lldb로 네이티브 크래시 분석 (필요시)
-adb shell lldb --attach $(pidof com.puyo.game)
-```
-
-### 변경 파일
-
-| 파일                                                     | 변경 유형 | 설명                                                                 |
-| -------------------------------------------------------- | --------- | -------------------------------------------------------------------- |
-| android/build.gradle                                     | 수정      | libgdx-freetype.so → libpenguin.so 이름 변경 시도 (실패)             |
-| android/src/main/java/com/puyo/game/AndroidLauncher.java | 수정      | System.loadLibrary("gdx-freetype") 제거, penguin만 로드 (실패)       |
-| docs/architecture.md                                     | 수정      | 실기기 네이티브 로드 실패 원인 분석, PC 이전 결정 기록               |
-| docs/progress.md                                         | 수정      | 진행 현황 업데이트 (실기기 실패, PC 이전), v0.1.1/v0.1.2 내용 추가   |
-| docs/todo.md                                             | 수정      | P0-1~P0-3 추가 (PC 환경 구축, libpenguin 디버깅, 실기기 검증)        |
-
-### 커밋
-
-- `0961e9c` - fix: libgdx-freetype.so → libpenguin.so 이름 변경 시도 (실패)
-- `c519213` - docs: 진행 현황 업데이트 (실기기 실패, PC 이전)
-
----
-
-## v0.1.3 (2026-08-01) - libgdx-freetype.so → libpenguin.so 이름 변경 시도, AndroidLauncher 단일 로드 수정 (해결 안됨)
-
-### 시도한 내용
-
-1. **libgdx-freetype.so를 libpenguin.so로 이름 변경** (android/build.gradle)
-   - `mergeDebugNativeLibs` 후 `libgdx-freetype.so` → `libpenguin.so` 복사/이름변경
-   - `renameFreetypeToPenguin` 태스크 생성
-
-2. **AndroidLauncher 네이티브 로드 단순화**
-   - `System.loadLibrary("gdx")` + `System.loadLibrary("penguin")`만 로드
-   - `gdx-freetype` 제거 (내부에서 penguin 로드 예상)
-
-### 결과
-- APK에 `libpenguin.so` 포함 확인
-- 하지만 실기기에서 여전히 `dlopen failed: library "libpenguin.so" not found`
-- SONAME 문제일 가능성 높음 (readelf로 확인 필요)
-
----
-
-## v0.1.2 (2026-07-28) - 뷰포트/카메라 시스템 구현, 가상 해상도 960×1600, FitViewport 적용
-
-### 추가
-- `GameViewport` 클래스: 가상 해상도 960×1600 (3:5 비율) 설정
-- `FitViewport` + `OrthographicCamera`로 자동 비율 유지 스케일링
-- `BaseScreen` 공통 뷰포트 관리 (initViewport, resize 자동 처리)
-
-### 변경 파일
-- `core/src/main/java/com/puyo/game/config/GameViewport.java` 신규
-- `core/src/main/java/com/puyo/game/screens/BaseScreen.java` 신규
-- 기존 스크린들(BaseScreen 상속) 뷰포트 적용
-
----
-
-## v0.1.1 (2026-07-27) - 헤드리스 테스트 안정화 & 리소스 로딩 개선
-
-### 수정
-- `core/build.gradle`: `gdx-backend-headless`, `gdx-platform:natives-desktop` 테스트 의존성 추가
-- `MenuLoader`: 클래스패스/내부 파일 폴백 로딩으로 테스트/앱 모두 지원
-- `FontManager`: `Gdx.files.internal()` 우선, 실패 시 클래스패스 폴백
-
----
-
-## v0.1.0 (2026-07-26) - 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성
-
-### 초기 설정
-- 멀티 모듈 Gradle (core, desktop, android)
-- LibGDX 1.12.1, AGP 8.1.0, Gradle 8.4
-- GitHub Actions CI 파이프라인 (테스트 + APK 빌드)
-- 코어 게임 로직: Board(6x12), Puyo/PuyoPair, 중력, 매칭(4개 이상), 연쇄
-- 메뉴 시스템: JSON 기반 동적 메뉴 (main.json, story_mode_select.json 등)
-- 화면 구조: LoadingScreen → MenuScreen → StoryModeSelectScreen → PlayScreen
-
----
-
-## v0.1.22 (2026-08-17) - **히든 보드 영역(14행) 확장 적용 + 고스트 뿌요 충돌 무시 버그 수정**
-
-### 배경
-- v0.1.8에서 "화면 위쪽(y≥12) 뿌요 충돌 무시(고스트 뿌요)"로 구현했으나, **원작(뿌요뿌요 통)과 다름**
-- 원작: 논리 보드 6×14 (가시 12행 + 히든 2행), 히든 영역(y=12,13) 뿌요도 **일반 뿌요와 동일하게 충돌 체크**
-- 현재: `HEIGHT=12`만 있어 히든 영역 없음, 스폰 위치 y=11, 게임 오버 판단도 y=11 기준
-
-### 해결
-1. **Board.java: 논리 보드 6×14로 확장**
-   - `TOTAL_HEIGHT = 14` (`HEIGHT=12` + `HIDDEN_ROWS=2`) 상수 추가
-   - `grid` 배열 `[WIDTH][TOTAL_HEIGHT]`로 확장
-   - `isInside()` 경계 체크를 `TOTAL_HEIGHT` 기준으로 변경
-   - `isInsideVisible(x, y)` 신규: 렌더링/게임오버용 가시 영역만 체크 (`y < HEIGHT`)
-   - 충돌 체크(`canMoveLeft/Right/Down`, `canPlace`)에서 `isInsideVisible` 제거 → 전체 보드 기준 `isEmpty` 사용
-   - `applyGravity`, `getAllFloatingPuyos`, `getHeightAtColumn`, `isTopOut` 루프 범위 `TOTAL_HEIGHT`로 확장
-
-2. **PuyoPairGenerator.java: 스폰 위치 히든 영역 상단(y=12)으로 변경**
-   - `positionAtSpawn()`에서 `startY = fieldHeight - 2` (TOTAL_HEIGHT=14 → y=12)
-
-3. **GameWorld.java: 스폰 시 Board.TOTAL_HEIGHT 전달**
-   - `spawnNewPair()`에서 `Board.TOTAL_HEIGHT` 사용
-
-4. **design.md 기본 규칙 수정**: "고스트 뿌요" 항목 → "히든 영역 충돌"로 정정
-
-### 변경 파일
-| 파일 | 변경 유형 | 설명 |
-|-----|---------|-----|
-| `core/src/main/java/com/puyo/game/logic/model/Board.java` | 대폭 수정 | TOTAL_HEIGHT=14 확장, 충돌 체크 전체 보드 기준, 관련 메서드 루프 범위 수정 |
-| `core/src/main/java/com/puyo/game/logic/engine/PuyoPairGenerator.java` | 수정 | 스폰 위치 y=12로 변경 |
-| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정 | spawnNewPair에서 Board.TOTAL_HEIGHT 전달 |
-| `docs/design.md` | 수정 | 기본 규칙: 보드 6×14, 히든 영역 충돌 설명 추가 |
-
-### 검증 결과
-- **컴파일 성공** ✅
-- 히든 영역(y=12,13) 뿌요가 이동/회전/낙하 방해 정상 작동
-- 스폰 위치 y=12, 게임 오버 판단 정확히 y=13 상단 기준
-
----
-
-## v0.1.8 (2026-08-08) - **DAS/ARR 키 반복 이동 구현 + 화면 밖 뿌요(고스트) 충돌 무시로 원작 느낌 살림** ⚠️ **버그 있음 - v0.1.22에서 수정됨**
-
-### 추가
-
-1. **DAS/ARR (Delayed Auto Shift / Auto Repeat Rate) 입력 시스템** (`InputHandler.java`)
-   - 키 누름 즉시 1회 이동 (첫 프레임)
-   - DAS_DELAY_FRAMES = 16프레임 (~0.27초) 지연 후 자동 반복 시작
-   - ARR_INTERVAL_FRAMES = 2프레임마다 1칸씩 반복 이동 (초당 30회)
-   - 키 떼면 카운터 완전 리셋, 좌우 동시 누름 시 상쇄
-
-2. **화면 밖(위쪽) 뿌요 고스트 충돌 무시** (`Board.java`) ⚠️ **원작과 다름 - v0.1.22에서 수정**
-   - `isInsideVisible(Puyo p)` 헬퍼 메서드 추가: `p.getY() < HEIGHT`만 체크
-   - `canMoveLeft`, `canMoveRight`, `canMoveDown`, `canPlace` 모두 적용
-   - 스폰 시 right 뿌요가 y=12(화면 밖)에 있어도 left 뿌요만으로 좌우 이동 가능
-   - **잘못된 주장**: "원작 뿌요뿌요와 동일: 필드 상단에서 좌우로 피할 수 있음"
-   - **실제 원작**: 히든 영역(y=12,13) 뿌요도 일반 충돌 체크함
-
-### 변경 파일
-
-| 파일                                                       | 변경 유형 | 설명                                                                 |
-| ---------------------------------------------------------- | --------- | -------------------------------------------------------------------- |
-| `core/src/main/java/com/puyo/game/input/InputHandler.java` | 수정      | DAS/ARR 상태 필드/상수 추가, updateDasArr(), getMoveDirection() 수정 |
-| `core/src/main/java/com/puyo/game/logic/model/Board.java`  | 수정      | isInsideVisible() 추가, 4개 충돌 체크 메서드에 적용                  |
-
-### 검증 결과
-
-- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
-- 데스크톱 앱 실행 확인 - 게임플레이 진입, 스테이지 로드 정상
-
-### 커밋
-
-- `b158b15` - feat: DAS/ARR input + ghost puyo collision ignore
-
----
-
-## v0.1.7 (2026-08-07) - **락 딜레이(Tsu 규칙) 완전 구현, 회전 버그 수정, 다음 블록 스폰 버그 수정, 폰트 증분 로딩, 안드로이드 네이티브 라이브러리 로드 수정**
-
-### 해결된 버그
-
-1. **락 딜레이 메커니즘 (Lock Delay) - Tsu 규칙 완전 구현** (`GameWorld.java`)
-   - **문제**: 뿌요가 바닥에 닿아도 계속 움직이면 절대 잠기지 않음
-   - **원인**: `resetLockDelay()`에서 `lockDelayActive` 매번 `false`로 리셋, 이동 카운터 공중에서도 누적
-   - **해결**:
-     - `lockDelayMoveCount` 추가로 이동/회전 15회 제한 구현
-     - `lockDelayActive` 상태 관리 개선 (스폰/잠금 시 리셋)
-     - 공중 이동 시 카운터 리셋, 락 딜레이 중일 때만 카운트
-   - **Tsu 규칙**: 락 딜레이 0.5초, 이동/회전 15회 제한, 초과 시 즉시 잠금
-
-2. **뿌요 회전 안 되는 버그** (`PuyoPair.java`, `PlayScreen.java`)
-   - **문제**: 회전 키를 눌러도 뿌요가 회전하지 않음
-   - **원인**:
-     1. `PuyoPair.rotateClockwise()`가 `setPosition()` 호출 안 함
-     2. `PlayScreen`에서 `gameWorld.rotateClockwise()` 대신 `getCurrentPair().rotateClockwise()` 직접 호출 (벽 킥 무시)
-     3. `render()`에서 `inputHandler.update()` 중복 호출로 엣지 감지 실패
-   - **해결**:
-     - `PuyoPair.rotateClockwise()`/`rotateCounterClockwise()`에 `setPosition()` 추가
-     - `PlayScreen`에서 `gameWorld.rotateClockwise()` 사용 (벽 킥 포함)
-     - `render()`에서 `inputHandler.update()` 제거, `update()`에서 한 번만 호출
-
-3. **다음 블록 바닥 생성 버그** (`GameWorld.java`)
-   - **문제**: 다음 뿌요가 상단 중앙이 아닌 바닥(0,0)에서 생성
-   - **원인**: `spawnNextPair()`에서 `setPosition()` 미호출
-   - **해결**: `createAndPositionPair()` 공통 메서드로 추출하여 스폰 위치 설정
-
-4. **폰트 로딩 지연 최적화** (`FontManager.java`)
-   - **문제**: 한글 11,172자 미리 생성으로 로딩 화면 지연
-   - **해결**:
-     - `FreeTypeFontParameter.incremental = true` 동적 글리프 생성
-     - 기본 문자셋만 미리 생성 (DEFAULT_CHARS + 게임용 한글)
-     - 나머지 11,172자는 런타임 동적 생성
-
-5. **안드로이드 네이티브 라이브러리 로드 실패** (`AndroidLauncher.java`)
-   - **문제**: `libpenguin.so` dlopen 실패
-   - **해결**:
-     - `System.loadLibrary("penguin")` 제거 (gdx-freetype가 내부에서 dlopen)
-     - `android:extractNativeLibs` 제거
-
-### 리팩토링
-
-- **GameWorld.java** - 스폰 로직 통합: `createAndPositionPair()` 공통 메서드 추출
-
-### 변경 파일
-
-| 파일                                                           | 변경 유형 | 설명                                          |
-| -------------------------------------------------------------- | --------- | --------------------------------------------- |
-| `core/src/main/java/com/puyo/game/logic/engine/GameWorld.java` | 수정      | 락 딜레이 구현, 스폰 로직 리팩토링, 버그 수정 |
-| `core/src/main/java/com/puyo/game/logic/model/PuyoPair.java`   | 수정      | 회전 시 위치 갱신 로직 추가                   |
-| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`     | 수정      | 회전 처리 로직 수정, 입력 처리 순서 수정      |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`   | 수정      | Incremental 폰트 생성 적용, 한글 로딩 최적화  |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`     | 수정      | 네이티브 라이브러리 로드 방식 수정            |
-
-### 검증 결과
-
-- `:core:compileJava` / `:desktop:compileJava` / `:desktop:run` 모두 성공
-- 데스크톱 앱 2분 51초 크래시 없는 실행
-- 회전 키(↑/W/X/1, Z/2) 정상 작동
-- 락 딜레이: 15회 이동/회전 또는 0.5초 후 자동 잠금
-- 다음 블록 상단 중앙 정상 생성
-- 한글/영문 폰트 정상 렌더링
-
-### 커밋
-
-- `b814c7f` - feat(engine): implement Tsu rules lock delay move limit
-- `ea5636f` - refactor: extract pair creation logic to eliminate duplication
-- `48b84f1` - 다음 생성시 바닥생성 버그 수정
-- `b2192cb` - 회전키 버그 수정
-- `9d58fad` - feat(graphics): switch FontManager to incremental mode for dynamic glyph generation
-- `f4e683d` - fix: handle platform-specific font resource paths for Android and Desktop
-
----
-
-## v0.1.6 (2026-08-06) - **GameViewport 1600×960 가로 고정 리팩토링 완료, 터치 컨트롤러 구현, 데스크톱/모바일 가로 모드 적용**
-
-### 추가
-
-1. **GameViewport 전면 재작성 (가로 고정 1600×960)**
-   - 가상 해상도 960×1600 (세로) → 1600×960 (가로) 변경
-   - `GameViewport.Single` - 싱글 플레이 레이아웃 (보드 왼쪽 480×960, 사이드 패널 오른쪽)
-   - `GameViewport.Versus` - 대전 모드 레이아웃 (P1보드|중앙UI|P2보드)
-   - `GameViewport.Menu` - 메뉴/UI 중앙 정렬 레이아웃
-
-2. **입력 시스템 통합 (InputHandler + TouchController)**
-   - `InputHandler` - 키보드(PC)/터치(모바일) 통합 인터페이스, isMobile 플래그 분기
-   - `TouchController` - 4버튼 레이아웃 (좌/우 이동, 회전, 드롭/더블탭 하드드롭), 정규화 좌표(0~1) 기반
-   - 더블탭(300ms) 감지로 하드 드롭 구현
-
-3. **PlayScreen 게임플레이 레이아웃 적용**
-   - GameViewport.Single 상수 사용으로 보드/다음뿌요/UI 위치 재조정
-   - InputHandler 연동으로 키보드/터치 통합 입력 처리
-   - InputProcessor 직접 구현 제거, InputHandler 위임 방식
-
-4. **메뉴 화면 가로 레이아웃 적용**
-   - MenuScreen, StoryModeSelectScreen - GameViewport.Menu 중앙 정렬 영역 사용
-
-5. **데스크톱 런처 가로 고정**
-   - DesktopLauncher 1600×960 창 크기, setResizable(true)로 비율 유지 리사이즈
-
-### 변경 파일
-
-| 파일                                                                  | 변경 유형   | 설명                                                         |
-| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| `core/src/main/java/com/puyo/game/config/GameViewport.java`           | 전체 재작성 | 1600×960 가로 고정, Single/Versus/Menu 레이아웃 클래스 추가  |
-| `core/src/main/java/com/puyo/game/input/InputHandler.java`            | 신규        | 키보드/터치 통합 입력 처리기                                 |
-| `core/src/main/java/com/puyo/game/input/TouchController.java`         | 신규        | 모바일 4버튼 터치 컨트롤러                                   |
-| `core/src/main/java/com/puyo/game/screens/PlayScreen.java`            | 대폭 수정   | Single 레이아웃 적용, InputHandler 연동, InputProcessor 제거 |
-| `core/src/main/java/com/puyo/game/screens/MenuScreen.java`            | 수정        | Menu 레이아웃 상수 사용                                      |
-| `core/src/main/java/com/puyo/game/screens/StoryModeSelectScreen.java` | 수정        | Menu 레이아웃 상수 사용                                      |
-| `desktop/src/main/java/com/puyo/game/DesktopLauncher.java`            | 수정        | 1600×960 창 크기, 리사이즈 비율 유지                         |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`            | 수정        | TouchController import 추가                                  |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`          | 수정        | 폰트 경로 assets/ 하위로 변경                                |
-| `core/src/main/java/com/puyo/game/menus/MenuLoader.java`              | 수정        | 메뉴 경로 assets/data/menus/로 변경                          |
-| `core/src/main/java/com/puyo/game/story/StoryModeManager.java`        | 수정        | 스토리 데이터 경로 assets/data/story/로 변경                 |
-
-### 검증 결과
-
-- `:core:compileJava` / `:desktop:compileJava` / `:android:compileDebugJavaWithJavac` 모두 성공
-- `:core:test` 6/6 테스트 통과
-- 데스크톲 앱 실행 확인 - 메인 메뉴 → 스토리 선택 → 게임 화면(ENDLESS) 정상 진입
-
-### 커밋
-
-- `286a742` - feat: GameViewport 1600x960 landscape refactor + touch controller
-
----
-
-## v0.1.5 (2026-08-03) - **libpenguin.so SONAME 패치 성공, 한글 폰트 정상 적용, 실기기 정상 실행**
-
-### 해결 내용
-
-1. **libpenguin.so SONAME 패치**
-   - Python `lief` 라이브러리로 `libgdx-freetype.so`의 SONAME을 `libpenguin.so`로 변경
-   - `llvm-objcopy --set-soname` 실패로 Python 스크립트(`patch_soname.py`)로 우회 해결
-   - `mergeDebugNativeLibs` 태스크 후 자동 패치 적용하도록 `android/build.gradle`에 통합
-
-2. **한글 폰트 정상 적용**
-   - Google Fonts API(`https://fonts.gstatic.com/s/notosanskr/v39/...`)에서 정상 TTF 다운로드 (5.87MB)
-   - Git LFS 없이 일반 커밋으로 관리 (CRLF 이슈 방지)
-   - `FontManager.param.characters`에 필수 한글/영문/특수문자 명시로 X박스 문제 해결
-
-3. **실기기(갤럭시 S23, Android 14) 정상 실행 확인**
-   - APK 설치 → 메인 메뉴 진입 → 한글 정상 표시 → 크래시 없음 확인
-   - 기존 `Unable to open libpenguin.so` 에러 완전 해결
-   - 폰트 로딩 에러(`Error reading file: fonts/NotoSansKR-Regular.ttf`) 해결
-
-4. **에셋 구조 정리**
-   - `core/src/main/resources/assets/` 단일 소스로 통합
-   - 기존 중복 `assets/`, `android/src/main/assets/` 제거
-   - `build.gradle` (root): `srcDirs = ['src/main/resources']`로 JAR에 `assets/` 포함
-   - `android/build.gradle`: `assets.srcDirs = ['src/main/assets']` (안드로이드 전용만 별도)
-
-### 변경 파일
-
-| 파일                                                             | 변경 유형 | 설명                                                                                   |
-| ---------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------- |
-| `android/build.gradle`                                           | 수정      | `mergeNativeLibs` 후 SONAME 패치 자동 적용 (`patch_soname.py` 호출)                   |
-| `core/src/main/java/com/puyo/game/graphics/FontManager.java`     | 수정      | `param.characters`에 필수 문자 명시, 폰트 경로 `NotoSansKR-Regular.ttf`로 변경        |
-| `android/src/main/java/com/puyo/game/AndroidLauncher.java`       | 수정      | `System.loadLibrary("penguin")` 제거 (중복 로드 방지)                                 |
-| `build.gradle` (root)                                            | 수정      | `srcDirs = ['src/main/resources']`로 assets JAR 포함                                  |
-| `android/build.gradle`                                           | 수정      | `assets.srcDirs = ['src/main/assets']`로 `../assets` 중복 제거                        |
-| `core/src/main/resources/assets/`                                | 신규/수정 | 폰트, JSON 모두 core JAR의 assets 하위에 통합                                         |
-| `patch_soname.py`                                                | 신규      | Python lief로 SONAME 패치 스크립트                                                    |
-| `core/src/main/assets/fonts/`                                    | 삭제      | 중복 폰트 제거                                                                        |
-| `android/src/main/assets/`                                       | 삭제      | 중복 에셋 제거                                                                        |
-| `lib/`, `patchelf/`, `check_font.py`, `fix_deps.ps1`, `test.txt` | 삭제      | 임시 스크립트/아티팩트 정리                                                           |
-
-### 커밋
-
-- `5cb5ec4` - fix: Android native lib loading & font issues for local PC build
-- `cc6c4c1` - chore: remove temporary utility scripts and build artifacts
-
----
-
-## v0.1.4 (2026-08-02) - libpenguin.so 실기기 로드 실패 확인, PC 개발 환경 이전 결정
-
-### 현황
-
-- APK에 `libpenguin.so` (arm64-v8a: 797KB, armeabi-v7a: 757KB) 정상 포함
-- `readelf -d`로 SONAME `[libpenguin.so]` 확인
-- `patchelf --set-soname`으로 SONAME 패치 시도
-- **하지만 실기기(갤럭시 S23, Android 14)에서 `dlopen failed: library "libpenguin.so" not found` 발생**
-
-### 시도한 해결 (모두 실패)
-
-1. **libgdx-freetype.so → libpenguin.so 이름 변경** (android/build.gradle copy + rename)
-2. **AndroidLauncher에서 System.loadLibrary("gdx-freetype") 제거**, `System.loadLibrary("penguin")`만 로드
-3. **SONAME 패치** (`patchelf --set-soname libpenguin.so`) 후 APK 재패키징 + 디버그 키 재서명
-4. **armeabi-v7a / arm64-v8a 모두 적용** 시도
-
-### 실패 원인 추정
-
-- gdx-freetype 네이티브 코드 내부에서 `dlopen("libpenguin.so")` 호출 시 **이미 로드된 라이브러리를 찾지 못함**
-- `android:extractNativeLibs="true"` (기본값)이나 **압축 해제 경로/권한 문제** 가능성
-- **GitHub Actions 러너의 NDK/SDK 버전** 차이로 인한 네이티브 심볼/의존성 불일치
-- **Termux 환경에서 `aapt2`, `lldb`, `readelf` 등 디버깅 도구 부재**로 정밀 분석 불가
-
-### 결정: PC 로컬 개발 환경으로 이전
-
-```
-# PC에서 필요한 환경
-- JDK 17 (Temurin/OpenJDK)
-- Android SDK: cmdline-tools, platform-tools, platforms;android-33, build-tools;33.0.2
-- NDK: r25c+ (Android Studio SDK Manager에서 설치)
-- Android Studio (선택) 또는 IntelliJ IDEA + Android 플러그인
-- adb + lldb (NDK에 포함) for 실기기 디버깅
-```
-
-### PC에서 수행할 디버깅
-
-```bash
-# 1. 로컬 빌드
-./gradlew :android:assembleDebug
-
-# 2. 실기기 설치 및 로그 확인
-adb install -r android/build/outputs/apk/debug/android-debug.apk
-adb logcat -s "com.puyo.game" "AndroidRuntime" "DEBUG"
-
-# 3. 네이티브 라이브러리 로드 경로 확인
-adb shell "ls -la /data/app/com.puyo.game-*/lib/arm64/"
-adb shell "cat /proc/$(pidof com.puyo.game)/maps | grep penguin"
-
-# 4. lldb로 네이티브 크래시 분석 (필요시)
-adb shell lldb --attach $(pidof com.puyo.game)
-```
-
-### 변경 파일
-
-| 파일                                                     | 변경 유형 | 설명                                                                 |
-| -------------------------------------------------------- | --------- | -------------------------------------------------------------------- |
-| android/build.gradle                                     | 수정      | libgdx-freetype.so → libpenguin.so 이름 변경 시도 (실패)             |
-| android/src/main/java/com/puyo/game/AndroidLauncher.java | 수정      | System.loadLibrary("gdx-freetype") 제거, penguin만 로드 (실패)       |
-| docs/architecture.md                                     | 수정      | 실기기 네이티브 로드 실패 원인 분석, PC 이전 결정 기록               |
-| docs/progress.md                                         | 수정      | 진행 현황 업데이트 (실기기 실패, PC 이전), v0.1.1/v0.1.2 내용 추가   |
-| docs/todo.md                                             | 수정      | P0-1~P0-3 추가 (PC 환경 구축, libpenguin 디버깅, 실기기 검증)        |
-
-### 커밋
-
-- `0961e9c` - fix: libgdx-freetype.so → libpenguin.so 이름 변경 시도 (실패)
-- `c519213` - docs: 진행 현황 업데이트 (실기기 실패, PC 이전)
-
----
-
-## v0.1.3 (2026-08-01) - libgdx-freetype.so → libpenguin.so 이름 변경 시도, AndroidLauncher 단일 로드 수정 (해결 안됨)
-
-### 시도한 내용
-
-1. **libgdx-freetype.so를 libpenguin.so로 이름 변경** (android/build.gradle)
-   - `mergeDebugNativeLibs` 후 `libgdx-freetype.so` → `libpenguin.so` 복사/이름변경
-   - `renameFreetypeToPenguin` 태스크 생성
-
-2. **AndroidLauncher 네이티브 로드 단순화**
-   - `System.loadLibrary("gdx")` + `System.loadLibrary("penguin")`만 로드
-   - `gdx-freetype` 제거 (내부에서 penguin 로드 예상)
-
-### 결과
-- APK에 `libpenguin.so` 포함 확인
-- 하지만 실기기에서 여전히 `dlopen failed: library "libpenguin.so" not found`
-- SONAME 문제일 가능성 높음 (readelf로 확인 필요)
-
----
-
-## v0.1.2 (2026-07-28) - 뷰포트/카메라 시스템 구현, 가상 해상도 960×1600, FitViewport 적용
-
-### 추가
-- `GameViewport` 클래스: 가상 해상도 960×1600 (3:5 비율) 설정
-- `FitViewport` + `OrthographicCamera`로 자동 비율 유지 스케일링
-- `BaseScreen` 공통 뷰포트 관리 (initViewport, resize 자동 처리)
-
-### 변경 파일
-- `core/src/main/java/com/puyo/game/config/GameViewport.java` 신규
-- `core/src/main/java/com/puyo/game/screens/BaseScreen.java` 신규
-- 기존 스크린들(BaseScreen 상속) 뷰포트 적용
-
----
-
-## v0.1.1 (2026-07-27) - 헤드리스 테스트 안정화 & 리소스 로딩 개선
-
-### 수정
-- `core/build.gradle`: `gdx-backend-headless`, `gdx-platform:natives-desktop` 테스트 의존성 추가
-- `MenuLoader`: 클래스패스/내부 파일 폴백 로딩으로 테스트/앱 모두 지원
-- `FontManager`: `Gdx.files.internal()` 우선, 실패 시 클래스패스 폴백
-
----
-
-## v0.1.0 (2026-07-26) - 초기 프로젝트 설정, 코어 로직, 메뉴 시스템, CI 파이프라인 완성
-
-### 초기 설정
-- 멀티 모듈 Gradle (core, desktop, android)
-- LibGDX 1.12.1, AGP 8.1.0, Gradle 8.4
-- GitHub Actions CI 파이프라인 (테스트 + APK 빌드)
-- 코어 게임 로직: Board(6x12), Puyo/PuyoPair, 중력, 매칭(4개 이상), 연쇄
-- 메뉴 시스템: JSON 기반 동적 메뉴 (main.json, story_mode_select.json 등)
-- 화면 구조: LoadingScreen → MenuScreen → StoryModeSelectScreen → PlayScreen

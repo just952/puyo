@@ -55,6 +55,12 @@ public class ConfigManager {
         public String player_data_endpoint = "";
         public String matchmaking_endpoint = "";
         public int heartbeat_interval_sec = 0;
+
+        // DAS/ARR 설정 (초 단위, float) - GameWorld.FALLING_ANIMATION_INTERVAL(0.025f) 스타일과 통일
+        public float das_delay_horizontal_sec = 0.166f;    // 166ms
+        public float arr_interval_horizontal_sec = 0.033f;  // 33ms
+        public float das_delay_softdrop_sec = 0.166f;       // 166ms
+        public float arr_interval_softdrop_sec = 0.033f;    // 33ms
         // 필요 시 필드 추가 가능
     }
 }

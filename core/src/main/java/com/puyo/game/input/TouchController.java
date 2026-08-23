@@ -3,11 +3,13 @@ package com.puyo.game.input;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.utils.Disposable;
+import com.puyo.game.config.ConfigManager;
 
 /**
  * 모바일 전용 터치 컨트롤러.
  * 4버튼 레이아웃: 좌/우 이동, 회전, 드롭(더블탭=하드드롭)
  * 정규화 좌표(0~1) 기반 해상도 독립적 터치 영역.
+ * DAS/ARR은 초 단위(float)로 관리하며 InputHandler와 동일 로직 적용.
  */
 public class TouchController implements InputProcessor, Disposable {
     // 버튼 영역 (정규화 좌표 0~1, 화면 기준: 좌하단 0,0 / 우상단 1,1)
@@ -52,7 +54,35 @@ public class TouchController implements InputProcessor, Disposable {
     private long lastDropTapTime = 0;
     private static final long DOUBLE_TAP_WINDOW_MS = 300;
 
+    // DAS/ARR 설정 (초 단위, ConfigManager에서 로드)
+    private float dasDelayHorizontalSec;
+    private float arrIntervalHorizontalSec;
+    private float dasDelaySoftdropSec;
+    private float arrIntervalSoftdropSec;
+
+    // DAS/ARR 추적용 상태 (좌우/소프트드랍 독립 관리)
+    private float horizontalHeldTimeSec = 0f;
+    private float softDropHeldTimeSec = 0f;
+    private boolean horizontalRepeatTriggered = false;
+    private boolean softDropRepeatTriggered = false;
+
+    // 🆕 첫 프레임 즉시 이동 감지용 플래그 (터치 눌림 순간 true, updateDasArr에서 처리 후 false)
+    private boolean horizontalFirstFrame = false;
+    private boolean softDropFirstFrame = false;
+
     public TouchController() {
+        loadConfig();
+    }
+
+    /**
+     * 설정 로드 (ConfigManager에서 DAS/ARR 값 읽기)
+     */
+    private void loadConfig() {
+        ConfigManager.GameConfig config = ConfigManager.getInstance().getConfig();
+        this.dasDelayHorizontalSec = config.das_delay_horizontal_sec;
+        this.arrIntervalHorizontalSec = config.arr_interval_horizontal_sec;
+        this.dasDelaySoftdropSec = config.das_delay_softdrop_sec;
+        this.arrIntervalSoftdropSec = config.arr_interval_softdrop_sec;
     }
 
     @Override
@@ -77,6 +107,7 @@ public class TouchController implements InputProcessor, Disposable {
                 rightPressed = true;
             }
             dragStartedInLeftArea = true;
+            horizontalFirstFrame = true; // 🆕 첫 프레임 즉시 이동 플래그
             return true;
         }
 
@@ -98,6 +129,7 @@ public class TouchController implements InputProcessor, Disposable {
                 } else {
                     // 싱글탭 = 소프트 드롭
                     dropPressed = true;
+                    softDropFirstFrame = true; // 🆕 첫 프레임 즉시 이동 플래그
                 }
                 lastDropTapTime = now;
             }
@@ -119,6 +151,8 @@ public class TouchController implements InputProcessor, Disposable {
         dropPressed = false;
         dragStartedInLeftArea = false;
         // hardDropPressed는 엣지 감지 후 자동 리셋됨
+        horizontalFirstFrame = false; // 🆕 리셋
+        softDropFirstFrame = false;   // 🆕 리셋
 
         return true;
     }
@@ -186,15 +220,80 @@ public class TouchController implements InputProcessor, Disposable {
     }
 
     /**
-     * 매 프레임 호출하여 이전 상태 업데이트 (엣지 감지용)
+     * 매 프레임 호출하여 이전 상태 업데이트 (엣지 감지용) 및 DAS/ARR 처리
+     * 
+     * @param delta 프레임 시간(초)
      */
-    public void update() {
+    public void update(float delta) {
         prevRotatePressed = rotatePressed;
         prevHardDropPressed = hardDropPressed;
 
         // 하드 드롭은 한 프레임만 true
         if (hardDropPressed) {
             hardDropPressed = false;
+        }
+
+        // DAS/ARR 처리 (터치 홀드 시 적용)
+        updateDasArr(delta);
+    }
+
+    /**
+     * DAS (Delayed Auto Shift) / ARR (Auto Repeat Rate) 업데이트
+     * - 좌우 이동 터치와 소프트 드랍 터치를 독립적으로 관리
+     * - 첫 프레임 즉시 repeatTriggered = true
+     * - DAS 지연 후 ARR 간격으로 반복
+     * 
+     * @param delta 프레임 시간(초)
+     */
+    private void updateDasArr(float delta) {
+        // 좌우 이동 터치 체크
+        boolean horizontalPressed = leftPressed || rightPressed;
+
+        if (horizontalPressed) {
+            if (horizontalFirstFrame) {
+                // 🆕 첫 프레임: 즉시 트리거 후 플래그 해제
+                horizontalRepeatTriggered = true;
+                horizontalFirstFrame = false;
+                horizontalHeldTimeSec = 0f; // 타이머 시작
+            } else {
+                horizontalHeldTimeSec += delta;
+                if (horizontalHeldTimeSec < dasDelayHorizontalSec) {
+                    // DAS 지연 중: 반복 없음
+                    horizontalRepeatTriggered = false;
+                } else {
+                    // DAS 지연 후: ARR 주기로 반복
+                    float postDasTime = horizontalHeldTimeSec - dasDelayHorizontalSec;
+                    horizontalRepeatTriggered = (postDasTime % arrIntervalHorizontalSec) < delta;
+                }
+            }
+        } else {
+            horizontalHeldTimeSec = 0f;
+            horizontalRepeatTriggered = false;
+            horizontalFirstFrame = false; // 🆕 리셋
+        }
+
+        // 소프트 드랍 터치 체크 (독립적)
+        if (dropPressed) {
+            if (softDropFirstFrame) {
+                // 🆕 첫 프레임: 즉시 트리거 후 플래그 해제
+                softDropRepeatTriggered = true;
+                softDropFirstFrame = false;
+                softDropHeldTimeSec = 0f; // 타이머 시작
+            } else {
+                softDropHeldTimeSec += delta;
+                if (softDropHeldTimeSec < dasDelaySoftdropSec) {
+                    // DAS 지연 중: 반복 없음
+                    softDropRepeatTriggered = false;
+                } else {
+                    // DAS 지연 후: ARR 주기로 반복
+                    float postDasTime = softDropHeldTimeSec - dasDelaySoftdropSec;
+                    softDropRepeatTriggered = (postDasTime % arrIntervalSoftdropSec) < delta;
+                }
+            }
+        } else {
+            softDropHeldTimeSec = 0f;
+            softDropRepeatTriggered = false;
+            softDropFirstFrame = false; // 🆕 리셋
         }
     }
 
@@ -225,12 +324,24 @@ public class TouchController implements InputProcessor, Disposable {
 
     /**
      * 좌우 이동 방향 반환 (-1: 왼쪽, 0: 없음, 1: 오른쪽)
+     * DAS/ARR 적용: 첫 프레임 즉시 이동 + DAS 지연 후 ARR 주기 반복 이동
      */
     public int getMoveDirection() {
-        if (leftPressed && !rightPressed)
+        // 양쪽 동시 누름: 상쇄
+        if (leftPressed && rightPressed) {
+            return 0;
+        }
+
+        // 왼쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
+        if (leftPressed && horizontalRepeatTriggered) {
             return -1;
-        if (rightPressed && !leftPressed)
+        }
+
+        // 오른쪽 이동: 첫 프레임 또는 ARR 반복 트리거 시
+        if (rightPressed && horizontalRepeatTriggered) {
             return 1;
+        }
+
         return 0;
     }
 
@@ -242,10 +353,10 @@ public class TouchController implements InputProcessor, Disposable {
     }
 
     /**
-     * 드롭 버튼이 눌려 있는지 확인 (홀드 감지)
+     * 드롭 버튼이 눌려 있는지 확인 (DAS/ARR 적용)
      */
     public boolean isDropPressed() {
-        return dropPressed;
+        return dropPressed && softDropRepeatTriggered;
     }
 
     /**

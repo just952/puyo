@@ -131,7 +131,7 @@ public class PlayScreen extends BaseScreen {
                 gameWorld.rotateClockwise();
             }
 
-            inputHandler.update();
+            inputHandler.update(delta);
 
             // 좌우 이동
             if (allowInput) {
