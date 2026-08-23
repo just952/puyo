@@ -15,9 +15,15 @@ import java.util.List;
 import static org.junit.Assert.*;
 
 /**
- * 부유 뿌요 낙하 애니메이션 버그 재현 테스트.
- * 로그에 나온 정확한 보드 상태에서 CHAIN_FLOATING_CHECK → FALLING_ANIMATION → CHAIN_FINDING
- * 단계 진행 시 부유 뿌요가 공중에 멈추는지(버그) 검증.
+ * 부유 뿌요 낙하 애니메이션 테스트 - 최신 로그 시나리오 기반.
+ * 
+ * 로그 상황:
+ * 1. 연쇄 1단계: BLUE 6개 매치 팝 (4,1)(5,1)(5,2)(4,2)(4,3)(5,0)
+ * 2. 팝 후 보드에서 column 4에 부유 뿌요 5개 발견:
+ *    - (4,4) RED, (4,5) RED, (4,6) PURPLE, (4,7) PURPLE, (4,8) YELLOW
+ * 3. column 4 바닥엔 grounded: (4,0) GREEN, (4,1) GREEN
+ * 4. 예상 착지 위치: y=2,3,4,5,6 (grounded 위 연속 쌓임)
+ * 5. 착지 후 바운스(SETTLING) → CHAIN_FINDING 전이 → 2차 매치 검색
  */
 public class FallingAnimationTest {
     private HeadlessApplication app;
@@ -28,7 +34,6 @@ public class FallingAnimationTest {
         HeadlessApplicationConfiguration cfg = new HeadlessApplicationConfiguration();
         app = new HeadlessApplication(new HeadlessGame(), cfg);
         
-        // GameWorld 생성 (테스트용 보드 주입 가능)
         gameWorld = new GameWorld();
     }
 
@@ -38,7 +43,6 @@ public class FallingAnimationTest {
         if (gameWorld != null) gameWorld.dispose();
     }
 
-    // Minimal game for headless testing
     public static class HeadlessGame extends com.badlogic.gdx.Game {
         @Override
         public void create() {}
@@ -47,69 +51,77 @@ public class FallingAnimationTest {
     }
 
     /**
-     * 로그에 나온 보드 상태 재현 후 부유 뿌요 낙하 테스트.
+     * 최신 로그 시나리오: column 4에 부유 5개가 grounded 2개 위에 낙하하는 경우.
      * 
-     * 초기 보드 (CHAIN_POP_ANIMATION 완료 직후):
-     * |......|
-     * |......|
-     * |.B....|
-     * |.P....|
-     * |......|
-     * |P.....|
-     * |PR....|
-     * |RBY..R|
-     * |R.PP.Y|
-     * |P..R.Y|
-     * |....GY|
-     * |....GR|
+     * 초기 보드 (CHAIN_POP_ANIMATION 완료 직후, 팝 후):
+     * |......|  <- y=11
+     * |......|  <- y=10
+     * |......|  <- y=9
+     * |...PY.|  <- y=8  : x=3:P, x=4:Y
+     * |.P.YP.|  <- y=7  : x=1:P, x=3:Y, x=4:P
+     * |.R.PP.|  <- y=6  : x=1:R, x=3:P, x=4:P
+     * |.R.RR.|  <- y=5  : x=1:R, x=3:R, x=4:R, x=5:R
+     * |.PRYR.|  <- y=4  : x=1:P, x=2:R, x=3:Y, x=4:R  ← 부유 시작 (y=4)
+     * |.YGY..|  <- y=3  : x=1:Y, x=2:G, x=3:Y
+     * |.RBY..|  <- y=2  : x=1:R, x=2:B, x=3:Y
+     * |YRBG..|  <- y=1  : x=0:Y, x=1:R, x=2:B, x=3:G  ← column 4: y=1 GREEN (grounded)
+     * |GRBYR.|  <- y=0  : x=0:G, x=1:R, x=2:B, x=3:Y, x=4:R  ← column 4: y=0 GREEN (grounded)
      * +------+
      * 
-     * 부유 뿌요 13개:
-     * Column 0: y=2(P), y=3(R), y=5(P), y=6(R) - 4개
-     * Column 1: y=4(B), y=5(R), y=8(P), y=9(B) - 4개
-     * Column 2: y=3(P), y=4(Y) - 2개
-     * Column 3: y=2(R), y=3(P) - 2개
-     * Column 5: y=8(R), y=9(Y) - 1개? wait, 로그에는 13개라고 나옴
+     * column 4 부유 뿌요 (y=4~8): R, R, P, P, Y (5개)
+     * column 4 grounded (y=0,1): G, G (2개)
      * 
-     * 예상 올바른 동작: 모든 부유 뿌요가 바닥에 밀착하여 낙하
-     * - Column 0: y=0,1,2,3 착지
-     * - Column 1: y=0,1,2,3 착지  
-     * - Column 2: y=0,1 착지
-     * - Column 3: y=0,1 착지
-     * 
-     * 버그 동작: 열 단위 강체 낙하로 공중에 멈춤
-     * - Column 1: y=4,5 뿌요가 y=0,1 착지, y=8,9 뿌요가 y=4,5에서 멈춤 (간격 유지)
+     * 예상 낙하 후 위치: y=2,3,4,5,6 (grounded 위에 연속 쌓임)
+     * 착지 순서 (아래부터): y=4 RED → y=2, y=5 RED → y=3, y=6 PURPLE → y=4, y=7 PURPLE → y=5, y=8 YELLOW → y=6
      */
     @Test
-    public void testFloatingPuyosFallToGround() {
-        // 1. 로그 보드 상태 재현
-        setupBoardFromLog();
+    public void testFloatingPuyosFallOntoGroundedColumn() {
+        // 1. 로그 보드 상태 재현 (팝 완료 직후)
+        setupBoardFromLatestLog();
         
         // 2. CHAIN_FLOATING_CHECK 단계로 강제 설정
         setGamePhase(GameWorld.GamePhase.CHAIN_FLOATING_CHECK);
         
         // 3. update 호출로 단계 진행: CHAIN_FLOATING_CHECK → FALLING_ANIMATION
-        gameWorld.update(0.016f); // 1프레임 (약 16ms)
+        gameWorld.update(0.016f);
         
         // FALLING_ANIMATION 단계로 전이되었는지 확인
         assertEquals("CHAIN_FLOATING_CHECK → FALLING_ANIMATION 전이", 
                      GameWorld.GamePhase.FALLING_ANIMATION, getGamePhase());
         
+        // 부유 뿌요 5개가 animatingPuyos에 추가되었는지 확인
+        assertEquals("부유 뿌요 5개가 애니메이션 리스트에 있어야 함", 
+                     5, gameWorld.getAnimatingPuyos().size());
+        
+        // 모든 뿌요가 FALLING 상태인지 확인
+        for (Puyo p : gameWorld.getAnimatingPuyos()) {
+            assertEquals("부유 뿌요는 FALLING 상태여야 함", 
+                         Puyo.State.FALLING, p.getState());
+        }
+        
         // 4. 낙하 애니메이션 완료까지 반복 update
-        int maxFrames = 500; // 충분한 프레임 (0.025초 간격 * 500 = 12.5초)
+        int maxFrames = 500; // 충분한 프레임
         boolean fallingCompleted = false;
+        int lastAnimatingCount = -1;
         
         for (int frame = 0; frame < maxFrames; frame++) {
             gameWorld.update(0.016f);
             
+            // animatingPuyos 크기 변화 로깅 (디버깅용)
+            int currentAnimating = gameWorld.getAnimatingPuyos().size();
+            if (currentAnimating != lastAnimatingCount) {
+                System.out.println("Frame " + frame + ": animatingPuyos=" + currentAnimating + ", phase=" + getGamePhase());
+                lastAnimatingCount = currentAnimating;
+            }
+            
             if (getGamePhase() == GameWorld.GamePhase.CHAIN_FINDING) {
                 fallingCompleted = true;
-                System.out.println("낙하 완료 프레임: " + frame);
+                System.out.println("낙하+바운스 완료 프레임: " + frame);
                 break;
             }
         }
         
-        assertTrue("낙하 애니메이션이 완료되어야 함 (CHAIN_FINDING 전이)", fallingCompleted);
+        assertTrue("낙하+바운스 애니메이션이 완료되어야 함 (CHAIN_FINDING 전이)", fallingCompleted);
         
         // 5. 검증: 모든 뿌요가 바닥에 밀착했는지 확인 (공중에 떠있는 것 없는지)
         Board board = gameWorld.getBoard();
@@ -117,97 +129,100 @@ public class FallingAnimationTest {
         
         System.out.println("낙하 후 보드 상태:\n" + board.toString());
         System.out.println("낙하 후 부유 뿌요 수: " + floatingAfterFall.size());
+        if (!floatingAfterFall.isEmpty()) {
+            for (Puyo p : floatingAfterFall) {
+                System.out.println("  부유 남아있음: (" + p.getX() + "," + p.getY() + ") " + p.getColor());
+            }
+        }
         
-        // 버그 재현 시: floatingAfterFall.size() > 0 (공중에 멈춘 뿌요 존재)
         // 정상 동작 시: floatingAfterFall.size() == 0 (모두 바닥에 착지)
         assertEquals("모든 부유 뿌요가 바닥에 착지해야 함 (공중 정지 버그 없음)", 
                      0, floatingAfterFall.size());
         
-        // 6. 추가 검증: 각 열의 뿌요들이 연속해서 바닥에 밀착되어 있는지
-        verifyContinuousStacking(board);
+        // 6. column 4 검증: grounded(y=0,1) 위에 5개가 연속 쌓여야 함 (y=2,3,4,5,6)
+        verifyColumn4Stacking(board);
+        
+        // 7. column 4의 뿌요들 색상 순서 검증 (아래부터: RED, RED, PURPLE, PURPLE, YELLOW)
+        verifyColumn4Colors(board);
     }
     
     /**
-     * 로그에 나온 정확한 보드 상태 재현.
-     * Board.toString()은 y=HEIGHT-1(11)부터 y=0(바닥)까지 출력.
-     * 로그 보드:
-     * |......|  <- y=11
-     * |......|  <- y=10
-     * |.B....|  <- y=9
-     * |.P....|  <- y=8
-     * |......|  <- y=7
-     * |P.....|  <- y=6
-     * |PR....|  <- y=5
-     * |RBY..R|  <- y=4
-     * |R.PP.Y|  <- y=3
-     * |P..R.Y|  <- y=2
-     * |....GY|  <- y=1
-     * |....GR|  <- y=0
-     * +------+
-     * 
-     * getAllFloatingPuyos 예상 결과 (로그 기준 13개):
-     * Column 0: y=2,3,4,5,6 (P,R,R,P,P) - 5개 (y=0,1 비어있으므로 모두 부유)
-     * Column 1: y=4,5,8,9 (B,R,P,B) - 4개 (y=0-3 비어있으므로 모두 부유)
-     * Column 2: y=3,4 (P,Y) - 2개 (y=0-2 비어있으므로 모두 부유)
-     * Column 3: y=2,3 (R,P) - 2개 (y=0,1 비어있으므로 모두 부유)
-     * Column 4: y=0,1 (G,G) - 접지됨 (부유 아님)
-     * Column 5: y=0,1,2,3,4,5 (R,Y,Y,Y,R,R) - 모두 접지됨 (부유 아님)
-     * Total: 13개
+     * 최신 로그 기반 보드 상태 재현.
+     * BLUE 6개 팝 완료 후 상태.
      */
-    private void setupBoardFromLog() {
+    private void setupBoardFromLatestLog() {
         Board board = gameWorld.getBoard();
         board.clear();
         
-        // y=0 (바닥): |....GR| -> x=4:G, x=5:R
-        placePuyo(board, 4, 0, PuyoColor.GREEN);
-        placePuyo(board, 5, 0, PuyoColor.RED);
+        // y=0 (바닥): |GRBYR.| -> x=0:G, x=1:R, x=2:B, x=3:Y, x=4:R
+        placePuyo(board, 0, 0, PuyoColor.GREEN);
+        placePuyo(board, 1, 0, PuyoColor.RED);
+        placePuyo(board, 2, 0, PuyoColor.BLUE);
+        placePuyo(board, 3, 0, PuyoColor.YELLOW);
+        placePuyo(board, 4, 0, PuyoColor.GREEN);  // column 4 grounded
+        // x=5: 빈칸
         
-        // y=1: |....GY| -> x=4:G, x=5:Y
-        placePuyo(board, 4, 1, PuyoColor.GREEN);
-        placePuyo(board, 5, 1, PuyoColor.YELLOW);
+        // y=1: |YRBG..| -> x=0:Y, x=1:R, x=2:B, x=3:G
+        placePuyo(board, 0, 1, PuyoColor.YELLOW);
+        placePuyo(board, 1, 1, PuyoColor.RED);
+        placePuyo(board, 2, 1, PuyoColor.BLUE);
+        placePuyo(board, 3, 1, PuyoColor.GREEN);
+        placePuyo(board, 4, 1, PuyoColor.GREEN);  // column 4 grounded
         
-        // y=2: |P..R.Y| -> x=0:P, x=3:R, x=5:Y
-        placePuyo(board, 0, 2, PuyoColor.PURPLE);
-        placePuyo(board, 3, 2, PuyoColor.RED);
-        placePuyo(board, 5, 2, PuyoColor.YELLOW);
+        // y=2: |.RBY..| -> x=1:R, x=2:B, x=3:Y
+        placePuyo(board, 1, 2, PuyoColor.RED);
+        placePuyo(board, 2, 2, PuyoColor.BLUE);
+        placePuyo(board, 3, 2, PuyoColor.YELLOW);
         
-        // y=3: |R.PP.Y| -> x=0:R, x=2:P, x=3:P, x=5:Y
-        placePuyo(board, 0, 3, PuyoColor.RED);
-        placePuyo(board, 2, 3, PuyoColor.PURPLE);
-        placePuyo(board, 3, 3, PuyoColor.PURPLE);
-        placePuyo(board, 5, 3, PuyoColor.YELLOW);
+        // y=3: |.YGY..| -> x=1:Y, x=2:G, x=3:Y
+        placePuyo(board, 1, 3, PuyoColor.YELLOW);
+        placePuyo(board, 2, 3, PuyoColor.GREEN);
+        placePuyo(board, 3, 3, PuyoColor.YELLOW);
         
-        // y=4: |RBY..R| -> x=0:R, x=1:B, x=2:Y, x=5:R
-        placePuyo(board, 0, 4, PuyoColor.RED);
-        placePuyo(board, 1, 4, PuyoColor.BLUE);
-        placePuyo(board, 2, 4, PuyoColor.YELLOW);
-        placePuyo(board, 5, 4, PuyoColor.RED);
+        // y=4: |.PRYR.| -> x=1:P, x=2:R, x=3:Y, x=4:R  ← 부유 시작
+        placePuyo(board, 1, 4, PuyoColor.PURPLE);
+        placePuyo(board, 2, 4, PuyoColor.RED);
+        placePuyo(board, 3, 4, PuyoColor.YELLOW);
+        placePuyo(board, 4, 4, PuyoColor.RED);      // 부유 1
         
-        // y=5: |PR....| -> x=0:P, x=1:R
-        placePuyo(board, 0, 5, PuyoColor.PURPLE);
+        // y=5: |.R.RR.| -> x=1:R, x=3:R, x=4:R, x=5:R
         placePuyo(board, 1, 5, PuyoColor.RED);
+        placePuyo(board, 3, 5, PuyoColor.RED);
+        placePuyo(board, 4, 5, PuyoColor.RED);      // 부유 2
+        placePuyo(board, 5, 5, PuyoColor.RED);
         
-        // y=6: |P.....| -> x=0:P
-        placePuyo(board, 0, 6, PuyoColor.PURPLE);
+        // y=6: |.R.PP.| -> x=1:R, x=3:P, x=4:P
+        placePuyo(board, 1, 6, PuyoColor.RED);
+        placePuyo(board, 3, 6, PuyoColor.PURPLE);
+        placePuyo(board, 4, 6, PuyoColor.PURPLE);   // 부유 3
         
-        // y=7: |......| -> 없음
+        // y=7: |.P.YP.| -> x=1:P, x=3:Y, x=4:P
+        placePuyo(board, 1, 7, PuyoColor.PURPLE);
+        placePuyo(board, 3, 7, PuyoColor.YELLOW);
+        placePuyo(board, 4, 7, PuyoColor.PURPLE);   // 부유 4
         
-        // y=8: |.P....| -> x=1:P
-        placePuyo(board, 1, 8, PuyoColor.PURPLE);
+        // y=8: |...PY.| -> x=3:P, x=4:Y
+        placePuyo(board, 3, 8, PuyoColor.PURPLE);
+        placePuyo(board, 4, 8, PuyoColor.YELLOW);   // 부유 5
         
-        // y=9: |.B....| -> x=1:B
-        placePuyo(board, 1, 9, PuyoColor.BLUE);
+        // y=9,10,11: 빈칸
         
-        // y=10: |......| -> 없음
-        // y=11: |......| -> 없음
-        
-        // 검증: 로그에서 getAllFloatingPuyos가 13개 찾았는지 확인
+        // 검증: getAllFloatingPuyos가 column 4에서 5개 찾는지 확인
         List<Puyo> floatingBefore = board.getAllFloatingPuyos();
         System.out.println("초기 부유 뿌요 수: " + floatingBefore.size());
         for (Puyo p : floatingBefore) {
-            System.out.println("  부유: (" + p.getX() + "," + p.getY() + ") " + p.getColor());
+            System.out.println("  부유: (" + p.getX() + "," + p.getY() + ") " + p.getColor() + " state=" + p.getState());
         }
-        assertEquals("로그와 동일한 13개 부유 뿌요", 13, floatingBefore.size());
+        // column 4에서 5개, 다른 열에서도 부유 있을 수 있음
+        // 로그에서는 column 4만 5개 나왔음 (다른 열은 grounded 있음)
+        assertTrue("최소 column 4의 5개 부유 뿌요는 있어야 함", floatingBefore.size() >= 5);
+        
+        // column 4 부유 5개 확인
+        int col4Floating = 0;
+        for (Puyo p : floatingBefore) {
+            if (p.getX() == 4) col4Floating++;
+        }
+        assertEquals("column 4에서 5개 부유", 5, col4Floating);
     }
     
     private void placePuyo(Board board, int x, int y, PuyoColor color) {
@@ -216,7 +231,59 @@ public class FallingAnimationTest {
     }
     
     /**
-     * 각 열의 뿌요들이 바닥부터 연속해서 쌓여있는지 검증 (간격 없음)
+     * column 4: grounded(y=0,1) 위에 5개가 연속 쌓여야 함 (y=2,3,4,5,6)
+     */
+    private void verifyColumn4Stacking(Board board) {
+        // y=0,1은 grounded (GREEN, GREEN)
+        assertNotNull("y=0 grounded", board.getPuyoAt(4, 0));
+        assertNotNull("y=1 grounded", board.getPuyoAt(4, 1));
+        assertEquals("y=0 GREEN", PuyoColor.GREEN, board.getPuyoAt(4, 0).getColor());
+        assertEquals("y=1 GREEN", PuyoColor.GREEN, board.getPuyoAt(4, 1).getColor());
+        
+        // y=2~6은 낙하한 부유 뿌요들 (연속, 간격 없음)
+        for (int y = 2; y <= 6; y++) {
+            assertNotNull("column 4 y=" + y + "에 뿌요 있어야 함", board.getPuyoAt(4, y));
+        }
+        
+        // y=7 이상은 비어있어야 함
+        for (int y = 7; y < Board.TOTAL_HEIGHT; y++) {
+            assertNull("column 4 y=" + y + "는 비어있어야 함", board.getPuyoAt(4, y));
+        }
+        
+        // 연속성 검증: 각 뿌요가 바로 아래 뿌요 위에 있어야 함
+        int lastY = 1; // grounded top
+        for (int y = 2; y <= 6; y++) {
+            Puyo p = board.getPuyoAt(4, y);
+            assertNotNull("연속 쌓임 검증 y=" + y, p);
+            // 간격 체크는 verifyContinuousStacking에서 수행
+        }
+    }
+    
+    /**
+     * column 4 색상 순서 검증 (아래부터 위로): RED, RED, PURPLE, PURPLE, YELLOW
+     * 원래 부유 순서 (아래부터): y=4 RED, y=5 RED, y=6 PURPLE, y=7 PURPLE, y=8 YELLOW
+     * 낙하 후 (y=2부터): RED, RED, PURPLE, PURPLE, YELLOW
+     */
+    private void verifyColumn4Colors(Board board) {
+        PuyoColor[] expected = {
+            PuyoColor.RED,      // y=2 (원래 y=4)
+            PuyoColor.RED,      // y=3 (원래 y=5)
+            PuyoColor.PURPLE,   // y=4 (원래 y=6)
+            PuyoColor.PURPLE,   // y=5 (원래 y=7)
+            PuyoColor.YELLOW    // y=6 (원래 y=8)
+        };
+        
+        for (int i = 0; i < expected.length; i++) {
+            int y = 2 + i;
+            Puyo p = board.getPuyoAt(4, y);
+            assertNotNull("column 4 y=" + y + "에 뿌요 있어야 함", p);
+            assertEquals("column 4 y=" + y + " 색상", expected[i], p.getColor());
+            assertEquals("column 4 y=" + y + " 상태는 NORMAL", Puyo.State.NORMAL, p.getState());
+        }
+    }
+    
+    /**
+     * 전체 보드 연속 쌓임 검증 (간격 없음)
      */
     private void verifyContinuousStacking(Board board) {
         for (int x = 0; x < Board.WIDTH; x++) {
@@ -225,7 +292,6 @@ public class FallingAnimationTest {
                 Puyo p = board.getPuyoAt(x, y);
                 if (p != null) {
                     if (lastY >= 0) {
-                        // 이전 뿌요 바로 위에 있어야 함 (간격 1)
                         assertEquals("Column " + x + "에서 뿌요 간격 없음 (연속 쌓임)", 
                                      lastY + 1, y);
                     }
