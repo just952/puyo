@@ -43,7 +43,7 @@
 |                     | **단일 뿌요 낙하 속도 분리**                                          | **완료** | 별도 타이머로 소프트 드롭 속도 적용                                  |
 |                     | **팝 애니메이션 (Pop Animation)**                                     | **완료** | Puyo 모델 팝 상태, updateFalling 통합, 렌더링 스케일 (0.3초)         |
 |                     | **연쇄 후 기둥 낙하 동시 애니메이션**                                 | **완료** | Board.getAllFloatingPuyos() 수정, 열 단위 동시 낙하                  |
-|                     | **기둥 낙하 렌더링 깜빡임 해결**                                      | **완료** | drawFallingPuyos() 추가로 모든 fallingPuyos 렌더링                   |
+|                     | **기둥 낙하 렌더링 깜빡임 해결**                                      | **완료** | drawStatefulPuyos() 추가로 모든 statefulPuyos 렌더링                   |
 |                     | **낙하 속도 통일**                                                    | **완료** | FALLING_ANIMATION_INTERVAL 0.025f 적용, 분리/기둥 동일 속도           |
 | 폰트/한글           | NotoSansKR-Regular.ttf 적용                                           | **완료** | Google Fonts에서 정상 파일 다운로드                                  |
 |                     | 한글 깨짐(X박스) 해결                                                 | **완료** | FontManager.param.characters에 필수 문자 명시                        |

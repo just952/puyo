@@ -6,9 +6,7 @@ import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.util.LogUtil;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 게임 상태 머신: 보드, 현재/다음 쌍, 점수, 연쇄 수, 게임오버 상태 관리.
@@ -49,7 +47,7 @@ public class GameWorld {
     private GamePhase gamePhase = GamePhase.SPAWNING;
 
     // 애니메이션 상태 (GameWorld에서 직접 관리)
-    private List<FallingPuyo> fallingPuyos = new ArrayList<>();
+    private List<StatefulPuyo> statefulPuyos = new ArrayList<>();
     private float fallingAnimationTimer = 0f;
     private static final float FALLING_ANIMATION_INTERVAL = 0.025f;
 
@@ -271,7 +269,7 @@ public class GameWorld {
         }
         fallTimer = 0f;
         chainManager.startNewChain();
-        fallingPuyos.clear();
+        statefulPuyos.clear();
         fallingAnimationTimer = 0f;
         gamePhase = GamePhase.FALLING_AUTO;
         LogUtil.debug("GameWorld", "Phase: SPAWNING -> FALLING_AUTO, new pair spawned");
@@ -333,7 +331,7 @@ public class GameWorld {
             SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
             if (sepResult.separated) {
                 board.placePuyo(sepResult.blockedPuyo);
-                addFallingPuyo(sepResult.freePuyo, FallingPuyo.FallType.FALLING);
+                addStatefulPuyo(sepResult.freePuyo, StatefulPuyo.StateType.FALLING);
                 fallingAnimationTimer = 0f;
                 lockDelayManager.deactivate();
                 currentPair = null;
@@ -352,8 +350,8 @@ public class GameWorld {
         }
     }
 
-    private void addFallingPuyo(Puyo puyo, FallingPuyo.FallType type) {
-        fallingPuyos.add(new FallingPuyo(puyo, type));
+    private void addStatefulPuyo(Puyo puyo, StatefulPuyo.StateType type) {
+        statefulPuyos.add(new StatefulPuyo(puyo, type));
     }
 
     // ==========================================
@@ -367,9 +365,9 @@ public class GameWorld {
      */
     private boolean updatePopAnimation(float delta) {
         boolean allPopDone = true;
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isChainPop()) {
-                boolean popDone = fp.puyo.updatePop(delta);
+        for (StatefulPuyo sp : statefulPuyos) {
+            if (sp.isPopping()) {
+                boolean popDone = sp.puyo.updatePop(delta);
                 if (!popDone) {
                     allPopDone = false;
                 }
@@ -379,25 +377,25 @@ public class GameWorld {
     }
 
     /**
-     * 팝 완료된 CHAIN_POP 엔트리 수집 및 리스트에서 제거
+     * 팝 완료된 POPPING 엔트리 수집 및 리스트에서 제거
      * 
      * @return 보드에서 제거할 뿌요들
      */
     private List<Puyo> collectAndClearChainPop() {
         List<Puyo> poppedPuyos = new ArrayList<>();
-        List<FallingPuyo> toRemove = new ArrayList<>();
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isChainPop()) {
-                poppedPuyos.add(fp.puyo);
-                toRemove.add(fp);
+        List<StatefulPuyo> toRemove = new ArrayList<>();
+        for (StatefulPuyo sp : statefulPuyos) {
+            if (sp.isPopping()) {
+                poppedPuyos.add(sp.puyo);
+                toRemove.add(sp);
             }
         }
         if (!poppedPuyos.isEmpty()) {
             LogUtil.debug("GameWorld", "collectAndClearChainPop: " + poppedPuyos.size() + " puyos, listSize before="
-                    + fallingPuyos.size());
-            fallingPuyos.removeAll(toRemove);
+                    + statefulPuyos.size());
+            statefulPuyos.removeAll(toRemove);
             LogUtil.debug("GameWorld",
-                    "collectAndClearChainPop: removed CHAIN_POP, listSize after=" + fallingPuyos.size());
+                    "collectAndClearChainPop: removed POPPING, listSize after=" + statefulPuyos.size());
         }
         return poppedPuyos;
     }
@@ -417,11 +415,11 @@ public class GameWorld {
         }
         fallingAnimationTimer = 0f;
 
-        // FALLING 타입만 필터링 (CHAIN_POP은 별도 처리)
-        List<FallingPuyo> fallingList = new ArrayList<>();
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFalling()) {
-                fallingList.add(fp);
+        // FALLING 타입만 필터링 (POPPING은 별도 처리)
+        List<StatefulPuyo> fallingList = new ArrayList<>();
+        for (StatefulPuyo sp : statefulPuyos) {
+            if (sp.isFalling()) {
+                fallingList.add(sp);
             }
         }
         
@@ -434,9 +432,9 @@ public class GameWorld {
 
         // 각 뿌요별로 독립적으로 이동 가능 여부 체크 및 이동
         boolean anyMoved = false;
-        for (FallingPuyo fp : fallingList) {
-            if (canSinglePuyoFallDuringFallingAnimation(fp, fallingList)) {
-                fp.puyo.moveDown();
+        for (StatefulPuyo sp : fallingList) {
+            if (canSinglePuyoFallDuringFallingAnimation(sp, fallingList)) {
+                sp.puyo.moveDown();
                 anyMoved = true;
             }
         }
@@ -447,8 +445,8 @@ public class GameWorld {
         }
 
         // 아무도 이동 못 했으면 완료 체크 (여전히 이동 가능한 게 있는지)
-        for (FallingPuyo fp : fallingList) {
-            if (canSinglePuyoFallDuringFallingAnimation(fp, fallingList)) {
+        for (StatefulPuyo sp : fallingList) {
+            if (canSinglePuyoFallDuringFallingAnimation(sp, fallingList)) {
                 return true; // 아직 이동 가능한 뿌요가 있음
             }
         }
@@ -460,21 +458,21 @@ public class GameWorld {
      * 낙하 애니메이션 완료된 뿌요들 수집 및 보드에 배치
      */
     private void collectAndPlaceCompletedFalling() {
-        if (fallingPuyos.isEmpty())
+        if (statefulPuyos.isEmpty())
             return;
-        for (FallingPuyo fp : fallingPuyos) {
-            board.placePuyo(fp.puyo);
+        for (StatefulPuyo sp : statefulPuyos) {
+            board.placePuyo(sp.puyo);
         }
-        LogUtil.debug("GameWorld", "Completed falling puyos placed: " + fallingPuyos.size());
-        fallingPuyos.clear();
+        LogUtil.debug("GameWorld", "Completed stateful puyos placed: " + statefulPuyos.size());
+        statefulPuyos.clear();
     }
 
     /**
      * 낙하 애니메이션 중 단일 뿌요가 한 칸 아래로 이동 가능한지 확인.
      * 보드 충돌(이미 착지한 것) + 다른 falling puyo 충돌 체크.
      */
-    private boolean canSinglePuyoFallDuringFallingAnimation(FallingPuyo fp, List<FallingPuyo> fallingList) {
-        Puyo puyo = fp.puyo;
+    private boolean canSinglePuyoFallDuringFallingAnimation(StatefulPuyo sp, List<StatefulPuyo> fallingList) {
+        Puyo puyo = sp.puyo;
         
         // 바닥 체크
         if (puyo.getY() == 0) return false;
@@ -483,8 +481,8 @@ public class GameWorld {
         if (!board.canMoveDown(puyo)) return false;
         
         // 다른 falling puyo 충돌: targetY = y-1 위치에 다른 falling puyo가 있는지
-        for (FallingPuyo other : fallingList) {
-            if (other == fp) continue;
+        for (StatefulPuyo other : fallingList) {
+            if (other == sp) continue;
             if (other.puyo.getX() == puyo.getX() && other.puyo.getY() == (puyo.getY() - 1) ) {
                 return false;
             }
@@ -497,10 +495,10 @@ public class GameWorld {
      * 통합된 낙하 애니메이션 핸들러 (분리/부유 통합: FALLING 타입)
      */
     private void handleFallingAnimation(float delta) {
-        // FALLING 타입만 처리하면 됨 (CHAIN_POP은 별도 처리됨)
+        // FALLING 타입만 처리하면 됨 (POPPING은 별도 처리됨)
         boolean hasFalling = false;
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFalling()) {
+        for (StatefulPuyo sp : statefulPuyos) {
+            if (sp.isFalling()) {
                 hasFalling = true;
                 break;
             }
@@ -549,11 +547,11 @@ public class GameWorld {
                 if (!puyo.isPopping()) {
                     puyo.startPop();
                 }
-                addFallingPuyo(puyo, FallingPuyo.FallType.CHAIN_POP);
+                addStatefulPuyo(puyo, StatefulPuyo.StateType.POPPING);
             }
         }
         gamePhase = GamePhase.CHAIN_POP_ANIMATION;
-        LogUtil.debug("GameWorld", "Phase: CHAIN_FINDING -> CHAIN_POP_ANIMATION, fallingPuyos=" + fallingPuyos.size());
+        LogUtil.debug("GameWorld", "Phase: CHAIN_FINDING -> CHAIN_POP_ANIMATION, statefulPuyos=" + statefulPuyos.size());
     }
 
     private void handlePopAnimation(float delta) {
@@ -582,7 +580,7 @@ public class GameWorld {
             LogUtil.debug("GameWorld", "Found " + floating.size() + " floating puyos, starting falling animation");
             for (Puyo p : floating) {
                 board.removePuyo(p);
-                addFallingPuyo(p, FallingPuyo.FallType.FALLING);
+                addStatefulPuyo(p, StatefulPuyo.StateType.FALLING);
             }
             fallingAnimationTimer = 0f;
             gamePhase = GamePhase.FALLING_ANIMATION;
@@ -659,23 +657,9 @@ public class GameWorld {
         return nextPair;
     }
 
-    /**
-     * @deprecated FallType이 FALLING으로 통합됨. {@link #getFallingPuyos()} 사용 권장.
-     *             호환용: 낙하 중인 단일 뿌요 반환 (첫 번째 FALLING 타입)
-     */
-    @Deprecated
-    public Puyo getFallingSinglePuyo() {
-        for (FallingPuyo fp : fallingPuyos) {
-            if (fp.isFalling()) {
-                return fp.puyo;
-            }
-        }
-        return null;
-    }
-
-    /** 호환용: 모든 낙하 중인 뿌요 리스트 반환 (렌더링용) */
-    public List<FallingPuyo> getFallingPuyos() {
-        return new ArrayList<>(fallingPuyos);
+    /** 호환용: 모든 상태를 가진 뿌요 리스트 반환 (렌더링용) */
+    public List<StatefulPuyo> getStatefulPuyos() {
+        return new ArrayList<>(statefulPuyos);
     }
 
     public int getScore() {

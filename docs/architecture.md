@@ -49,7 +49,8 @@ puyo/
 │   │   │   │   ├── SeparationManager.java # 가로 쌍 분리 로직
 │   │   │   │   ├── LockDelayManager.java  # 락 딜레이 타이머/이동 카운트
 │   │   │   │   ├── ChainManager.java      # 연쇄 상태 관리 (chainCount, currentGroups)
-│   │   │   │   └── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
+│   │   │   │   ├── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
+│   │   │   │   └── StatefulPuyo.java     # 상태를 가진 뿌요 모델 (POPPING/FALLING/SETTLING, v0.1.27~)
 │   │   │   └── model/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
 │   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, 팝 애니메이션, inMiddle 반칸 상태 v0.1.24~)
@@ -129,7 +130,7 @@ puyo/
 
 **주요 변경 (v0.1.20)**: `GamePhase.FALLING`을 3단계로 분리 (`FALLING_AUTO`, `LOCK_DELAY`, `SEPARATION`). 입력 허용 페이즈 명시화 (`FALLING_AUTO` && `LOCK_DELAY`만 허용). `getGamePhase()`, `recordLockDelayMove()` 추가로 PlayScreen 입력 제어 중앙화. 자동 낙하 중 락딜레이 로직 완전 제거로 상태 관리 단순화.
 
-**주요 변경 (v0.1.15)**: `FallingAnimationManager` 클래스 삭제 → 로직을 `GameWorld` 내부에 private 메서드로 통합 (`updatePopAnimation`, `updateSeparationFalling`, `updateFloatingFalling`, `collectAndClearChainPop`, `collectCompletedFalling`, `canFallInColumn`). `FallingAnimationManager.FallingPuyo` 중첩 클래스 → 별도 파일 `FallingPuyo.java`로 단일화. `float[]` 래퍼 패턴 제거로 타이머 버그(프리징) 해결. 단일 `GamePhase` enum으로 모든 Phase 처리.
+**주요 변경 (v0.1.15)**: `FallingAnimationManager` 클래스 삭제 → 로직을 `GameWorld` 내부에 private 메서드로 통합 (`updatePopAnimation`, `updateSeparationFalling`, `updateFloatingFalling`, `collectAndClearChainPop`, `collectCompletedFalling`, `canFallInColumn`). `FallingAnimationManager.FallingPuyo` 중첩 클래스 → 별도 파일 `StatefulPuyo.java`로 단일화 (v0.1.27~ `StatefulPuyo`로 리네이밍). `float[]` 래퍼 패턴 제거로 타이머 버그(프리징) 해결. 단일 `GamePhase` enum으로 모든 Phase 처리.
 
 ---
 
@@ -781,7 +782,7 @@ private void handleSeparation() {
         SeparationManager.SeparationResult sepResult = separationManager.separate(currentPair, board);
         if (sepResult.separated) {
             board.placePuyo(sepResult.blockedPuyo);
-            addFallingPuyo(sepResult.freePuyo, FallingPuyo.FallType.FALLING);
+            addStatefulPuyo(sepResult.freePuyo, StatefulPuyo.StateType.FALLING);
             fallingAnimationTimer = 0f;
             lockDelayManager.deactivate();
             currentPair = null;

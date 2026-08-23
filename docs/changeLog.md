@@ -4,6 +4,64 @@
 
 ---
 
+## v0.1.27 (2026-08-23)
+
+### 🔧 **클래스/변수명 리네이밍: FallingPuyo → StatefulPuyo (확장성 확보)**
+
+**배경**: `FallingPuyo` 클래스가 낙하 중인 뿌요뿐만 아니라 팝 애니메이션(CHAIN_POP) 중인 뿌요도 담고 있었고, 향후 착지 후 흔들림(SETTLING) 상태도 추가될 예정이라 이름이 역할과 맞지 않음
+
+**해결**: 클래스명과 관련된 모든 변수/메서드를 `StatefulPuyo`로 변경, `FallType` enum을 `StateType`으로 변경
+
+#### 변경 내용
+
+**1. StatefulPuyo.java (신규 생성)**
+```java
+public class StatefulPuyo {
+    public Puyo puyo;
+    public StateType type;
+    public int originalX;
+    public int originalY;
+
+    public enum StateType {
+        POPPING,   // 연쇄 팝 애니메이션 (제자리 스케일)
+        FALLING,   // 일반 낙하 (분리/부유 통합)
+        SETTLING   // 착지 후 흔들림/정착 대기 (향후 확장용)
+    }
+    // ... 생성자, isPopping(), isFalling(), isSettling() 메서드
+}
+```
+
+**2. GameWorld.java - 필드/메서드/변수 전체 변경**
+- 필드: `fallingPuyos` → `statefulPuyos` (List<StatefulPuyo>)
+- 메서드: `addFallingPuyo()` → `addStatefulPuyo(Puyo, StatefulPuyo.StateType)`
+- getter: `getFallingPuyos()` → `getStatefulPuyos()`, `getFallingSinglePuyo()` 제거(사용 안 함)
+- 로컬 변수: `fallingPuyos` → `statefulPuyos`, `fallingList` → `fallingList` (StatefulPuyo 타입)
+- 로그 메시지: `fallingPuyos=` → `statefulPuyos=`
+
+**3. PlayScreen.java**
+- import: `FallingPuyo` → `StatefulPuyo`
+- 메서드: `drawFallingPuyos()` → `drawStatefulPuyos()`
+- 내부 변수: `fallingPuyos` → `statefulPuyos`, `fp` → `sp`
+
+**4. FallingPuyo.java 삭제** (기존 클래스 완전 제거)
+
+#### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `StatefulPuyo.java` | **신규** | 상태를 가진 뿌요 모델 (POPPING/FALLING/SETTLING) |
+| `GameWorld.java` | 대폭 수정 | 필드/메서드/변수/로그 전체 리네이밍 |
+| `PlayScreen.java` | 수정 | import, 렌더링 메서드명 변경 |
+| `FallingPuyo.java` | **삭제** | 기존 클래스 완전 제거 |
+
+#### 효과
+- ✅ 클래스명이 실제 역할(상태 보유)과 일치
+- ✅ 향후 SETTLING(착지 흔들림) 상태 추가 용이
+- ✅ POPPING/FALLING 타입 구분 명확화
+- ✅ 컴파일 성공, 테스트 7개 모두 통과 (100%)
+
+---
+
 ## v0.1.26 (2026-08-23)
 
 ### 🎮 **DAS/ARR 전면 개편: 프레임→초 단위 전환 + 좌우/소프트드랍 분리 + 설정 외부화 + TouchController 적용**

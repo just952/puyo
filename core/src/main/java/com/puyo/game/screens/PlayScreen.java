@@ -10,9 +10,9 @@ import com.puyo.game.GameMode;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.engine.GameWorld;
-import com.puyo.game.logic.engine.FallingPuyo;
+import com.puyo.game.logic.engine.StatefulPuyo;
 import com.puyo.game.logic.model.Puyo;
-import com.puyo.game.logic.model.PuyoColor;
+//import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
 
 import java.util.List;
@@ -29,7 +29,7 @@ public class PlayScreen extends BaseScreen {
     private final GameMode mode;
     private final StoryModeManager storyManager;
     private final GameWorld gameWorld;
-    private float stateTime = 0f;
+    //private float stateTime = 0f;
     private ShapeRenderer shapeRenderer;
     private SpriteBatch batch;
     private final FontManager fontManager;
@@ -97,7 +97,7 @@ public class PlayScreen extends BaseScreen {
         // Draw game board
         drawBoard();
         drawCurrentPair();
-        drawFallingPuyos();
+        drawStatefulPuyos();
         drawNextPair();
         drawUI();
     }
@@ -110,7 +110,7 @@ public class PlayScreen extends BaseScreen {
             }
             return;
         }
-        stateTime += delta;
+        //stateTime += delta;
 
         // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
         if (inputHandler != null) {
@@ -220,14 +220,14 @@ public class PlayScreen extends BaseScreen {
         batch.end();
     }
 
-    private void drawFallingPuyos() {
-        List<FallingPuyo> fallingPuyos = gameWorld.getFallingPuyos();
-        if (fallingPuyos == null || fallingPuyos.isEmpty())
+    private void drawStatefulPuyos() {
+        List<StatefulPuyo> statefulPuyos = gameWorld.getStatefulPuyos();
+        if (statefulPuyos == null || statefulPuyos.isEmpty())
             return;
 
         batch.begin();
-        for (FallingPuyo fp : fallingPuyos) {
-            Puyo puyo = fp.puyo;
+        for (StatefulPuyo sp : statefulPuyos) {
+            Puyo puyo = sp.puyo;
             drawPuyo(puyo,
                     GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
                     GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
@@ -371,26 +371,6 @@ public class PlayScreen extends BaseScreen {
         batch.end();
     }
 
-    private Color getColorForPuyo(PuyoColor color) {
-        switch (color) {
-            case RED:
-                return Color.RED;
-            case GREEN:
-                return Color.GREEN;
-            case BLUE:
-                return Color.BLUE;
-            case YELLOW:
-                return Color.YELLOW;
-            case PURPLE:
-                return Color.MAGENTA;
-            case OJAMA:
-                return Color.GRAY;
-            case HARD:
-                return Color.BLACK;
-            default:
-                return Color.WHITE;
-        }
-    }
 
     @Override
     public void resize(int width, int height) {

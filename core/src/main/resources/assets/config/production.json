@@ -10,8 +10,8 @@
   "player_data_endpoint": "/player/data",
   "matchmaking_endpoint": "/match/find",
   "heartbeat_interval_sec": 30,
-  "das_delay_horizontal_sec": 0.166,
+  "das_delay_horizontal_sec": 0.14,
   "arr_interval_horizontal_sec": 0.033,
-  "das_delay_softdrop_sec": 0.166,
-  "arr_interval_softdrop_sec": 0.033
+  "das_delay_softdrop_sec": 0.18,
+  "arr_interval_softdrop_sec": 0.016
 }
