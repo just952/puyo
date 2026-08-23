@@ -404,6 +404,7 @@ public class GameWorld {
      * 통합된 낙하 애니메이션 업데이트 (FALLING 타입 전체 대상)
      * 각 뿌요가 독립적으로 낙하하며, 아래쪽 뿌요부터 순차 처리하여
      * 이미 착지한 뿌요 위에 쌓이게 함 (뿌요뿌요 규칙).
+     * 착지한 뿌요는 SETTLING 상태로 전이하여 바운스 애니메이션 시작.
      * 
      * @param delta 프레임 시간
      * @return 아직 낙하 중이면 true, 완료면 false
@@ -415,7 +416,7 @@ public class GameWorld {
         }
         fallingAnimationTimer = 0f;
 
-        // FALLING 타입만 필터링 (POPPING은 별도 처리)
+        // FALLING 타입만 필터링 (POPPING, SETTLING은 별도 처리)
         List<StatefulPuyo> fallingList = new ArrayList<>();
         for (StatefulPuyo sp : statefulPuyos) {
             if (sp.isFalling()) {
@@ -436,6 +437,12 @@ public class GameWorld {
             if (canSinglePuyoFallDuringFallingAnimation(sp, fallingList)) {
                 sp.puyo.moveDown();
                 anyMoved = true;
+            } else {
+                // 더 이상 이동 불가 = 착지함 → SETTLING 전이 + 바운스 시작
+                if (sp.type == StatefulPuyo.StateType.FALLING) {
+                    sp.type = StatefulPuyo.StateType.SETTLING;
+                    sp.puyo.startSettle();
+                }
             }
         }
 
@@ -451,7 +458,38 @@ public class GameWorld {
             }
         }
 
-        return false; // 모두 착지 완료
+        return false; // 모두 착지 완료 (SETTLING으로 전이됨)
+    }
+
+    /**
+     * 착지 바운스 애니메이션 업데이트 (SETTLING 타입 전체 대상)
+     * 모든 SETTLING 뿌요가 독립적으로 바운스 애니메이션 재생.
+     * 
+     * @param delta 프레임 시간
+     * @return 아직 바운스 중이면 true, 모두 완료면 false
+     */
+    private boolean updateSettlingAnimation(float delta) {
+        // SETTLING 타입만 필터링
+        List<StatefulPuyo> settlingList = new ArrayList<>();
+        for (StatefulPuyo sp : statefulPuyos) {
+            if (sp.isSettling()) {
+                settlingList.add(sp);
+            }
+        }
+        
+        if (settlingList.isEmpty()) {
+            return false;
+        }
+
+        boolean anySettling = false;
+        for (StatefulPuyo sp : settlingList) {
+            boolean settleDone = sp.puyo.updateSettle(delta);
+            if (!settleDone) {
+                anySettling = true;
+            }
+        }
+
+        return anySettling; // 하나라도 진행 중이면 true
     }
 
     /**
@@ -492,37 +530,32 @@ public class GameWorld {
 
 
     /**
-     * 통합된 낙하 애니메이션 핸들러 (분리/부유 통합: FALLING 타입)
+     * 통합된 낙하 애니메이션 핸들러 (분리/부유 통합: FALLING 타입 + SETTLING 바운스)
+     * 각 업데이트 메서드가 내부에서 할 일 없음을 판단하므로 사전 체크 불필요.
      */
     private void handleFallingAnimation(float delta) {
-        // FALLING 타입만 처리하면 됨 (POPPING은 별도 처리됨)
-        boolean hasFalling = false;
-        for (StatefulPuyo sp : statefulPuyos) {
-            if (sp.isFalling()) {
-                hasFalling = true;
-                break;
-            }
-        }
-
-        if (!hasFalling) {
-            // 처리할 것이 없으면 CHAIN_FINDING으로
+        // statefulPuyos가 비어있으면 즉시 전이 (최소한의 가드만)
+        if (statefulPuyos.isEmpty()) {
             gamePhase = GamePhase.CHAIN_FINDING;
             return;
         }
 
+        // 각 업데이트 메서드가 내부에서 "할 일 없음" 판단
         boolean stillFalling = updateFallingAnimation(delta);
+        boolean stillSettling = updateSettlingAnimation(delta);
 
-        if (!stillFalling) {
-            // 낙하 완료: 보드에 배치
+        // 둘 다 완료되면 보드에 배치 후 CHAIN_FINDING으로
+        if (!stillFalling && !stillSettling) {
+            // 낙하/바운스 완료: 보드에 배치
             collectAndPlaceCompletedFalling();
 
             // 정리
             currentPair = null;
             lockDelayManager.deactivate();
 
-            // 무조건 연쇄 찾기 단계로
+            // 연쇄 찾기 단계로
             gamePhase = GamePhase.CHAIN_FINDING;
-            LogUtil.debug("GameWorld", "Phase: FALLING_ANIMATION -> CHAIN_FINDING");
+            LogUtil.debug("GameWorld", "Phase: FALLING_ANIMATION -> CHAIN_FINDING (falling+settling done)");
         }
     }
 

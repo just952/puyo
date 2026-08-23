@@ -255,14 +255,35 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawPuyo(Puyo puyo, float x, float y) {
-        float scale = puyo.getPopScale(); // 팝 애니메이션 스케일 적용
+        // 팝 애니메이션 스케일 (POPPING 상태)
+        float popScale = puyo.getPopScale();
+        
+        // 착지 바운스 애니메이션 (SETTLING 상태) - 비균일 스케일
+        boolean isSettling = puyo.isSettling();
+        float settleScaleX = 1.0f;
+        float settleScaleY = 1.0f;
+        if (isSettling) {
+            settleScaleX = puyo.getSettleScaleX();
+            settleScaleY = puyo.getSettleScaleY();
+        }
+        
+        // 최종 스케일 결정
+        float finalScaleX = popScale > 0 ? popScale : settleScaleX;
+        float finalScaleY = popScale > 0 ? popScale : settleScaleY;
         
         // 스케일이 0이면 그리지 않음 (완전히 사라짐)
-        if (scale <= 0)
+        if (finalScaleX <= 0 || finalScaleY <= 0)
             return;
 
-        // PuyoRenderer를 사용하여 SpriteBatch로 그리기
-        puyoRenderer.draw(batch, puyo.getColor(), x, y - (puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0 ) , GameViewport.CELL_SIZE, scale);
+        // Y 오프셋 계산 (반칸 상태 고려)
+        float offsetY = puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0;
+
+        // PuyoRenderer를 사용하여 SpriteBatch로 그리기 (비균일 스케일 지원)
+        if (isSettling) {
+            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, finalScaleX, finalScaleY);
+        } else {
+            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, finalScaleX);
+        }
     }
 
     private void drawUI() {

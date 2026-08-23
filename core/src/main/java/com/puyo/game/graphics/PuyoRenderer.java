@@ -564,7 +564,7 @@ public class PuyoRenderer implements Disposable {
     }
 
     /**
-     * 뿌요 그리기 (기본 변형)
+     * 뿌요 그리기 (기본 변형) - 균일 스케일
      * 
      * @param batch SpriteBatch
      * @param color 뿌요 색상
@@ -574,20 +574,37 @@ public class PuyoRenderer implements Disposable {
      * @param scale 팝 애니메이션 스케일 (1.0 = 정상)
      */
     public void draw(SpriteBatch batch, PuyoColor color, float x, float y, float cellSize, float scale) {
+        draw(batch, color, x, y, cellSize, scale, scale);
+    }
+
+    /**
+     * 뿌요 그리기 (기본 변형) - 비균일 스케일 지원 (착지 바운스용)
+     * 
+     * @param batch SpriteBatch
+     * @param color 뿌요 색상
+     * @param x 화면 X 좌표 (왼쪽 아래)
+     * @param y 화면 Y 좌표 (왼쪽 아래)
+     * @param cellSize 한 칸 크기 (보통 80f)
+     * @param scaleX X축 스케일
+     * @param scaleY Y축 스케일
+     */
+    public void draw(SpriteBatch batch, PuyoColor color, float x, float y, float cellSize, float scaleX, float scaleY) {
         if (disposed || color == null) return;
         
         int colorIdx = color.ordinal();
         if (colorIdx < 0 || colorIdx >= COLORS) return;
         
-        if (scale <= 0) return;
+        if (scaleX <= 0 || scaleY <= 0) return;
 
         TextureRegion region = regions[colorIdx][0]; // 기본 변형
-        float drawSize = cellSize * scale;
-        float offset = (cellSize - drawSize) / 2f;
+        float drawWidth = cellSize * scaleX;
+        float drawHeight = cellSize * scaleY;
+        float offsetX = (cellSize - drawWidth) / 2f;
+        float offsetY = (cellSize - drawHeight) / 2f;
 
         batch.draw(region, 
-            x + offset, y + offset,
-            drawSize, drawSize);
+            x + offsetX, y + offsetY,
+            drawWidth, drawHeight);
     }
 
     /**
