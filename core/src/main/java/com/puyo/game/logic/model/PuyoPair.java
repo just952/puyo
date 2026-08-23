@@ -162,4 +162,9 @@ public class PuyoPair {
         rotation = (rotation + 3) % 4;
         setPosition(left.getX(), left.getY());
     }
+
+    public String toString() {
+        return "PuyoPair [left" + left + " /  right" + right + " / rotation=" + rotation + "]";
+    }
+
 }

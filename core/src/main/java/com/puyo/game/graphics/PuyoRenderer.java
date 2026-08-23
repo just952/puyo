@@ -11,6 +11,7 @@ import com.badlogic.gdx.utils.Disposable;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.config.GameViewport;
+import com.puyo.game.util.LogUtil;
 
 /**
  * 뿌요 렌더링 전용 클래스.
@@ -601,6 +602,8 @@ public class PuyoRenderer implements Disposable {
         float drawHeight = cellSize * scaleY;
         float offsetX = (cellSize - drawWidth) / 2f;
         float offsetY = (cellSize - drawHeight) / 2f;
+
+        //LogUtil.debug("PuyoRenderer", String.format("Drawing Puyo: color=%s, x=%.2f, y=%.2f, cellSize=%.2f, scaleX=%.2f, scaleY=%.2f",             color.name(), x, y, cellSize, scaleX, scaleY));
 
         batch.draw(region, 
             x + offsetX, y + offsetY,

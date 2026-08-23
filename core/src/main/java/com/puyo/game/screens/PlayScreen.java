@@ -10,10 +10,11 @@ import com.puyo.game.GameMode;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.engine.GameWorld;
-import com.puyo.game.logic.engine.StatefulPuyo;
+
 import com.puyo.game.logic.model.Puyo;
 //import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
+import com.puyo.game.util.LogUtil;
 
 import java.util.List;
 import com.puyo.game.story.StoryModeManager;
@@ -221,13 +222,12 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawStatefulPuyos() {
-        List<StatefulPuyo> statefulPuyos = gameWorld.getStatefulPuyos();
-        if (statefulPuyos == null || statefulPuyos.isEmpty())
+        List<Puyo> animatingPuyos = gameWorld.getAnimatingPuyos();
+        if (animatingPuyos == null || animatingPuyos.isEmpty())
             return;
 
         batch.begin();
-        for (StatefulPuyo sp : statefulPuyos) {
-            Puyo puyo = sp.puyo;
+        for (Puyo puyo : animatingPuyos) {
             drawPuyo(puyo,
                     GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
                     GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
@@ -255,34 +255,38 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawPuyo(Puyo puyo, float x, float y) {
-        // 팝 애니메이션 스케일 (POPPING 상태)
-        float popScale = puyo.getPopScale();
+        // 상태별 스케일 결정
+        float scaleX = 1.0f;
+        float scaleY = 1.0f;
         
-        // 착지 바운스 애니메이션 (SETTLING 상태) - 비균일 스케일
-        boolean isSettling = puyo.isSettling();
-        float settleScaleX = 1.0f;
-        float settleScaleY = 1.0f;
-        if (isSettling) {
-            settleScaleX = puyo.getSettleScaleX();
-            settleScaleY = puyo.getSettleScaleY();
+        switch (puyo.getState()) {
+            case POPPING:
+                scaleX = scaleY = puyo.getScaleX(); // 팝은 균일 스케일
+                break;
+            case SETTLING:
+                scaleX = puyo.getScaleX();
+                scaleY = puyo.getScaleY();
+                break;
+            case FALLING:
+                // 낙하 중에도 스케일 적용 (반칸 처리용)
+                scaleX = scaleY = 1.0f;
+                break;
+            default: // NORMAL
+                scaleX = scaleY = 1.0f;
         }
         
-        // 최종 스케일 결정
-        float finalScaleX = popScale > 0 ? popScale : settleScaleX;
-        float finalScaleY = popScale > 0 ? popScale : settleScaleY;
-        
-        // 스케일이 0이면 그리지 않음 (완전히 사라짐)
-        if (finalScaleX <= 0 || finalScaleY <= 0)
+        // 스케일이 0이면 그리지 않음 (팝 완료 시)
+        if (scaleX <= 0 || scaleY <= 0)
             return;
 
         // Y 오프셋 계산 (반칸 상태 고려)
         float offsetY = puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0;
 
         // PuyoRenderer를 사용하여 SpriteBatch로 그리기 (비균일 스케일 지원)
-        if (isSettling) {
-            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, finalScaleX, finalScaleY);
+        if (puyo.isSettling()) {
+            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, scaleX, scaleY);
         } else {
-            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, finalScaleX);
+            puyoRenderer.draw(batch, puyo.getColor(), x, y - offsetY, GameViewport.CELL_SIZE, scaleX);
         }
     }
 
