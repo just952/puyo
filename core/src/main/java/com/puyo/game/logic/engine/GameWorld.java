@@ -51,7 +51,7 @@ public class GameWorld {
     // 애니메이션 상태 (GameWorld에서 직접 관리)
     private List<FallingPuyo> fallingPuyos = new ArrayList<>();
     private float fallingAnimationTimer = 0f;
-    private static final float FALLING_ANIMATION_INTERVAL = 0.05f;
+    private static final float FALLING_ANIMATION_INTERVAL = 0.025f;
 
     public GameWorld() {
         this(new Board());
@@ -87,8 +87,8 @@ public class GameWorld {
         // 미리보기용이므로 보드 스폰 위치 설정 불필요 (렌더링 시 고정 좌표 사용)
     }
 
-    /** 현재 쌍이 낙하 가능한지 확인 */
-    public boolean canFall() {
+    /** 현재 쌍(PuyoPair)이 낙하 가능한지 확인 */
+    private boolean canPuyoPairFall() {
         return currentPair != null && board.canMoveDown(currentPair);
     }
 
@@ -105,8 +105,8 @@ public class GameWorld {
         if (board.canMoveLeft(currentPair)) {
             currentPair.moveLeft();
             if (lockDelayManager.isActive()) {
-                // 공중으로 빠져나오면 락딜레이 비활성화
-                if (canFall()) {
+                // 공중으로 빠져나가면 락딜레이 비활성화
+                if (canPuyoPairFall()) {
                     lockDelayManager.deactivate();
                 } else {
                     lockDelayManager.recordMove();
@@ -131,7 +131,7 @@ public class GameWorld {
             currentPair.moveRight();
             if (lockDelayManager.isActive()) {
                 // 공중으로 빠져나가면 락딜레이 비활성화
-                if (canFall()) {
+                if (canPuyoPairFall()) {
                     lockDelayManager.deactivate();
                 } else {
                     lockDelayManager.recordMove();
@@ -162,14 +162,14 @@ public class GameWorld {
                 currentPair.rotateCounterClockwise();
             }
         }
-        if (lockDelayManager.isActive()) {
-            // 회전 후 공중으로 빠져나가면 락딜레이 비활성화
-            if (canFall()) {
-                lockDelayManager.deactivate();
-            } else {
-                lockDelayManager.recordMove();
+            if (lockDelayManager.isActive()) {
+                // 회전 후 공중으로 빠져나가면 락딜레이 비활성화
+                if (canPuyoPairFall()) {
+                    lockDelayManager.deactivate();
+                } else {
+                    lockDelayManager.recordMove();
+                }
             }
-        }
     }
 
     /** 하드 드롭 */
@@ -182,7 +182,7 @@ public class GameWorld {
             return;
         }
 
-        while (canFall()) {
+        while (canPuyoPairFall()) {
             currentPair.moveDown();
         }
         lockPiece();
@@ -287,15 +287,15 @@ public class GameWorld {
         fallTimer += delta;
         if (fallTimer >= fallInterval) {
             fallTimer = 0f;
-            if (canFall()) {
-                currentPair.moveDown();
-                // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
-            } else {
-                // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
-                lockDelayManager.activate();
-                gamePhase = GamePhase.LOCK_DELAY;
-                LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
-            }
+        if (canPuyoPairFall()) {
+            currentPair.moveDown();
+            // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
+        } else {
+            // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
+            lockDelayManager.activate();
+            gamePhase = GamePhase.LOCK_DELAY;
+            LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
+        }
         }
     }
 
@@ -315,7 +315,7 @@ public class GameWorld {
         }
 
         // 공중 이탈 시 락딜레이 해제 → 자동 낙하로
-        if (canFall()) {
+        if (canPuyoPairFall()) {
             lockDelayManager.deactivate();
             gamePhase = GamePhase.FALLING_AUTO;
             LogUtil.debug("GameWorld", "Phase: LOCK_DELAY -> FALLING_AUTO (back in air)");
@@ -404,6 +404,8 @@ public class GameWorld {
 
     /**
      * 통합된 낙하 애니메이션 업데이트 (FALLING 타입 전체 대상)
+     * 각 뿌요가 독립적으로 낙하하며, 아래쪽 뿌요부터 순차 처리하여
+     * 이미 착지한 뿌요 위에 쌓이게 함 (뿌요뿌요 규칙).
      * 
      * @param delta 프레임 시간
      * @return 아직 낙하 중이면 true, 완료면 false
@@ -415,31 +417,26 @@ public class GameWorld {
         }
         fallingAnimationTimer = 0f;
 
-        // 전체 fallingPuyos를 열(column) 단위로 기둥 낙하
-        Map<Integer, List<FallingPuyo>> columns = new HashMap<>();
+        // FALLING 타입만 필터링 (CHAIN_POP은 별도 처리)
+        List<FallingPuyo> fallingList = new ArrayList<>();
         for (FallingPuyo fp : fallingPuyos) {
-            int x = fp.puyo.getX();
-            columns.computeIfAbsent(x, k -> new ArrayList<>()).add(fp);
+            if (fp.isFalling()) {
+                fallingList.add(fp);
+            }
+        }
+        
+        if (fallingList.isEmpty()) {
+            return false;
         }
 
-        // 각 열(column)별로 독립적으로 한 칸 이동 처리
-        boolean anyMoved = false;
-        for (List<FallingPuyo> column : columns.values()) {
-            // 열 내 가장 아래쪽 뿌요(최소 Y)만 체크
-            FallingPuyo bottomFp = null;
-            int minY = Integer.MAX_VALUE;
-            for (FallingPuyo fp : column) {
-                if (fp.puyo.getY() < minY) {
-                    minY = fp.puyo.getY();
-                    bottomFp = fp;
-                }
-            }
+        // Y좌표 오름차순 정렬 (바닥쪽부터 처리: y=0이 바닥)
+        fallingList.sort((a, b) -> Integer.compare(a.puyo.getY(), b.puyo.getY()));
 
-            // 가장 아래쪽 뿌요만 체크해서 열 전체 이동 여부 결정
-            if (bottomFp != null && canFallInColumn(board, column, bottomFp.puyo)) {
-                for (FallingPuyo fp : column) {
-                    fp.puyo.moveDown();
-                }
+        // 각 뿌요별로 독립적으로 이동 가능 여부 체크 및 이동
+        boolean anyMoved = false;
+        for (FallingPuyo fp : fallingList) {
+            if (canSinglePuyoFallDuringFallingAnimation(fp, fallingList)) {
+                fp.puyo.moveDown();
                 anyMoved = true;
             }
         }
@@ -449,24 +446,14 @@ public class GameWorld {
             return true;
         }
 
-        // 아무도 이동 못 했으면 완료 체크
-        boolean anyCanFall = false;
-        for (List<FallingPuyo> column : columns.values()) {
-            FallingPuyo bottomFp = null;
-            int minY = Integer.MAX_VALUE;
-            for (FallingPuyo fp : column) {
-                if (fp.puyo.getY() < minY) {
-                    minY = fp.puyo.getY();
-                    bottomFp = fp;
-                }
-            }
-            if (bottomFp != null && canFallInColumn(board, column, bottomFp.puyo)) {
-                anyCanFall = true;
-                break;
+        // 아무도 이동 못 했으면 완료 체크 (여전히 이동 가능한 게 있는지)
+        for (FallingPuyo fp : fallingList) {
+            if (canSinglePuyoFallDuringFallingAnimation(fp, fallingList)) {
+                return true; // 아직 이동 가능한 뿌요가 있음
             }
         }
 
-        return anyCanFall; // true면 아직 낙하 중, false면 완료
+        return false; // 모두 착지 완료
     }
 
     /**
@@ -483,30 +470,28 @@ public class GameWorld {
     }
 
     /**
-     * 특정 열에서 특정 뿌요가 한 칸 아래로 이동 가능한지 체크
+     * 낙하 애니메이션 중 단일 뿌요가 한 칸 아래로 이동 가능한지 확인.
+     * 보드 충돌(이미 착지한 것) + 다른 falling puyo 충돌 체크.
      */
-    private boolean canFallInColumn(Board board, List<FallingPuyo> column, Puyo puyo) {
-        int x = puyo.getX();
-        int targetY = puyo.getY() - 1;
-
-        if (targetY < 0) {
-            return false; // 바닥
-        }
-
-        // 보드 그리드 체크
-        if (board.getPuyoAt(x, targetY) != null) {
-            return false; // 보드에 다른 뿌요가 있음
-        }
-
-        // 같은 열의 다른 falling puyos 체크
-        for (FallingPuyo fp : column) {
-            if (fp != null && fp.puyo != puyo && fp.puyo.getX() == x && fp.puyo.getY() == targetY) {
-                return false; // 같은 열의 다른 falling puyo가 있음
+    private boolean canSinglePuyoFallDuringFallingAnimation(FallingPuyo fp, List<FallingPuyo> fallingList) {
+        Puyo puyo = fp.puyo;
+        
+        // 바닥 체크
+        if (puyo.getY() == 0) return false;
+        
+        // 보드 충돌 체크 (이미 착지한 뿌요들)
+        if (!board.canMoveDown(puyo)) return false;
+        
+        // 다른 falling puyo 충돌: targetY = y-1 위치에 다른 falling puyo가 있는지
+        for (FallingPuyo other : fallingList) {
+            if (other == fp) continue;
+            if (other.puyo.getX() == puyo.getX() && other.puyo.getY() == (puyo.getY() - 1) ) {
+                return false;
             }
         }
-
         return true;
     }
+
 
     /**
      * 통합된 낙하 애니메이션 핸들러 (분리/부유 통합: FALLING 타입)
@@ -640,7 +625,7 @@ public class GameWorld {
             return false;
         }
 
-        if (canFall()) {
+        if (canPuyoPairFall()) {
             currentPair.moveDown();
             // 공중 상태면 락딜레이 비활성화
             if (lockDelayManager.isActive()) {
