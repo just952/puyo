@@ -435,8 +435,9 @@ public class GameWorld {
         // FALLING 상태만 필터링 (POPPING, SETTLING은 별도 처리)
         List<Puyo> fallingList = new ArrayList<>();
         for (Puyo puyo : animatingPuyos) {
-            if (puyo.isFalling()) {
+            if (puyo.isFalling() || puyo.isSettling()) {
                 fallingList.add(puyo);
+                LogUtil.debug("GameWorld","updateFallingAnimation[fallingList added] "+puyo);
             }
         }
         
@@ -452,11 +453,13 @@ public class GameWorld {
         for (Puyo puyo : fallingList) {
             if (canSinglePuyoFallDuringFallingAnimation(puyo, fallingList)) {
                 puyo.moveDown();
+                LogUtil.debug("GameWorld","updateFallingAnimation[Move down] "+puyo);
                 anyMoved = true;
             } else {
                 // 더 이상 이동 불가 = 착지함 → SETTLING 전이 + 바운스 시작
                 if (puyo.getState() == Puyo.State.FALLING) {
                     puyo.setState(Puyo.State.SETTLING);
+                    LogUtil.debug("GameWorld","updateFallingAnimation[to SETTLE] "+puyo);
                 }
             }
         }
@@ -526,7 +529,7 @@ public class GameWorld {
      */
     private boolean canSinglePuyoFallDuringFallingAnimation(Puyo puyo, List<Puyo> fallingList) {
         // 바닥 체크
-        if (puyo.getY() == 0) return false;
+        if (puyo.getY() == 0 || puyo.isSettling()) return false;
         
         // 보드 충돌 체크 (이미 착지한 뿌요들)
         if (!board.canMoveDown(puyo)) return false;
@@ -534,9 +537,13 @@ public class GameWorld {
         // 다른 falling puyo 충돌: targetY = y-1 위치에 다른 falling puyo가 있는지
         for (Puyo other : fallingList) {
             if (other == puyo) continue;
-            if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - 1) ) {
+            //int offsetY = puyo.getInMiddle() ? 1 : 0;
+            if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - 1) && other.isFalling() == false ) {
+            //if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - offsetY) ) {    
+                //LogUtil.debug("GameWorld","canSinglePuyoFallDuringFallingAnimation[Conflict]:Puyo="+puyo + ", target="+other);
                 return false;
             }
+            //LogUtil.debug("GameWorld","canSinglePuyoFallDuringFallingAnimation[OK]:Puyo="+puyo + ", target="+other);
         }
         return true;
     }
