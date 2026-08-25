@@ -50,10 +50,9 @@ puyo/
 │   │   │   │   ├── LockDelayManager.java  # 락 딜레이 타이머/이동 카운트
 │   │   │   │   ├── ChainManager.java      # 연쇄 상태 관리 (chainCount, currentGroups)
 │   │   │   │   ├── PuyoPairGenerator.java # 랜덤 PuyoPair 생성
-│   │   │   │   └── StatefulPuyo.java     # 상태를 가진 뿌요 모델 (POPPING/FALLING/SETTLING, v0.1.27~)
 │   │   │   └── model/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
-│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, 팝 애니메이션, inMiddle 반칸 상태 v0.1.24~)
+│   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, **통합 애니메이션 상태 NORMAL/FALLING/SETTLING/POPPING**, inMiddle 반칸 상태 v0.1.24~)
 │   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
 │   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
 │   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)

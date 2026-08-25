@@ -4,6 +4,53 @@
 
 ---
 
+## v0.1.28 (2026-08-25)
+
+### 🐛 **부유 뿌요 낙하 버그 수정 (착지 바운스 후 SETTLING 상태 처리 개선)**
+
+**배경**: v0.1.27에서 착지 바운스(SETTLING) 애니메이션 추가 후, 부유 뿌요 낙하 시 `updateFallingAnimation()`에서 SETTLING 상태인 뿌요가 `fallingList`에 포함되지 않아 착지 직후 바운스 전이된 뿌요들이 충돌 체크에서 누락되는 버그 발생
+
+**해결**:
+1. `updateFallingAnimation()`: `fallingList` 필터에 `puyo.isSettling()` 추가로 착지 직후 바운스 전이된 뿌요도 낙하 루프에서 처리
+2. `canSinglePuyoFallDuringFallingAnimation()`: `isSettling()`이면 즉시 `false` 반환 (SETTLING은 더 이상 낙하 안 함)
+3. 충돌 체크: `other.isFalling() == false` 조건 추가 (FALLING이 아닌 것들만 충돌로 간주)
+
+#### 변경 내용
+
+**1. GameWorld.java - updateFallingAnimation()**
+```java
+// FALLING 상태만 필터링 (POPPING, SETTLING은 별도 처리)
+List<Puyo> fallingList = new ArrayList<>();
+for (Puyo puyo : animatingPuyos) {
+    if (puyo.isFalling() || puyo.isSettling()) {  // SETTLING 추가
+        fallingList.add(puyo);
+    }
+}
+```
+
+**2. GameWorld.java - canSinglePuyoFallDuringFallingAnimation()**
+```java
+// 바닥 체크 + SETTLING이면 낙하 불가
+if (puyo.getY() == 0 || puyo.isSettling()) return false;
+
+// 다른 falling puyo 충돌: targetY = y-1 위치에 다른 falling puyo가 있는지
+for (Puyo other : fallingList) {
+    if (other == puyo) continue;
+    // SETTLING 상태인 것들만 충돌로 간주 (FALLING은 함께 낙하 상태이므로 충돌 아님)
+    if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - 1) && other.isFalling() == false) {
+        return false;
+    }
+}
+```
+
+#### 효과
+- ✅ 부유 뿌요가 바닥에 밀착하여 자연스럽게 낙하
+- ✅ 착지 직후 SETTLING(바운스) 전이된 뿌요들이 정상 처리
+- ✅ 연쇄 3단계까지 정상 완료 (`chainCount=3` → 정상 종료)
+- ✅ `animatingPuyos` 누적 없음 (2 → 5 → 5 → 0)
+
+---
+
 ## v0.1.27 (2026-08-23)
 
 ### 🔧 **클래스/변수명 리네이밍: FallingPuyo → StatefulPuyo (확장성 확보)**

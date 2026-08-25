@@ -537,13 +537,9 @@ public class GameWorld {
         // 다른 falling puyo 충돌: targetY = y-1 위치에 다른 falling puyo가 있는지
         for (Puyo other : fallingList) {
             if (other == puyo) continue;
-            //int offsetY = puyo.getInMiddle() ? 1 : 0;
-            if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - 1) && other.isFalling() == false ) {
-            //if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - offsetY) ) {    
-                //LogUtil.debug("GameWorld","canSinglePuyoFallDuringFallingAnimation[Conflict]:Puyo="+puyo + ", target="+other);
+            if (other.getX() == puyo.getX() && other.getY() == (puyo.getY() - 1) && other.isFalling() == false ) {      // 같이 떨어지고 있는 뿌요는 충돌 체크에서 제외
                 return false;
             }
-            //LogUtil.debug("GameWorld","canSinglePuyoFallDuringFallingAnimation[OK]:Puyo="+puyo + ", target="+other);
         }
         return true;
     }

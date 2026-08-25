@@ -90,6 +90,27 @@
 
 ---
 
+## ✅ 완료된 작업 (이번 세션 - v0.1.28)
+
+| ID       | 작업                                                                          | 완료일     | 비고                                              |
+| -------- | ----------------------------------------------------------------------------- | ---------- | ------------------------------------------------- |
+| V0128-1  | **부유 뿌요 낙하 버그 수정 (착지 바운스 SETTLING 상태 처리)**                 | 2026-08-25 | updateFallingAnimation fallingList에 SETTLING 포함, canSinglePuyoFallDuringFallingAnimation SETTLING 체크 추가 |
+| V0128-2  | **FallingAnimationTest 작성 (로그 기반 회귀 방지 테스트)**                    | 2026-08-24 | column 4 부유 5개 낙하 시나리오 재현, 색상/위치 검증 |
+
+---
+
+## ✅ 완료된 작업 (이번 세션 - v0.1.27)
+
+| ID       | 작업                                                                          | 완료일     | 비고                                              |
+| -------- | ----------------------------------------------------------------------------- | ---------- | ------------------------------------------------- |
+| V0127-1  | **StatefulPuyo 리네이밍 (FallingPuyo → StatefulPuyo)**                        | 2026-08-23 | 클래스명/변수명/메서드 전체 변경, POPPING/FALLING/SETTLING 3상태 지원 |
+| V0127-2  | **Puyo.java 통합 애니메이션 상태 (State enum, updateAnimation())**            | 2026-08-23 | NORMAL/FALLING/SETTLING/POPPING, animTimer/scaleX/scaleY 통일 |
+| V0127-3  | **착지 바운스(SETTLING) 애니메이션 구현 (0.35초, 2회 진동)**                    | 2026-08-23 | Squash & Stretch 4단계, scaleX/scaleY 비균일 스케일 |
+| V0127-4  | **PlayScreen drawPuyo 단순화 (state 기반 scale 선택)**                        | 2026-08-23 | SETTLING/POPPING/FALLING/NORMAL 분기 처리 |
+| V0127-5  | **GameWorld animatingPuyos 통합 (StatefulPuyo → List<Puyo>)**                 | 2026-08-23 | collectAndClearChainPop chainManager.getCurrentGroups() 기반 수정 |
+
+---
+
 ## ✅ 완료된 작업 (이번 세션 - v0.1.26)
 
 | ID       | 작업                                                                          | 완료일     | 비고                                              |
@@ -214,6 +235,7 @@
 | V015-5 | 문서 현행화 (design.md, architecture.md, progress.md, changeLog.md, todo.md) | 2026-08-03 | **모두 최신화**                 |
 
 ---
+
 
 ## 🎯 다음 마일스톤: v0.3.0 (2026-08-31 목표)
 
