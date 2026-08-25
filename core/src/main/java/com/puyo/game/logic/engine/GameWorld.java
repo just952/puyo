@@ -358,12 +358,6 @@ public class GameWorld {
         }
     }
 
-    /**
-     * 애니메이션 중인 Puyo를 리스트에 추가
-     */
-    private void addAnimatingPuyo(Puyo puyo) {
-        animatingPuyos.add(puyo);
-    }
 
     // ==========================================
     // 애니메이션 로직 (기존 유지)
