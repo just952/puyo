@@ -290,15 +290,16 @@ public class GameWorld {
         fallTimer += delta;
         if (fallTimer >= fallInterval) {
             fallTimer = 0f;
-        if (canPuyoPairFall()) {
-            currentPair.moveDown();
-            // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
-        } else {
-            // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
-            lockDelayManager.activate();
-            gamePhase = GamePhase.LOCK_DELAY;
-            LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
-        }
+
+            if (canPuyoPairFall()) {
+                currentPair.moveDown();
+                // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
+            } else {
+                // 착지! → 락딜레이 활성화하고 LOCK_DELAY로 전이
+                lockDelayManager.activate();
+                gamePhase = GamePhase.LOCK_DELAY;
+                LogUtil.debug("GameWorld", "Phase: FALLING_AUTO -> LOCK_DELAY (landed, lock delay activated)");
+            }
         }
     }
 

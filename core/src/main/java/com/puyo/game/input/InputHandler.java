@@ -31,10 +31,10 @@ public class InputHandler implements InputProcessor {
     private boolean prevHardDropPressed = false;
 
     // DAS/ARR 설정 (초 단위, ConfigManager에서 로드)
-    private float dasDelayHorizontalSec;
-    private float arrIntervalHorizontalSec;
-    private float dasDelaySoftdropSec;
-    private float arrIntervalSoftdropSec;
+    private float DAS_DEPLAY_HORIZONTAL_SEC;
+    private float ARR_INTERVAL_HORIZONTAL_SEC;
+    private float DAS_DELAY_SOFTDROP_SEC;
+    private float ARR_INTERVAL_SOFTDROP_SEC;
 
     // DAS/ARR 추적용 상태 (좌우/소프트드랍 독립 관리)
     private float horizontalHeldTimeSec = 0f;
@@ -57,15 +57,15 @@ public class InputHandler implements InputProcessor {
         loadConfig();
     }
 
-    /**
+    /**`
      * 설정 로드 (ConfigManager에서 DAS/ARR 값 읽기)
      */
     private void loadConfig() {
         ConfigManager.GameConfig config = ConfigManager.getInstance().getConfig();
-        this.dasDelayHorizontalSec = config.das_delay_horizontal_sec;
-        this.arrIntervalHorizontalSec = config.arr_interval_horizontal_sec;
-        this.dasDelaySoftdropSec = config.das_delay_softdrop_sec;
-        this.arrIntervalSoftdropSec = config.arr_interval_softdrop_sec;
+        this.DAS_DEPLAY_HORIZONTAL_SEC = config.das_delay_horizontal_sec;
+        this.ARR_INTERVAL_HORIZONTAL_SEC = config.arr_interval_horizontal_sec;
+        this.DAS_DELAY_SOFTDROP_SEC = config.das_delay_softdrop_sec;
+        this.ARR_INTERVAL_SOFTDROP_SEC = config.arr_interval_softdrop_sec;
     }
 
     /**
@@ -244,14 +244,14 @@ public class InputHandler implements InputProcessor {
                 horizontalHeldTimeSec = 0f; // 타이머 시작
             } else {
                 horizontalHeldTimeSec += delta;
-                if (horizontalHeldTimeSec < dasDelayHorizontalSec) {
+                if (horizontalHeldTimeSec < DAS_DEPLAY_HORIZONTAL_SEC) {
                     // DAS 지연 중: 반복 없음
                     horizontalRepeatTriggered = false;
                 } else {
                     // DAS 지연 후: ARR 주기로 반복
                     // (누적시간 - 지연) % 주기 < delta 면 이번 프레임에 트리거
-                    float postDasTime = horizontalHeldTimeSec - dasDelayHorizontalSec;
-                    horizontalRepeatTriggered = (postDasTime % arrIntervalHorizontalSec) < delta;
+                    float postDasTime = horizontalHeldTimeSec - DAS_DEPLAY_HORIZONTAL_SEC;
+                    horizontalRepeatTriggered = (postDasTime % ARR_INTERVAL_HORIZONTAL_SEC) < delta;
                 }
             }
         } else {
@@ -269,13 +269,13 @@ public class InputHandler implements InputProcessor {
                 softDropHeldTimeSec = 0f; // 타이머 시작
             } else {
                 softDropHeldTimeSec += delta;
-                if (softDropHeldTimeSec < dasDelaySoftdropSec) {
+                if (softDropHeldTimeSec < DAS_DELAY_SOFTDROP_SEC) {
                     // DAS 지연 중: 반복 없음
                     softDropRepeatTriggered = false;
                 } else {
                     // DAS 지연 후: ARR 주기로 반복
-                    float postDasTime = softDropHeldTimeSec - dasDelaySoftdropSec;
-                    softDropRepeatTriggered = (postDasTime % arrIntervalSoftdropSec) < delta;
+                    float postDasTime = softDropHeldTimeSec - DAS_DELAY_SOFTDROP_SEC;
+                    softDropRepeatTriggered = (postDasTime % ARR_INTERVAL_SOFTDROP_SEC) < delta;
                 }
             }
         } else {
