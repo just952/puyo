@@ -4,9 +4,73 @@
 
 ---
 
-## v0.1.28 (2026-08-25)
+## v0.1.29 (2026-08-29)
 
-### 🐛 **부유 뿌요 낙하 버그 수정 (착지 바운스 후 SETTLING 상태 처리 개선)**
+### 🏗️ **입력 아키텍처 전면 리팩토링 (InputProvider + Command 패턴 + 플랫폼 분리)**
+
+**배경**: 기존 `InputHandler`가 core 모듈에 있으면서 `TouchController`(Android 전용), `ConfigManager`, `Gdx.app.getType()` 등 플랫폼 의존성을 가지고 있어 core의 플랫폼 독립성이 깨져있었음. 또한 `PlayScreen.render()` → `update()` → `GameWorld` 메서드 직접 호출 구조로 캡슐화 위반.
+
+**해결**:
+1. **core/input**에 인터페이스/데이터 클래스 신규 생성:
+   - `InputProvider` - 입력 공급자 인터페이스 (플랫폼 독립적)
+   - `InputCommand` - 불변 입력 명령 레코드 (Record, Command 패턴)
+   - `InputMode` - 입력 모드 열거형 (GAME_PLAY, TEXT_INPUT, UI_NAVIGATION)
+   - `TextInputListener` - 텍스트 입력 이벤트 리스너 (IME 지원)
+
+2. **플랫폼별 구현체 분리**:
+   - `desktop/input/DesktopInputHandler` - 키보드 입력, DAS/ARR, IME 연동
+   - `android/input/AndroidInputHandler` - TouchController 위임, 터치 입력, IME 지원
+
+3. **GameWorld 입력 처리 내부화**:
+   - `update(float delta, InputProvider input)` 시그니처 변경
+   - `handleFallingInput(InputCommand cmd)` 메서드 추가로 FALLING_AUTO/LOCK_DELAY에서만 입력 처리
+   - `hold()` 메서드 구현 (heldPair 슬롯 + resetRotation(), 한 조각당 1회 제한)
+
+4. **PlayScreen 단순화**:
+   - `InputProvider` 생성자 주입
+   - `update()` 메서드 제거 → `render()`에서 직접 `gameWorld.update(delta, inputProvider)`
+   - `Gdx.input.setInputProcessor()` 제거 (구현체 생성자에서 처리)
+
+5. **팩토리 패턴으로 Screen 생성**:
+   - `PuyoGame.createPlayScreen(mode, stageIndex)` + `createInputProvider()` 추상 메서드
+   - `DesktopLauncher`/`AndroidLauncher`에서 익명 클래스로 오버라이드
+
+6. **테스트 개선**:
+   - Mock InputProvider로 GameWorld 단독 테스트 가능
+
+#### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `InputProvider.java` | **신규** | 입력 공급자 인터페이스 |
+| `InputCommand.java` | **신규** | 불변 입력 명령 레코드 |
+| `InputMode.java` | **신규** | 입력 모드 열거형 |
+| `TextInputListener.java` | **신규** | 텍스트 입력 리스너 |
+| `DesktopInputHandler.java` | **신규** (desktop) | 키보드 입력 구현체 |
+| `AndroidInputHandler.java` | **신규** (android) | 터치 입력 구현체 |
+| `GameWorld.java` | 대폭 수정 | update 시그니처 변경, handleFallingInput, hold 구현 |
+| `PlayScreen.java` | 대폭 수정 | InputProvider 주입, update 제거, render에서 직접 호출 |
+| `PuyoGame.java` | 수정 | createPlayScreen 팩토리, createInputProvider 추상화 |
+| `DesktopLauncher.java` | 수정 | 익명 클래스로 DesktopInputProvider 제공 |
+| `AndroidLauncher.java` | 수정 | 익명 클래스로 AndroidInputProvider 제공 |
+| `MenuScreen.java` | 수정 | game.createPlayScreen() 사용 |
+| `StoryModeSelectScreen.java` | 수정 | game.createPlayScreen() 사용 |
+| `PuyoPair.java` | 수정 | resetRotation() 추가 (홀드용) |
+| `FallingAnimationTest.java` | 수정 | Mock InputProvider 사용 |
+| `InputHandler.java` | **삭제** | core에서 플랫폼 의존성 제거 |
+
+#### 효과
+- ✅ **core 모듈 완전 플랫폼 독립성** 확보 (InputProvider 인터페이스만 의존)
+- ✅ **캡슐화 향상**: GameWorld가 입력 처리 로직을 내부에서 관리
+- ✅ **단일 책임**: PlayScreen=렌더링, GameWorld=게임 로직+입력 처리
+- ✅ **테스트 용이**: Mock InputProvider 주입으로 GameWorld 단독 테스트 가능
+- ✅ **Command 패턴**: pollCommand()로 프레임당 한 번 소비, 중복 처리 방지
+- ✅ **확장성**: TEXT_INPUT 모드 + TextInputListener로 채팅/검색 지원 준비
+- ✅ **컴파일/테스트 모두 통과**: core, desktop, test 모두 성공
+
+---
+
+## v0.1.28 (2026-08-25)
 
 **배경**: v0.1.27에서 착지 바운스(SETTLING) 애니메이션 추가 후, 부유 뿌요 낙하 시 `updateFallingAnimation()`에서 SETTLING 상태인 뿌요가 `fallingList`에 포함되지 않아 착지 직후 바운스 전이된 뿌요들이 충돌 체크에서 누락되는 버그 발생
 

@@ -5,6 +5,9 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.puyo.game.config.ConfigManager;
+import com.puyo.game.input.InputProvider;
+import com.puyo.game.screens.PlayScreen;
+import com.puyo.game.GameMode;
 
 public class PuyoGame extends Game {
     @Override
@@ -49,5 +52,21 @@ public class PuyoGame extends Game {
     @Override
     public void dispose() {
         super.dispose();
+    }
+
+    // === PlayScreen 팩토리 메서드 ===
+
+    public PlayScreen createPlayScreen(GameMode mode) {
+        return createPlayScreen(mode, -1);
+    }
+
+    public PlayScreen createPlayScreen(GameMode mode, int storyStageIndex) {
+        InputProvider inputProvider = createInputProvider();
+        return new PlayScreen(this, mode, storyStageIndex, inputProvider);
+    }
+
+    /** 플랫폼별 InputProvider 생성 (데스크톱/안드로이드 런처에서 반드시 오버라이드해야 함) */
+    protected InputProvider createInputProvider() {
+        throw new UnsupportedOperationException("createInputProvider() must be overridden by platform launcher");
     }
 }

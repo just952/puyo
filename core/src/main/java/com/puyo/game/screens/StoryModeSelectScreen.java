@@ -111,7 +111,7 @@ public class StoryModeSelectScreen extends BaseScreen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             if (selectedIndex < unlocked) {
                 storyManager.setCurrentStageIndex(selectedIndex);
-                game.setScreen(new PlayScreen(game, GameMode.NORMAL, selectedIndex));
+                game.setScreen(game.createPlayScreen(GameMode.NORMAL, selectedIndex));
             }
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.BACKSPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {

@@ -105,7 +105,7 @@ public class MenuScreen extends BaseScreen {
                     break;
                 case START_GAME:
                     if ("endless".equals(item.mode)) {
-                        game.setScreen(new PlayScreen(game, GameMode.ENDLESS));
+                        game.setScreen(game.createPlayScreen(GameMode.ENDLESS));
                     }
                     break;
                 case EXIT_GAME:

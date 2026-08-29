@@ -4,6 +4,8 @@ import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.util.LogUtil;
+import com.puyo.game.input.InputProvider;
+import com.puyo.game.input.InputCommand;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,8 @@ public class GameWorld {
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
+    private PuyoPair heldPair;        // 홀드된 조각
+    private boolean holdUsed = false; // 현재 조각에서 홀드 사용 여부 (한 조각당 1회 제한)
     private boolean gameOver = false;
     private int score = 0;
     private float fallTimer = 0f;
@@ -78,6 +82,7 @@ public class GameWorld {
         pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.TOTAL_HEIGHT);
         lockDelayManager.deactivate();
         justSpawned = true; // 새 조각 스폰 알림 (DAS 리셋용, 한 프레임 후 자동 해제)
+        holdUsed = false; // 새 조각 스폰 시 홀드 사용 가능하도록 리셋
     }
 
     /** 다음 쌍을 스폰 (미리보기용) */
@@ -189,6 +194,44 @@ public class GameWorld {
         LogUtil.debug("GameWorld", "Phase: HARD_DROP -> CHAIN_FINDING");
     }
 
+    /** 홀드: 현재 조각을 홀드 슬롯과 교체 (한 조각당 1회 제한) */
+    public void hold() {
+        if (currentPair == null) return;
+
+        // FALLING_AUTO, LOCK_DELAY에서만 홀드 허용
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
+            return;
+        }
+
+        // 이미 홀드 사용했으면 무시
+        if (holdUsed) {
+            return;
+        }
+
+        if (heldPair == null) {
+            // 홀드 슬롯이 비어있으면 현재 조각을 홀드로 이동하고 다음 조각 스폰
+            heldPair = currentPair;
+            heldPair.resetRotation(); // 회전 상태 초기화
+            pairGenerator.positionAtSpawn(heldPair, Board.WIDTH, Board.TOTAL_HEIGHT);
+            spawnNewPair(); // nextPair가 currentPair가 되고 새 nextPair 생성
+            holdUsed = true;
+            LogUtil.debug("GameWorld", "Hold: stored current pair, spawned next");
+        } else {
+            // 홀드 슬롯에 조각이 있으면 현재 조각과 교체
+            PuyoPair temp = currentPair;
+            currentPair = heldPair;
+            heldPair = temp;
+            heldPair.resetRotation(); // 회전 상태 초기화
+            pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.TOTAL_HEIGHT);
+            holdUsed = true;
+            LogUtil.debug("GameWorld", "Hold: swapped with held pair");
+        }
+
+        // 락딜레이 리셋
+        lockDelayManager.deactivate();
+        fallTimer = 0f;
+    }
+
     /** 소프트 드롭 / 락딜레이 중 이동 기록용 */
     public void recordLockDelayMove() {
         if (lockDelayManager.isActive()) {
@@ -206,56 +249,72 @@ public class GameWorld {
         return justSpawned;
     }
 
-    /** 메인 업데이트 루프 - 단일 switch로 모든 상태 처리 */
-    public void update(float delta) {
-        // justSpawned 플래그 클리어 (한 프레임만 유지)
+    /** 메인 업데이트 루프 - 입력 처리 포함 */
+    public void update(float delta, InputProvider input) {
+        // 1. 입력 업데이트 및 명령 획득
+        input.update(delta);
+        InputCommand cmd = input.pollCommand();
+
+        frameCount++;
+        if (frameCount % 300 == 0) {
+            LogUtil.debug("GameWorld", "Phase: " + gamePhase + ", score=" + score + ", chain=" + chainManager.getChainCount());
+        }
+
+        // 2. 게임오버 시 재시작 입력만 처리
+        if (gamePhase == GamePhase.GAME_OVER) {
+            if (cmd.restartPressed()) {
+                restartGame();
+            }
+            return;
+        }
+
+        // 3. justSpawned 플래그 클리어 (한 프레임만 유지)
         if (justSpawned) {
             justSpawned = false;
         }
 
-        if (gameOver)
-            return;
+        // 4. 입력 처리 (FALLING_AUTO, LOCK_DELAY에서만) - switch 앞!
+        handleFallingInput(cmd);
 
-        frameCount++;
-        //LogUtil.debug("GameWorld", "==========================================================");
-        //LogUtil.debug("GameWorld", "Frame = " + frameCount + ": gamePhase=" + gamePhase);
-
+        // 5. 상태 머신 처리
         switch (gamePhase) {
-            case SPAWNING: {
-                handleSpawning();
-                break;
-            }
-            case FALLING_AUTO: {
-                handleFallingAuto(delta);
-                break;
-            }
-            case LOCK_DELAY: {
-                handleLockDelay(delta);
-                break;
-            }
-            case SEPARATION: {
-                handleSeparation();
-                break;
-            }
-            case FALLING_ANIMATION: {
-                handleFallingAnimation(delta);
-                break;
-            }
-            case CHAIN_FINDING: {
-                handleChainFinding();
-                break;
-            }
-            case CHAIN_POP_ANIMATION: {
-                handlePopAnimation(delta);
-                break;
-            }
-            case CHAIN_FLOATING_CHECK: {
-                handleFloatingCheck();
-                break;
-            }
-            case GAME_OVER:
-                break;
+            case SPAWNING:              handleSpawning();               break;
+            case FALLING_AUTO:          handleFallingAuto(delta);       break;
+            case LOCK_DELAY:            handleLockDelay(delta);         break;
+            case SEPARATION:            handleSeparation();             break;
+            case FALLING_ANIMATION:     handleFallingAnimation(delta);  break;
+            case CHAIN_FINDING:         handleChainFinding();           break;
+            case CHAIN_POP_ANIMATION:   handlePopAnimation(delta);      break;
+            case CHAIN_FLOATING_CHECK:  handleFloatingCheck();          break;
+            case GAME_OVER:                                             break;
         }
+    }
+
+    /** 낙하 중 입력 처리 (FALLING_AUTO, LOCK_DELAY에서만 동작) */
+    private void handleFallingInput(InputCommand cmd) {
+        // 해당 페이즈가 아니면 즉시 리턴
+        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
+            return;
+        }
+        if (currentPair == null) return;
+
+        // 좌우 이동
+        if (cmd.moveDirection() != 0) {
+            if (cmd.moveDirection() < 0) moveLeft();
+            else moveRight();
+        }
+
+        // 회전
+        if (cmd.rotatePressed()) rotateClockwise();
+
+        // 소프트 드롭
+        if (cmd.dropPressed()) softDrop();
+
+        // 하드 드롭
+        if (cmd.hardDropPressed()) hardDrop();
+
+        // 홀드
+        if (cmd.holdPressed()) hold();
     }
 
     // ==========================================
@@ -728,5 +787,27 @@ public class GameWorld {
     }
 
     public void dispose() {
+    }
+
+    /** 게임 재시작 (게임오버 시 호출) */
+    public void restartGame() {
+        board.clear();
+        currentPair = null;
+        nextPair = null;
+        heldPair = null;
+        holdUsed = false;
+        gameOver = false;
+        score = 0;
+        fallTimer = 0f;
+        frameCount = 0;
+        justSpawned = false;
+        lockDelayManager.deactivate();
+        chainManager.startNewChain();
+        animatingPuyos.clear();
+        fallingAnimationTimer = 0f;
+        gamePhase = GamePhase.SPAWNING;
+        spawnNextPair();
+        spawnNewPair();
+        LogUtil.info("GameWorld", "Game restarted");
     }
 }

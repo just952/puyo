@@ -24,7 +24,7 @@ puyo/
 ├── build.gradle              # 루트 빌드 설정 (AGP 8.1.0, libGDX 1.12.1)
 ├── settings.gradle           # 모듈 포함: core, desktop, android
 ├── gradle.properties         # JVM 옵션, 버전 상수, org.gradle.java.home=JDK 17
-├── core/                     # 공통 게임 로직 (Pure Java + LibGDX API)
+├── core/                     # 공통 게임 로직 (Pure Java + LibGDX API) - **플랫폼 독립적**
 │   ├── build.gradle          # 의존성: gdx, gdx-ai, gdx-freetype, gdx-platform:natives-desktop(test)
 │   ├── src/main/java/com/puyo/game/
 │   │   ├── PuyoGame.java                 # 메인 게임 클래스 (Game 인터페이스 구현)
@@ -37,8 +37,11 @@ puyo/
 │   │   │   ├── PuyoConnectState.java     # 뿌요 연결 상태 enum (v0.1.23~)
 │   │   │   └── PuyoRenderer.java         # SpriteBatch + 아틀라스 렌더러 (v0.1.22~)
 │   │   ├── input/
-│   │   │   ├── InputHandler.java         # 키보드/터치 통합 입력 처리
-│   │   │   └── TouchController.java      # 모바일 4버튼 터치 컨트롤러
+│   │   │   ├── InputProvider.java        # 입력 공급자 인터페이스 (플랫폼 독립적)
+│   │   │   ├── InputCommand.java         # 불변 입력 명령 레코드 (Record)
+│   │   │   ├── InputMode.java            # 입력 모드 열거형 (GAME_PLAY, TEXT_INPUT, UI_NAVIGATION)
+│   │   │   ├── TextInputListener.java    # 텍스트 입력 이벤트 리스너 (IME 지원)
+│   │   │   └── TouchController.java      # 모바일 4버튼 터치 컨트롤러 (Android 모듈에서 사용)
 │   │   ├── logic/
 │   │   │   ├── ai/
 │   │   │   │   └── AIController.java     # AI 대전 컨트롤러 (휴리스틱)
@@ -54,7 +57,7 @@ puyo/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
 │   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, **통합 애니메이션 상태 NORMAL/FALLING/SETTLING/POPPING**, inMiddle 반칸 상태 v0.1.24~)
 │   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
-│   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
+│   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치, resetRotation() v0.1.28~)
 │   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)
 │   │   ├── menus/
 │   │   │   ├── MenuAction.java           # 메뉴 액션 열거형
@@ -63,7 +66,40 @@ puyo/
 │   │   │   ├── MenuLoaderTest.java       # 메뉴 로더 테스트
 │   │   │   └── MenuSystemDemo.java       # 메뉴 시스템 데모
 │   │   ├── screens/
-│   │   │   ├── BaseScreen.java           # 공통 스크린 베이스 (뷰포트, 카메라)
+│   │   │   ├── BaseScreen.java           # 공통 뷰포트/카메라 관리
+│   │   │   ├── LoadingScreen.java        # 로딩 화면
+│   │   │   ├── MenuScreen.java           # 메인 메뉴 (game.createPlayScreen() 사용)
+│   │   │   ├── PlayScreen.java           # 게임플레이 (InputProvider 주입, render()에서 gameWorld.update() 직접 호출)
+│   │   │   └── StoryModeSelectScreen.java # 스토리 모드 선택 (game.createPlayScreen() 사용)
+│   │   └── story/
+│   │       ├── StoryModeManager.java     # 스테이지 관리, 언락/난이도
+│   │       └── StageData.java            # 스테이지 데이터
+│   └── src/test/java/...                 # 헤드리스 테스트 (MockInputProvider로 GameWorld 단독 테스트 가능)
+├── desktop/                    # 데스크톱 전용 (LWJGL3 백엔드)
+│   ├── build.gradle
+│   └── src/main/java/com/puyo/game/
+│       ├── DesktopLauncher.java        # PuyoGame 익명 클래스로 DesktopInputProvider 오버라이드
+│       └── input/
+│           └── DesktopInputHandler.java # 키보드 입력 구현체 (DAS/ARR, IME 텍스트 입력 지원)
+├── android/                    # 안드로이드 전용 (Android SDK 백엔드)
+│   ├── build.gradle
+│   └── src/main/java/com/puyo/game/
+│       ├── AndroidLauncher.java        # PuyoGame 익명 클래스로 AndroidInputProvider 오버라이드
+│       └── input/
+│           └── AndroidInputHandler.java # 터치 입력 구현체 (TouchController 위임, IME 지원)
+```
+
+---
+
+### 모듈 간 의존성 규칙 (v0.1.28 강화)
+
+| 모듈 | 의존 가능 | 의존 불가 |
+|------|-----------|-----------|
+| **core** | (자체만) | desktop, android, platform-specific API |
+| **desktop** | core | android |
+| **android** | core | desktop |
+
+> **핵심 원칙**: core 모듈은 `InputProvider` 인터페이스만 의존하며, 플랫폼별 구현체(`DesktopInputHandler`, `AndroidInputHandler`)는 각 플랫폼 모듈에 격리됨.n.java           # 공통 스크린 베이스 (뷰포트, 카메라)
 │   │   │   ├── LoadingScreen.java        # 로딩 화면
 │   │   │   ├── MenuScreen.java           # 메인 메뉴 화면
 │   │   │   ├── PlayScreen.java           # 게임플레이 화면
@@ -801,32 +837,90 @@ private void handleSeparation() {
 }
 ```
 
-### 5. 입력 처리 (InputHandler / TouchController)
+### 5. 입력 처리 (InputProvider / InputCommand / InputMode)
 
 ```java
-// 키보드 (PC) - InputHandler
-keyDown/keyUp → 상태 플래그 설정
-update() → 이전 프레임 상태 저장 (엣지 감지용)
-updateDasArr() → 단일 카운터로 DAS/ARR 처리 (anyPressed 기준)
+// core/input/InputProvider.java - 인터페이스 (플랫폼 독립적)
+public interface InputProvider {
+    void update(float delta);
+    InputCommand pollCommand();      // 이번 프레임 명령 반환 + 버퍼 클리어
+    void resetDasArr();              // 새 조각 스폰 시 DAS/ARR 리셋
+    void dispose();
+    
+    // 텍스트 입력 지원 (로비/채팅/검색용)
+    InputMode getInputMode();
+    void setInputMode(InputMode mode);
+    void setTextInputListener(TextInputListener listener);
+    void clearTextInputListener();
+}
 
-// 터치 (모바일) - TouchController implements InputProcessor
-touchDown/Up/Dragged → 버튼 영역별 플래그 설정
-정규화 좌표(0~1) 사용으로 해상도 독립적
+// core/input/InputCommand.java - 불변 명령 레코드 (Record)
+public record InputCommand(
+    int moveDirection,        // -1: 왼쪽, 0: 없음, 1: 오른쪽
+    boolean rotatePressed,    // 회전 (엣지 감지)
+    boolean dropPressed,      // 소프트 드롭 (DAS/ARR 적용)
+    boolean hardDropPressed,  // 하드 드롭 (엣지 감지)
+    boolean holdPressed,      // 홀드 (엣지 감지)
+    boolean restartPressed    // 재시작 (게임오버 시, 엣지 감지)
+) {
+    public static final InputCommand EMPTY = new InputCommand(0, false, false, false, false, false);
+}
 
-// 공통 조회 메서드 (InputHandler)
-getMoveDirection()  // -1, 0, 1 (repeatTriggered + left/rightPressed)
-isRotatePressed()   // 엣지 감지 (한 번만 true)
-isDropPressed()     // 홀드 감지 (repeatTriggered + dropPressed)
-isHardDropPressed() // 엣지 감지
+// core/input/InputMode.java - 입력 모드
+public enum InputMode {
+    GAME_PLAY,      // 일반 게임 플레이 (DAS/ARR 적용, 액션 명령)
+    TEXT_INPUT,     // 채팅/닉네임/검색 입력 (문자 이벤트, IME 지원)
+    UI_NAVIGATION   // 메뉴 탐색 (방향키만, DAS/ARR 선택적)
+}
 ```
+
+**데스크톱 구현** (`desktop/input/DesktopInputHandler.java`):
+- `InputProvider`, `InputProcessor` 구현
+- 키보드 상태 관리 + DAS/ARR 타이머 (좌우/소프트드랍 독립)
+- `keyTyped()`로 텍스트 입력 처리 (IME 네이티브 연동)
+- `Gdx.input.setInputProcessor(this)` 생성자에서 자동 등록
+
+**안드로이드 구현** (`android/input/AndroidInputHandler.java`):
+- `InputProvider`, `InputProcessor`, `Disposable` 구현
+- `TouchController` 내부 위임 (터치 영역, 드래그, 더블탭 하드드롭)
+- `keyTyped()`로 하드웨어 키보드 텍스트 입력 지원
+- `Gdx.input.getTextInput()`로 Android IME 표시
+
+**GameWorld에서 사용** (`GameWorld.update(float delta, InputProvider input)`):
+```java
+public void update(float delta, InputProvider input) {
+    input.update(delta);
+    InputCommand cmd = input.pollCommand();  // 한 프레임 한 번만 호출
+
+    if (gamePhase == GamePhase.GAME_OVER) {
+        if (cmd.restartPressed()) restartGame();
+        return;
+    }
+
+    // FALLING_AUTO, LOCK_DELAY에서만 입력 처리
+    if (gamePhase == GamePhase.FALLING_AUTO || gamePhase == GamePhase.LOCK_DELAY) {
+        handleFallingInput(cmd);  // 내부에서 phase 체크 후 moveLeft/Right, rotateCW, softDrop, hardDrop, hold 호출
+    }
+    
+    // 상태 머신 처리 (switch)
+    switch (gamePhase) { ... }
+}
+```
+
+**장점**:
+1. **core 플랫폼 독립**: `InputProvider` 인터페이스만 의존
+2. **캡슐화**: GameWorld가 입력 처리 로직을 내부에서 관리 (`handleFallingInput`)
+3. **테스트 용이**: Mock InputProvider 주입으로 GameWorld 단독 테스트 가능
+4. **Command 패턴**: `pollCommand()`로 프레임당 한 번 소비, 중복 처리 방지
+5. **확장성**: `TEXT_INPUT` 모드 + `TextInputListener`로 채팅/검색 지원 준비
 
 ### 6. 화면 렌더링 파이프라인 (PlayScreen.render)
 
 ```java
 @Override
 public void render(float delta) {
-    // 1. Update game logic
-    update(delta);
+    // 1. 게임 로직 업데이트 (입력 처리 포함) - update() 메서드 제거, 직접 호출
+    gameWorld.update(delta, inputProvider);
 
     // 2. Clear screen (백버퍼 클리어)
     Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1);
@@ -840,20 +934,38 @@ public void render(float delta) {
     // 4. 그리기 (백버퍼에 기록)
     drawBoard();              // 고정된 뿌요들
     drawCurrentPair();        // 현재 떨어지는 쌍 (반칸 오프셋)
-    drawFallingPuyos();       // 분리/부유 뿌요 (반칸 오프셋)
+    drawAnimatingPuyos();     // 분리/부유 뿌요 (반칸 오프셋)
     drawNextPair();           // 다음 뿌요 프리뷰
     drawUI();                 // 점수, 연쇄, 스테이지 등
 
-    // 5. 프레임 끝 → LibGDX가 백버퍼→프론트버퍼 스왑
+    // 5. 게임오버 팝업 (배치 후 렌더링하여 최상단에 표시)
+    if (gameWorld.isGameOver()) {
+        drawGameOverPopup();
+    }
+
+    // 6. 프레임 끝 → LibGDX가 백버퍼→프론트버퍼 스왑
 }
 ```
+
+**변경점 (v0.1.28)**:
+- `PlayScreen.update()` 메서드 제거 → `render()`에서 직접 `gameWorld.update(delta, inputProvider)` 호출
+- `inputProvider`는 생성자에서 주입받음 (플랫폼별 런처에서 제공)
+- `Gdx.input.setInputProcessor()` 호출 제거 → `InputProvider` 구현체 생성자에서 처리
 
 ### 7. Screen 전환 흐름 (메뉴 → 게임)
 
 ```java
 // MenuScreen에서
-if (inputHandler.isEnterPressed()) {
-    game.setScreen(new PlayScreen(game, GameMode.NORMAL));
+if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+    game.setScreen(game.createPlayScreen(GameMode.ENDLESS));
+}
+
+// StoryModeSelectScreen에서
+if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+    if (selectedIndex < unlocked) {
+        storyManager.setCurrentStageIndex(selectedIndex);
+        game.setScreen(game.createPlayScreen(GameMode.NORMAL, selectedIndex));
+    }
 }
 
 // PuyoGame.setScreen() 호출 시
@@ -862,20 +974,27 @@ if (inputHandler.isEnterPressed()) {
 // 3. 다음 render()부터 새 Screen의 render() 호출
 ```
 
+**변경점 (v0.1.28)**:
+- `new PlayScreen(...)` 직접 생성 → `game.createPlayScreen(mode, stageIndex)` 팩토리 메서드 사용
+- `PuyoGame.createPlayScreen()` 내부에서 `createInputProvider()` 호출로 플랫폼별 InputProvider 생성
+- `DesktopLauncher` / `AndroidLauncher`에서 익명 클래스로 `createInputProvider()` 오버라이드
+
 ---
 
 ## 핵심 설계 포인트 요약
 
 | 구분            | 내용                                                                         |
 | --------------- | ---------------------------------------------------------------------------- |
-| **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `update()` + `render()`            |
+| **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `gameWorld.update(delta, inputProvider)` + 그리기 |
 | **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어 (반칸 토글로 1초/1칸) |
-| **입력 처리**   | `InputHandler`가 키보드/터치 통합, `update()`에서 엣지 감지, **페이즈 기반 허용 제어** |
+| **입력 처리**   | `InputProvider` 인터페이스만 의존, `InputCommand` 레코드로 전달, GameWorld 내부에서 `handleFallingInput`로 처리, **페이즈 기반 허용 제어** |
 | **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유, **GamePhase 11단계** |
-| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.05s)   |
+| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.05s) |
 | **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙), **stateful Manager** |
-| **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복                          |
-| **반칸 낙하**   | `Puyo.inMiddle` 토글로 모든 낙하 경로 자동 부드러운 이동 (v0.1.24~)          |
-| **렌더링**      | `SpriteBatch` + 아틀라스, `FitViewport`로 가상 해상도(1600×960) 유지         |
-| **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑)                                 |
+| **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복 |
+| **반칸 낙하**   | `Puyo.inMiddle` 토글로 모든 낙하 경로 자동 부드러운 이동 (v0.1.24~) |
+| **홀드 시스템** | `PuyoPair.resetRotation()` + `heldPair` 슬롯, 한 조각당 1회 제한 (v0.1.28~) |
+| **렌더링**      | `SpriteBatch` + 아틀라스, `FitViewport`로 가상 해상도(1600×960) 유지 |
+| **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑) |
 | **Screen 전환** | `Game.setScreen()` → hide/dispose → show/initViewport → 다음 프레임부터 적용 |
+| **모듈 분리**   | core(로직) / desktop(데스크톱) / android(안드로이드), **core는 플랫폼 독립적** |

@@ -6,6 +6,9 @@ import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.model.Puyo;
 import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.util.LogUtil;
+import com.puyo.game.input.InputProvider;
+import com.puyo.game.input.InputCommand;
+import com.puyo.game.input.InputMode;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -28,6 +31,42 @@ import static org.junit.Assert.*;
 public class FallingAnimationTest {
     private HeadlessApplication app;
     private GameWorld gameWorld;
+    
+    // 테스트용 Mock InputProvider
+    private static class MockInputProvider implements InputProvider {
+        private InputCommand pendingCommand = InputCommand.EMPTY;
+        private InputMode currentMode = InputMode.GAME_PLAY;
+        
+        @Override
+        public void update(float delta) {}
+        
+        @Override
+        public InputCommand pollCommand() {
+            InputCommand cmd = pendingCommand;
+            pendingCommand = InputCommand.EMPTY;
+            return cmd;
+        }
+        
+        @Override
+        public void resetDasArr() {}
+        
+        @Override
+        public void dispose() {}
+        
+        @Override
+        public InputMode getInputMode() { return currentMode; }
+        
+        @Override
+        public void setInputMode(InputMode mode) { currentMode = mode; }
+        
+        @Override
+        public void setTextInputListener(com.puyo.game.input.TextInputListener listener) {}
+        
+        @Override
+        public void clearTextInputListener() {}
+    }
+    
+    private MockInputProvider mockInput;
 
     @Before
     public void setUp() {
@@ -35,6 +74,7 @@ public class FallingAnimationTest {
         app = new HeadlessApplication(new HeadlessGame(), cfg);
         
         gameWorld = new GameWorld();
+        mockInput = new MockInputProvider();
     }
 
     @After
@@ -83,7 +123,7 @@ public class FallingAnimationTest {
         setGamePhase(GameWorld.GamePhase.CHAIN_FLOATING_CHECK);
         
         // 3. update 호출로 단계 진행: CHAIN_FLOATING_CHECK → FALLING_ANIMATION
-        gameWorld.update(0.016f);
+        gameWorld.update(0.016f, mockInput);
         
         // FALLING_ANIMATION 단계로 전이되었는지 확인
         assertEquals("CHAIN_FLOATING_CHECK → FALLING_ANIMATION 전이", 
@@ -104,7 +144,7 @@ public class FallingAnimationTest {
         int lastAnimatingCount = -1;
         
         for (int frame = 0; frame < maxFrames; frame++) {
-            gameWorld.update(0.016f);
+            gameWorld.update(0.016f, mockInput);
             
             // animatingPuyos 크기 변화 로깅 (디버깅용)
             int currentAnimating = gameWorld.getAnimatingPuyos().size();
@@ -214,14 +254,14 @@ public class FallingAnimationTest {
         }
         // column 4에서 5개, 다른 열에서도 부유 있을 수 있음
         // 로그에서는 column 4만 5개 나왔음 (다른 열은 grounded 있음)
-        //assertTrue("최소 column 4의 5개 부유 뿌요는 있어야 함", floatingBefore.size() >= 5);
+        assertTrue("최소 column 4의 5개 부유 뿌요는 있어야 함", floatingBefore.size() >= 5);
         
         // column 4 부유 5개 확인
         int col4Floating = 0;
         for (Puyo p : floatingBefore) {
             if (p.getX() == 4) col4Floating++;
         }
-        //assertEquals("column 4에서 5개 부유", 5, col4Floating);
+        assertEquals("column 4에서 5개 부유", 5, col4Floating);
     }
     
     private void placePuyo(Board board, int x, int y, PuyoColor color) {

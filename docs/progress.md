@@ -1,6 +1,6 @@
 # Puyo Puyo 2 - 개발 진행 현황
 
-## 최종 업데이트: 2026-08-25
+## 최종 업데이트: 2026-08-29
 
 ---
 
@@ -19,13 +19,14 @@
 |                     | **회전 시스템 (벽 킥 포함)**                                          | **완료** | PuyoPair 회전 + setPosition, GameWorld 벽 킥 처리                    |
 |                     | **스폰 위치 통일**                                                    | **완료** | createAndPositionPair() 공통 메서드로 상단 중앙 스폰 보장            |
 |                     | **반칸 단위 부드러운 낙하 (Half-cell Falling)**                       | **완료** | Puyo.inMiddle 토글 방식, 모든 낙하 경로 자동 적용 (2026-08-22)       |
+|                     | **홀드 시스템 (Hold)**                                                | **완료** | heldPair 슬롯 + resetRotation(), 한 조각당 1회 제한 (2026-08-29)     |
 | 메뉴 시스템         | JSON 데이터 기반 동적 메뉴                                            | 완료     | MenuLoader, MenuItem, MenuAction                                     |
 |                     | main.json, story_mode_select.json 등                                  | 완료     | 4개 메뉴 파일                                                        |
 |                     | MenuLoader 클래스패스/애셋 폴백 로딩                                  | 완료     | 테스트/앱 모두 지원                                                  |
 | 화면/스크린         | LoadingScreen → MenuScreen 전환                                       | 완료     | LoadingScreen.render() 즉시 전환                                     |
 |                     | MenuScreen (키보드/터치 입력)                                         | 완료     | 위/아래/엔터/백스페이스                                              |
 |                     | StoryModeSelectScreen (스테이지 선택)                                 | 완료     | 잠금/해금 표시                                                       |
-|                     | PlayScreen (게임플레이 진입점)                                        | 완료     | GameMode별 분기                                                      |
+|                     | PlayScreen (게임플레이 진입점)                                        | 완료     | GameMode별 분기, InputProvider 주입, render()에서 직접 gameWorld.update() |
 | 뷰포트/카메라       | 가상 해상도 1600x960 (5:3) 설정                                       | 완료     | GameViewport 설정 클래스                                             |
 |                     | FitViewport + OrthographicCamera                                      | 완료     | 자동 비율 유지 스케일링                                              |
 |                     | BaseScreen 공통 뷰포트 관리                                           | 완료     | initViewport(), resize() 자동 처리                                   |
@@ -35,6 +36,9 @@
 |                     | clear_to_advance 승리 조건                                            | 완료     | 2승/2승/3승                                                          |
 | 입력 시스템         | **DAS/ARR 밀리초→초 단위 전환 + 좌우/소프트드랍 분리 + 설정 외부화**   | **완료** | ConfigManager 연동, GameWorld.FALLING_ANIMATION_INTERVAL 스타일 통일  |
 |                     | **TouchController에도 DAS/ARR 적용**                                  | **완료** | 모바일 터치 홀드에도 동일 로직 적용                                  |
+|                     | **입력 아키텍처 리팩토링 (v0.1.28)**                                  | **완료** | InputProvider 인터페이스 + InputCommand 레코드, core 플랫폼 독립성 확보, GameWorld 내부 입력 처리 |
+|                     | **데스크톱/안드로이드 입력 구현체 분리**                              | **완료** | DesktopInputHandler (키보드), AndroidInputHandler (터치+TouchController) |
+|                     | **Command 패턴 + TextInputListener**                                  | **완료** | pollCommand()로 프레임당 한 번 소비, IME 텍스트 입력 지원 준비       |
 |                     | **락 딜레이 (Lock Delay) - Tsu 규칙**                                 | **완료** | 0.5초 딜레이, 이동/회전 15회 제한, 초과 시 즉시 잠금                 |
 |                     | **회전 시스템 (벽 킥 포함)**                                          | **완료** | PuyoPair 회전 + setPosition, GameWorld 벽 킥 처리                    |
 |                     | **스폰 위치 통일**                                                    | **완료** | createAndPositionPair() 공통 메서드로 상단 중앙 스폰 보장            |
@@ -135,10 +139,10 @@
 
 ## 진행률 요약
 
-전체 진행률: **92%**
+전체 진행률: **95%**
 
 - 코어 로직: 100%
-- 메뉴/스크린: 95%
+- 메뉴/스크린: 100%
 - 뷰포트/카메라: 100%
 - 스토리 모드: 80%
 - 안드로이드 빌드: **95%** (네이티브 로드/폰트/에셋 모두 해결)
@@ -151,9 +155,10 @@
 
 ## 다음 마일스톤 (v0.3.0 목표)
 
-| 마일스톤 | 목표일         | 핵심 포함 사항                                   |
-| -------- | -------------- | ------------------------------------------------ |
-| v0.3.0   | 2026-08-31     | AI 대전 + 사운드/이펙트 + 세이브/로드            |
+| 마일스톤 | 목표일         | 핵심 포함 사항                                   | 상태    |
+| -------- | -------------- | ------------------------------------------------ | ------- |
+| v0.1.28  | **2026-08-29** | **입력 아키텍처 리팩토링 (InputProvider, Command 패턴, 플랫폼 분리)** | **완료** |
+| v0.3.0   | 2026-08-31     | AI 대전 + 사운드/이펙트 + 세이브/로드            | 대기중  |
 | v0.4.0   | 2026-09-30     | 온라인 대전 베타 + 랭킹/업적                     |
 | v1.0.0   | 2026-10-31     | Play Store 출시 빌드                             |
 

@@ -10,38 +10,35 @@ import com.puyo.game.GameMode;
 import com.puyo.game.PuyoGame;
 import com.puyo.game.logic.model.Board;
 import com.puyo.game.logic.engine.GameWorld;
-
 import com.puyo.game.logic.model.Puyo;
-//import com.puyo.game.logic.model.PuyoColor;
 import com.puyo.game.logic.model.PuyoPair;
 import com.puyo.game.util.LogUtil;
-
-import java.util.List;
 import com.puyo.game.story.StoryModeManager;
 import com.puyo.game.story.StageData;
 import com.puyo.game.config.GameViewport;
 import com.puyo.game.graphics.FontManager;
 import com.puyo.game.graphics.PuyoRenderer;
-import com.puyo.game.input.InputHandler;
-import com.puyo.game.input.TouchController;
+import com.puyo.game.input.InputProvider;
+
+import java.util.List;
 
 public class PlayScreen extends BaseScreen {
     private final PuyoGame game;
     private final GameMode mode;
     private final StoryModeManager storyManager;
     private final GameWorld gameWorld;
-    //private float stateTime = 0f;
-    private ShapeRenderer shapeRenderer;
-    private SpriteBatch batch;
     private final FontManager fontManager;
     private final PuyoRenderer puyoRenderer;
-    private InputHandler inputHandler;
+    private final InputProvider inputProvider;
+    
+    private ShapeRenderer shapeRenderer;
+    private SpriteBatch batch;
 
-    public PlayScreen(PuyoGame game, GameMode mode) {
-        this(game, mode, -1);
+    public PlayScreen(PuyoGame game, GameMode mode, InputProvider inputProvider) {
+        this(game, mode, -1, inputProvider);
     }
 
-    public PlayScreen(PuyoGame game, GameMode mode, int storyStageIndex) {
+    public PlayScreen(PuyoGame game, GameMode mode, int storyStageIndex, InputProvider inputProvider) {
         super(game);
         this.game = game;
         this.mode = mode;
@@ -49,6 +46,7 @@ public class PlayScreen extends BaseScreen {
         this.gameWorld = new GameWorld();
         this.fontManager = FontManager.getInstance();
         this.puyoRenderer = new PuyoRenderer();
+        this.inputProvider = inputProvider;
     }
 
     @Override
@@ -63,99 +61,33 @@ public class PlayScreen extends BaseScreen {
             }
         }
 
-        // 뷰포트/카메라 초기화
         initViewport();
 
         shapeRenderer = new ShapeRenderer();
         batch = new SpriteBatch();
-
-        // 입력 핸들러 초기화 (데스크톱: 키보드만, 모바일: 터치 컨트롤러 추가)
-        // Android 플랫폼 감지
-        boolean isAndroid = "Android".equals(com.badlogic.gdx.Gdx.app.getType().name());
-        if (isAndroid) {
-            TouchController touchController = new TouchController();
-            inputHandler = new InputHandler(touchController);
-        } else {
-            inputHandler = new InputHandler();
-        }
-        Gdx.input.setInputProcessor(inputHandler);
+        // InputProvider는 생성자에서 이미 Gdx.input.setInputProcessor(this) 호출함
     }
 
     @Override
     public void render(float delta) {
-        // Update game logic
-        update(delta);
+        // 1. 게임 로직 업데이트 (입력 처리 포함)
+        gameWorld.update(delta, inputProvider);
 
-        // Clear screen
+        // 2. 화면 클리어
         Gdx.gl.glClearColor(0.05f, 0.05f, 0.1f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // 카메라 업데이트 및 프로젝션 매트릭스 적용
+        // 3. 카메라/프로젝션 업데이트
         camera.update();
         batch.setProjectionMatrix(camera.combined);
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        // Draw game board
+        // 4. 그리기
         drawBoard();
         drawCurrentPair();
         drawStatefulPuyos();
         drawNextPair();
         drawUI();
-    }
-
-    private void update(float delta) {
-        if (gameWorld.isGameOver()) {
-            // 게임 오버 시 리스타트 처리 (ENTER 키)
-            if (inputHandler != null && inputHandler.isHardDropPressed()) {
-                game.setScreen(new PlayScreen(game, mode));
-            }
-            return;
-        }
-        //stateTime += delta;
-
-        // 입력 처리 (InputHandler를 통해 키보드/터치 통합)
-        if (inputHandler != null) {
-            // 새 조각 스폰 시 DAS/ARR 리셋 (키를 누른 채로 있어도 첫 프레임 즉시 이동 보장)
-            if (gameWorld.isJustSpawned()) {
-                inputHandler.resetDasArr();
-            }
-
-            // 현재 Phase 확인
-            GameWorld.GamePhase phase = gameWorld.getGamePhase();
-            
-            // FALLING_AUTO, LOCK_DELAY에서만 조작 허용
-            boolean allowInput = (phase == GameWorld.GamePhase.FALLING_AUTO 
-                               || phase == GameWorld.GamePhase.LOCK_DELAY);
-
-            // 회전
-            if (allowInput && inputHandler.isRotatePressed()) {
-                gameWorld.rotateClockwise();
-            }
-
-            inputHandler.update(delta);
-
-            // 좌우 이동
-            if (allowInput) {
-                int moveDir = inputHandler.getMoveDirection();
-                if (moveDir < 0) {
-                    gameWorld.moveLeft();
-                } else if (moveDir > 0) {
-                    gameWorld.moveRight();
-                }
-            }
-
-            // 소프트 드롭 - GameWorld.softDrop() 위임 (착지 시 즉시 잠금, 락딜레이 우회)
-            if (allowInput && inputHandler.isDropPressed()) {
-                gameWorld.softDrop();
-            }
-
-            // 하드 드롭
-            if (allowInput && inputHandler.isHardDropPressed()) {
-                gameWorld.hardDrop();
-            }
-        }
-
-        gameWorld.update(delta);
     }
 
     private void drawBoard() {
@@ -190,7 +122,7 @@ public class PlayScreen extends BaseScreen {
         for (int y = 0; y < Board.HEIGHT; y++) {
             for (int x = 0; x < Board.WIDTH; x++) {
                 Puyo puyo = board.getPuyoAt(x, y);
-                if (puyo != null) {
+                if (puyo != null && puyo.isAlive()) {
                     // 연결 효과 포함 그리기
                     puyoRenderer.drawConnected(batch, board, x, y, puyo.getColor(),
                             GameViewport.Single.BOARD_OFFSET_X + x * GameViewport.CELL_SIZE,
@@ -203,57 +135,38 @@ public class PlayScreen extends BaseScreen {
     }
 
     private void drawCurrentPair() {
-        PuyoPair pair = gameWorld.getCurrentPair();
-        if (pair == null)
-            return;
-
-        batch.begin();
-        // PuyoPair의 left/right puyo는 이미 board 좌표를 가지고 있음
-        Puyo left = pair.getLeft();
-        Puyo right = pair.getRight();
-
-        drawPuyo(left,
-                GameViewport.Single.BOARD_OFFSET_X + left.getX() * GameViewport.CELL_SIZE,
-                GameViewport.Single.BOARD_OFFSET_Y + left.getY() * GameViewport.CELL_SIZE);
-        drawPuyo(right,
-                GameViewport.Single.BOARD_OFFSET_X + right.getX() * GameViewport.CELL_SIZE,
-                GameViewport.Single.BOARD_OFFSET_Y + right.getY() * GameViewport.CELL_SIZE);
-        batch.end();
+        PuyoPair currentPair = gameWorld.getCurrentPair();
+        if (currentPair != null) {
+            batch.begin();
+            for (Puyo p : currentPair.getPuyos()) {
+                if (p.isAlive()) {
+                    float x = GameViewport.Single.BOARD_OFFSET_X + p.getX() * GameViewport.CELL_SIZE;
+                    float y = GameViewport.Single.BOARD_OFFSET_Y + p.getY() * GameViewport.CELL_SIZE;
+                    drawPuyo(p, x, y);
+                }
+            }
+            batch.end();
+        }
     }
 
     private void drawStatefulPuyos() {
-        List<Puyo> animatingPuyos = gameWorld.getAnimatingPuyos();
-        if (animatingPuyos == null || animatingPuyos.isEmpty())
-            return;
-
-        batch.begin();
-        for (Puyo puyo : animatingPuyos) {
-            drawPuyo(puyo,
-                    GameViewport.Single.BOARD_OFFSET_X + puyo.getX() * GameViewport.CELL_SIZE,
-                    GameViewport.Single.BOARD_OFFSET_Y + puyo.getY() * GameViewport.CELL_SIZE);
+        List<Puyo> animating = gameWorld.getAnimatingPuyos();
+        if (!animating.isEmpty()) {
+            batch.begin();
+            for (Puyo p : animating) {
+                if (p.isAlive()) {
+                    float x = GameViewport.Single.BOARD_OFFSET_X + p.getX() * GameViewport.CELL_SIZE;
+                    float y = GameViewport.Single.BOARD_OFFSET_Y + p.getY() * GameViewport.CELL_SIZE;
+                    drawPuyo(p, x, y);
+                }
+            }
+            batch.end();
         }
-        batch.end();
     }
 
-    private void drawNextPair() {
-        PuyoPair next = gameWorld.getNextPair();
-        if (next == null)
-            return;
-
-        batch.begin();
-        // 새로운 싱글 레이아웃: 사이드 패널의 NEXT_PREVIEW 위치 사용
-        float nextX = GameViewport.Single.NEXT_PREVIEW_X;
-        float nextY = GameViewport.Single.NEXT_PREVIEW_Y;
-
-        // Next pair is shown in preview area (not on board)
-        Puyo left = next.getLeft();
-        Puyo right = next.getRight();
-
-        drawPuyo(left, nextX, nextY);
-        drawPuyo(right, nextX, nextY + GameViewport.CELL_SIZE);
-        batch.end();
-    }
-
+    /**
+     * 뿌요 그리기 헬퍼 - 상태별 스케일, inMiddle 반칸 오프셋, 비균일 스케일 지원
+     */
     private void drawPuyo(Puyo puyo, float x, float y) {
         // 상태별 스케일 결정
         float scaleX = 1.0f;
@@ -279,7 +192,7 @@ public class PlayScreen extends BaseScreen {
         if (scaleX <= 0 || scaleY <= 0)
             return;
 
-        // Y 오프셋 계산 (반칸 상태 고려)
+        // Y 오프셋 계산 (반칸 상태 고려: CELL_SIZE/2 = 40픽셀)
         float offsetY = puyo.getInMiddle() ? GameViewport.CELL_SIZE / 2 : 0;
 
         // PuyoRenderer를 사용하여 SpriteBatch로 그리기 (비균일 스케일 지원)
@@ -290,36 +203,51 @@ public class PlayScreen extends BaseScreen {
         }
     }
 
+    private void drawNextPair() {
+        PuyoPair nextPair = gameWorld.getNextPair();
+        if (nextPair != null) {
+            batch.begin();
+            // 다음 뿌요 프리뷰 위치 (사이드 패널)
+            float previewX = GameViewport.Single.NEXT_PREVIEW_X;
+            float previewY = GameViewport.Single.NEXT_PREVIEW_Y;
+            for (Puyo p : nextPair.getPuyos()) {
+                drawPuyo(p, previewX, previewY);
+                previewY -= GameViewport.CELL_SIZE;
+            }
+            batch.end();
+        }
+    }
+
     private void drawUI() {
         batch.begin();
-
-        // UI 폰트 (24px)
         BitmapFont uiFont = fontManager.getUIFont(24);
         uiFont.getData().setScale(1f);
+        uiFont.setColor(Color.WHITE);
 
-        // Score
-        uiFont.draw(batch, "SCORE: " + gameWorld.getScore(),
+        // 점수
+        uiFont.draw(batch, "Score: " + gameWorld.getScore(), 
                 GameViewport.Single.UI_X, GameViewport.VIRTUAL_HEIGHT - 50);
 
-        // Chain
-        if (gameWorld.getCurrentChain() > 0) {
+        // 연쇄 수
+        int chain = gameWorld.getCurrentChain();
+        if (chain > 0) {
             uiFont.setColor(Color.YELLOW);
-            uiFont.draw(batch, "CHAIN: " + gameWorld.getCurrentChain(),
+            uiFont.draw(batch, "CHAIN x" + chain, 
                     GameViewport.Single.UI_X, GameViewport.VIRTUAL_HEIGHT - 90);
             uiFont.setColor(Color.WHITE);
         }
 
-        // Next label
+        // NEXT 라벨
         uiFont.draw(batch, "NEXT",
                 GameViewport.Single.NEXT_PREVIEW_X,
                 GameViewport.Single.NEXT_PREVIEW_Y + GameViewport.CELL_SIZE + 20);
 
-        // Story mode info
+        // 스토리 모드 정보
         if (mode == GameMode.NORMAL && storyManager != null) {
             StageData current = storyManager.getCurrentStage();
             if (current != null) {
-                uiFont.draw(batch,
-                        "STAGE: " + storyManager.getCurrentStageNumber() + "/" + storyManager.getTotalStages(),
+                uiFont.draw(batch, "Stage: " + storyManager.getCurrentStageNumber()
+                        + "/" + storyManager.getTotalStages(),
                         GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 50);
                 uiFont.draw(batch, "VS: " + current.opponent,
                         GameViewport.VIRTUAL_WIDTH - 300, GameViewport.VIRTUAL_HEIGHT - 90);
@@ -335,31 +263,27 @@ public class PlayScreen extends BaseScreen {
         }
     }
 
-    /**
-     * 게임 오버 레이어 팝업 렌더링
-     * 반투명 오버레이 + 중앙 흰색 팝업 박스 + 텍스트
-     */
     private void drawGameOverPopup() {
         // 1. 반투명 전체 화면 오버레이
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0f, 0f, 0f, 0.7f); // 검은색 70% 투명도
+        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
         shapeRenderer.rect(0, 0, GameViewport.VIRTUAL_WIDTH, GameViewport.VIRTUAL_HEIGHT);
         shapeRenderer.end();
 
-        // 2. 중앙 팝업 박스 (흰색 둥근 사각형 느낌)
+        // 2. 중앙 팝업 박스
         float popupWidth = 400f;
         float popupHeight = 220f;
         float popupX = (GameViewport.VIRTUAL_WIDTH - popupWidth) / 2f;
         float popupY = (GameViewport.VIRTUAL_HEIGHT - popupHeight) / 2f;
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(1f, 1f, 1f, 0.95f); // 흰색 95% 불투명도
+        shapeRenderer.setColor(1f, 1f, 1f, 0.95f);
         shapeRenderer.rect(popupX, popupY, popupWidth, popupHeight);
         shapeRenderer.end();
 
         // 팝업 테두리
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-        shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 1f); // 어두운 회색 테두리
+        shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 1f);
         shapeRenderer.rect(popupX, popupY, popupWidth, popupHeight);
         shapeRenderer.end();
 
@@ -396,33 +320,28 @@ public class PlayScreen extends BaseScreen {
         batch.end();
     }
 
-
     @Override
     public void resize(int width, int height) {
         super.resize(width, height);
     }
 
     @Override
-    public void pause() {
-    }
+    public void pause() {}
 
     @Override
-    public void resume() {
-    }
+    public void resume() {}
 
     @Override
     public void hide() {
-        Gdx.input.setInputProcessor(null);
+        // InputProvider가 직접 Gdx.input.setInputProcessor 관리하므로 여기선 아무것도 안 함
     }
 
     @Override
     public void dispose() {
-        if (shapeRenderer != null)
-            shapeRenderer.dispose();
-        if (batch != null)
-            batch.dispose();
-        if (puyoRenderer != null)
-            puyoRenderer.dispose();
+        if (shapeRenderer != null) shapeRenderer.dispose();
+        if (batch != null) batch.dispose();
+        if (puyoRenderer != null) puyoRenderer.dispose();
+        if (inputProvider != null) inputProvider.dispose();
         // 폰트는 FontManager가 관리하므로 여기서 dispose 하지 않음
     }
 }
