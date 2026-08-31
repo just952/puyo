@@ -146,8 +146,8 @@ public class GameWorld {
         return false;
     }
 
-    /** 시계방향 회전 (벽 킥 포함) */
-    public void rotateClockwise() {
+    /** 회전 (벽 킥 포함) */
+    public void rotatePair(boolean isClockwise) {
         if (currentPair == null)
             return;
 
@@ -156,14 +156,23 @@ public class GameWorld {
             return;
         }
 
-        currentPair.rotateClockwise();
+        if (isClockwise) {
+            currentPair.rotateClockwise();
+        } else {
+            currentPair.rotateCounterClockwise();
+        }
+
         if (!board.canPlace(currentPair)) {
             if (board.canMoveLeft(currentPair)) {
                 currentPair.moveLeft();
             } else if (board.canMoveRight(currentPair)) {
                 currentPair.moveRight();
             } else {
-                currentPair.rotateCounterClockwise();
+                if (isClockwise) {
+                    currentPair.rotateCounterClockwise(); // 되돌리기
+                } else {
+                    currentPair.rotateClockwise(); // 되돌리기
+                }
             }
         }
             if (lockDelayManager.isActive()) {
@@ -175,6 +184,7 @@ public class GameWorld {
                 }
             }
     }
+
 
     /** 하드 드롭 */
     public void hardDrop() {
@@ -304,8 +314,11 @@ public class GameWorld {
             else moveRight();
         }
 
-        // 회전
-        if (cmd.rotatePressed()) rotateClockwise();
+        // 회전 (시계방향)
+        if (cmd.rotatePressed()) rotatePair(true);
+
+        // 회전 (반시계방향) - 롱프레스/Z키
+        if (cmd.rotateCounterClockwisePressed()) rotatePair(false);
 
         // 소프트 드롭
         if (cmd.dropPressed()) softDrop();

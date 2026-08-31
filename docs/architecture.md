@@ -432,6 +432,8 @@ public class TouchController implements InputProcessor, Disposable {
     // 4버튼 레이아웃: 좌/우 이동, 회전, 드롭(더블탭=하드드롭)
     // 정규화 좌표(0~1) 기반 해상도 독립적 터치 영역
     // 시각적 피드백: 누름 상태 시 알파/크기 변경
+    // 🆕 v0.1.30: 회전 버튼 롱프레스(0.5초) → 반시계방향 회전
+    // 🆕 v0.1.30: resetDasArr() 구현 (새 조각 스폰 시 DAS/ARR/롱프레스 타이머 리셋)
 }
 ```
 
@@ -711,6 +713,7 @@ PlayScreen.render(delta)
 │   │   ├── 현재 Phase 조회: gameWorld.getGamePhase()
 │   │   ├── allowInput = (FALLING_AUTO || LOCK_DELAY)
 │   │   ├── isRotatePressed() → gameWorld.rotateClockwise()
+│   │   ├── isRotateCounterClockwisePressed() → gameWorld.rotateCounterClockwise()  // 🆕 v0.1.30
 │   │   ├── getMoveDirection() → gameWorld.moveLeft/Right()
 │   │   ├── isDropPressed() → currentPair.moveDown() + recordLockDelayMove()
 │   │   └── isHardDropPressed() → gameWorld.hardDrop()
@@ -856,14 +859,15 @@ public interface InputProvider {
 
 // core/input/InputCommand.java - 불변 명령 레코드 (Record)
 public record InputCommand(
-    int moveDirection,        // -1: 왼쪽, 0: 없음, 1: 오른쪽
-    boolean rotatePressed,    // 회전 (엣지 감지)
-    boolean dropPressed,      // 소프트 드롭 (DAS/ARR 적용)
-    boolean hardDropPressed,  // 하드 드롭 (엣지 감지)
-    boolean holdPressed,      // 홀드 (엣지 감지)
-    boolean restartPressed    // 재시작 (게임오버 시, 엣지 감지)
+    int moveDirection,                   // -1: 왼쪽, 0: 없음, 1: 오른쪽
+    boolean rotatePressed,               // 회전 (시계방향, 엣지 감지)
+    boolean rotateCounterClockwisePressed, // 회전 (반시계방향, 엣지 감지) - 🆕 v0.1.30
+    boolean dropPressed,                 // 소프트 드롭 (DAS/ARR 적용)
+    boolean hardDropPressed,             // 하드 드롭 (엣지 감지)
+    boolean holdPressed,                 // 홀드 (엣지 감지)
+    boolean restartPressed               // 재시작 (게임오버 시, 엣지 감지)
 ) {
-    public static final InputCommand EMPTY = new InputCommand(0, false, false, false, false, false);
+    public static final InputCommand EMPTY = new InputCommand(0, false, false, false, false, false, false);
 }
 
 // core/input/InputMode.java - 입력 모드
@@ -877,12 +881,15 @@ public enum InputMode {
 **데스크톱 구현** (`desktop/input/DesktopInputHandler.java`):
 - `InputProvider`, `InputProcessor` 구현
 - 키보드 상태 관리 + DAS/ARR 타이머 (좌우/소프트드랍 독립)
+- 회전 키: `X`/`↑`/`W` = 시계방향, `Z` = 반시계방향 (v0.1.30~)
 - `keyTyped()`로 텍스트 입력 처리 (IME 네이티브 연동)
 - `Gdx.input.setInputProcessor(this)` 생성자에서 자동 등록
+- **v0.1.30 수정**: `update()`에서 `buildCommand()`를 `prev` 상태 복사 **앞**으로 이동하여 엣지 감지(회전/하드드롭/홀드/재시작) 정상화
 
 **안드로이드 구현** (`android/input/AndroidInputHandler.java`):
 - `InputProvider`, `InputProcessor`, `Disposable` 구현
 - `TouchController` 내부 위임 (터치 영역, 드래그, 더블탭 하드드롭)
+- 회전 버튼: **탭** = 시계방향, **롱프레스(0.5초)** = 반시계방향 (v0.1.30~)
 - `keyTyped()`로 하드웨어 키보드 텍스트 입력 지원
 - `Gdx.input.getTextInput()`로 Android IME 표시
 
@@ -899,7 +906,7 @@ public void update(float delta, InputProvider input) {
 
     // FALLING_AUTO, LOCK_DELAY에서만 입력 처리
     if (gamePhase == GamePhase.FALLING_AUTO || gamePhase == GamePhase.LOCK_DELAY) {
-        handleFallingInput(cmd);  // 내부에서 phase 체크 후 moveLeft/Right, rotateCW, softDrop, hardDrop, hold 호출
+        handleFallingInput(cmd);  // 내부에서 phase 체크 후 moveLeft/Right, rotateCW, rotateCCW, softDrop, hardDrop, hold 호출
     }
     
     // 상태 머신 처리 (switch)

@@ -70,6 +70,11 @@ public class TouchController implements InputProcessor, Disposable {
     private boolean horizontalFirstFrame = false;
     private boolean softDropFirstFrame = false;
 
+    // 🆕 회전 롱프레스 감지용 (반시계방향)
+    private float rotateHeldTimeSec = 0f;
+    private boolean rotateLongPressTriggered = false;
+    private static final float LONG_PRESS_THRESHOLD_SEC = 0.5f; // 0.5초 이상 홀드 시 반시계방향
+
     public TouchController() {
         loadConfig();
     }
@@ -118,6 +123,9 @@ public class TouchController implements InputProcessor, Disposable {
                 // 상단: 회전
                 rotatePressed = true;
                 prevRotatePressed = false; // 엣지 감지용
+                // 🆕 롱프레스 타이머 시작
+                rotateHeldTimeSec = 0f;
+                rotateLongPressTriggered = false;
             } else {
                 // 하단: 드롭 - 더블탭으로 하드 드롭 감지
                 long now = System.currentTimeMillis();
@@ -153,6 +161,9 @@ public class TouchController implements InputProcessor, Disposable {
         // hardDropPressed는 엣지 감지 후 자동 리셋됨
         horizontalFirstFrame = false; // 🆕 리셋
         softDropFirstFrame = false;   // 🆕 리셋
+        // 🆕 회전 롱프레스 리셋
+        rotateHeldTimeSec = 0f;
+        rotateLongPressTriggered = false;
 
         return true;
     }
@@ -231,6 +242,17 @@ public class TouchController implements InputProcessor, Disposable {
         // 하드 드롭은 한 프레임만 true
         if (hardDropPressed) {
             hardDropPressed = false;
+        }
+
+        // 🆕 회전 롱프레스 감지 (반시계방향)
+        if (rotatePressed) {
+            rotateHeldTimeSec += delta;
+            if (!rotateLongPressTriggered && rotateHeldTimeSec >= LONG_PRESS_THRESHOLD_SEC) {
+                rotateLongPressTriggered = true;
+            }
+        } else {
+            rotateHeldTimeSec = 0f;
+            rotateLongPressTriggered = false;
         }
 
         // DAS/ARR 처리 (터치 홀드 시 적용)
@@ -353,6 +375,14 @@ public class TouchController implements InputProcessor, Disposable {
     }
 
     /**
+     * 회전 버튼 롱프레스 확인 (반시계방향, 엣지 감지)
+     * 0.5초 이상 홀드 시 한 번만 true 반환
+     */
+    public boolean isRotateCounterClockwisePressed() {
+        return rotateLongPressTriggered;
+    }
+
+    /**
      * 드롭 버튼이 눌려 있는지 확인 (DAS/ARR 적용)
      */
     public boolean isDropPressed() {
@@ -364,6 +394,20 @@ public class TouchController implements InputProcessor, Disposable {
      */
     public boolean isHardDropPressed() {
         return hardDropPressed && !prevHardDropPressed;
+    }
+
+    /**
+     * DAS/ARR 상태 리셋 (새 조각 스폰 시 호출)
+     */
+    public void resetDasArr() {
+        horizontalHeldTimeSec = 0f;
+        softDropHeldTimeSec = 0f;
+        horizontalRepeatTriggered = false;
+        softDropRepeatTriggered = false;
+        horizontalFirstFrame = false;
+        softDropFirstFrame = false;
+        rotateHeldTimeSec = 0f;
+        rotateLongPressTriggered = false;
     }
 
     @Override

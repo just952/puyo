@@ -42,6 +42,7 @@ public class AndroidInputHandler implements InputProvider, InputProcessor, Dispo
     private void buildCommand() {
         int moveDirection = touchController.getMoveDirection();
         boolean rotate = touchController.isRotatePressed();
+        boolean rotateCCW = touchController.isRotateCounterClockwisePressed(); // 🆕 반시계방향 (롱프레스)
         boolean drop = touchController.isDropPressed();
         boolean hardDrop = touchController.isHardDropPressed();
         
@@ -50,7 +51,7 @@ public class AndroidInputHandler implements InputProvider, InputProcessor, Dispo
         boolean hold = false;
         boolean restart = false;
 
-        pendingCommand = new InputCommand(moveDirection, rotate, drop, hardDrop, hold, restart);
+        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, hold, restart);
     }
 
     @Override

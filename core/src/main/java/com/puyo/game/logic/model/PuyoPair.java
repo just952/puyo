@@ -20,7 +20,7 @@ public class PuyoPair {
     public PuyoPair(Puyo left, Puyo right) {
         this.left = left;
         this.right = right;
-        this.rotation = 0; // initial rotation: up (right is above left)
+        this.rotation = 2; // initial rotation: up (right is above left)
         // Ensure the puyos are positioned correctly: left at (x,y), right at (x, y+1)
         // for rotation 0.
         // We'll adjust in setPosition.

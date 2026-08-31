@@ -4,6 +4,43 @@
 
 ---
 
+## v0.1.30 (2026-08-31)
+
+### 🔧 **입력 시스템 버그 수정 + 반시계방향 회전 지원**
+
+**배경**: v0.1.29 입력 아키텍처 리팩토링 후 두 가지 이슈 발견:
+1. `DesktopInputHandler.update()`에서 `prev` 상태 업데이트가 `buildCommand()`보다 먼저 실행되어 엣지 감지(회전/하드드롭/홀드/재시작)가 모두 작동하지 않음
+2. 원작 뿌요뿌요 통 규칙에 맞는 **반시계방향 회전**이 미구현 (시계방향만 존재)
+
+**해결**:
+1. **DesktopInputHandler.update() 순서 수정**: `buildCommand()`를 `prev` 상태 복사 **앞**으로 이동하여 엣지 감지 정상화
+2. **반시계방향 회전 완전 구현**:
+   - `InputCommand`에 `rotateCounterClockwisePressed` 필드 추가
+   - `TouchController`: 회전 버튼 **롱프레스(0.5초)** 감지 → 반시계방향
+   - `DesktopInputHandler`: `Z` 키 = 반시계방향, `X` 키 = 시계방향 추가
+   - `GameWorld.rotateCounterClockwise()` 신규 구현 (벽킥 포함, 시계방향과 동일 로직)
+   - `AndroidInputHandler`/`TouchController` 새 필드 전달 연동
+
+#### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `DesktopInputHandler.java` | **수정** | update() 순서 수정(엣지 감지 버그), Z/X 키 매핑 추가 |
+| `InputCommand.java` | **수정** | `rotateCounterClockwisePressed` 필드 추가 (7개 파라미터) |
+| `TouchController.java` | **수정** | 롱프레스 감지 로직, `isRotateCounterClockwisePressed()`, `resetDasArr()` 구현 |
+| `AndroidInputHandler.java` | **수정** | 새 필드 `rotateCCW` 전달 |
+| `GameWorld.java` | **수정** | `rotateCounterClockwise()` 구현, `handleFallingInput()`에서 호출 |
+
+#### 효과
+- ✅ **데스크톱 회전/하드드롭/홀드/재시작** 정상 작동 (엣지 감지 복구)
+- ✅ **모바일 터치**: 탭=시계방향, 롱프레스(0.5초)=반시계방향
+- ✅ **데스크톱 키보드**: X=시계방향, Z=반시계방향 (일반적 뿌요뿌요 키맵)
+- ✅ **벽킥 완전 지원**: 양방향 회전 모두 좌/우 벽킥 동일 적용
+- ✅ **락딜레이 연동**: 반시계방향 회전도 이동 카운트 기록/공중 탈출 시 비활성화
+- ✅ **컴파일/테스트 모두 통과**: core, desktop, android, test 모두 성공
+
+---
+
 ## v0.1.29 (2026-08-29)
 
 ### 🏗️ **입력 아키텍처 전면 리팩토링 (InputProvider + Command 패턴 + 플랫폼 분리)**

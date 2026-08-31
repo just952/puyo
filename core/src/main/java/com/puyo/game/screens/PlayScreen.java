@@ -210,6 +210,7 @@ public class PlayScreen extends BaseScreen {
             // 다음 뿌요 프리뷰 위치 (사이드 패널)
             float previewX = GameViewport.Single.NEXT_PREVIEW_X;
             float previewY = GameViewport.Single.NEXT_PREVIEW_Y;
+
             for (Puyo p : nextPair.getPuyos()) {
                 drawPuyo(p, previewX, previewY);
                 previewY -= GameViewport.CELL_SIZE;

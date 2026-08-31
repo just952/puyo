@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
 import com.puyo.game.config.ConfigManager;
+import com.puyo.game.util.LogUtil;
 
 /**
  * 데스크톱(키보드) 전용 입력 처리기.
@@ -15,6 +16,7 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
     private boolean leftPressed = false;
     private boolean rightPressed = false;
     private boolean rotatePressed = false;
+    private boolean rotateCounterClockwisePressed = false; // 🆕 반시계방향 (Z 키)
     private boolean dropPressed = false;
     private boolean hardDropPressed = false;
     private boolean holdPressed = false;
@@ -24,6 +26,7 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
     private boolean prevLeftPressed = false;
     private boolean prevRightPressed = false;
     private boolean prevRotatePressed = false;
+    private boolean prevRotateCounterClockwisePressed = false; // 🆕 반시계방향 prev
     private boolean prevDropPressed = false;
     private boolean prevHardDropPressed = false;
     private boolean prevHoldPressed = false;
@@ -72,16 +75,20 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
             return;
         }
 
+        // 1. 먼저 명령 구성 (이전 프레임의 prev 상태 사용 - 엣지 감지 위함)
+        buildCommand();
+
+        // 2. 그 다음 현재 상태를 이전 상태로 복사 (다음 프레임용)
         prevLeftPressed = leftPressed;
         prevRightPressed = rightPressed;
         prevRotatePressed = rotatePressed;
+        prevRotateCounterClockwisePressed = rotateCounterClockwisePressed; // 🆕
         prevDropPressed = dropPressed;
         prevHardDropPressed = hardDropPressed;
         prevHoldPressed = holdPressed;
         prevRestartPressed = restartPressed;
 
         updateDasArr(delta);
-        buildCommand();
     }
 /** DAS/ARR 타이머 갱신 및 반복 트리거 계산 */
     private void updateDasArr(float delta) {
@@ -139,12 +146,17 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
         }
 
         boolean rotate = rotatePressed && !prevRotatePressed;
+        LogUtil.debug("DesktopInputHandler", "- rotatePressed: " + rotatePressed + ", prevRotatePressed: " + prevRotatePressed + ", rotate: " + rotate);
+        
+        // 🆕 반시계방향 회전 (Z 키)
+        boolean rotateCCW = rotateCounterClockwisePressed && !prevRotateCounterClockwisePressed;
+        
         boolean drop = dropPressed && softDropRepeatTriggered;
         boolean hardDrop = hardDropPressed && !prevHardDropPressed;
         boolean hold = holdPressed && !prevHoldPressed;
         boolean restart = restartPressed && !prevRestartPressed;
 
-        pendingCommand = new InputCommand(moveDirection, rotate, drop, hardDrop, hold, restart);
+        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, hold, restart);
     }
 
     @Override
@@ -215,7 +227,11 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
             case Input.Keys.UP:
             case Input.Keys.W:
             case Input.Keys.NUMPAD_8:
+            case Input.Keys.X: // 🆕 X 키도 시계방향 회전 (일반적 뿌요뿌요 키맵)
                 rotatePressed = true;
+                return true;
+            case Input.Keys.Z: // 🆕 Z 키 = 반시계방향 회전
+                rotateCounterClockwisePressed = true;
                 return true;
             case Input.Keys.DOWN:
             case Input.Keys.S:
@@ -258,7 +274,11 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
             case Input.Keys.UP:
             case Input.Keys.W:
             case Input.Keys.NUMPAD_8:
+            case Input.Keys.X:
                 rotatePressed = false;
+                return true;
+            case Input.Keys.Z: // 🆕 Z 키 = 반시계방향 회전 해제
+                rotateCounterClockwisePressed = false;
                 return true;
             case Input.Keys.DOWN:
             case Input.Keys.S:
