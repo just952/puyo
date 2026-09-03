@@ -122,12 +122,12 @@ public class FallingAnimationTest {
         // 2. CHAIN_FLOATING_CHECK 단계로 강제 설정
         setGamePhase(GameWorld.GamePhase.CHAIN_FLOATING_CHECK);
         
-        // 3. update 호출로 단계 진행: CHAIN_FLOATING_CHECK → FALLING_ANIMATION
+        // 3. update 호출로 단계 진행: CHAIN_FLOATING_CHECK → PUYO_EFFECT_ANIMATION
         gameWorld.update(0.016f, mockInput);
         
-        // FALLING_ANIMATION 단계로 전이되었는지 확인
-        assertEquals("CHAIN_FLOATING_CHECK → FALLING_ANIMATION 전이", 
-                     GameWorld.GamePhase.FALLING_ANIMATION, getGamePhase());
+        // PUYO_EFFECT_ANIMATION 단계로 전이되었는지 확인
+        assertEquals("CHAIN_FLOATING_CHECK → PUYO_EFFECT_ANIMATION 전이", 
+                     GameWorld.GamePhase.PUYO_EFFECT_ANIMATION, getGamePhase());
         
         // 부유 뿌요 5개가 animatingPuyos에 추가되었는지 확인
         assertEquals("부유 뿌요 6개가 애니메이션 리스트에 있어야 함", 6, gameWorld.getAnimatingPuyos().size());
