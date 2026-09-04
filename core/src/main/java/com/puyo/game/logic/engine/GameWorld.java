@@ -232,7 +232,7 @@ public class GameWorld {
 
         if (canPuyoPairFall()) {
             currentPair.moveDown();
-            LogUtil.debug("GameWorld", "softDrop moved down, currentPair=" + currentPair);
+            //LogUtil.debug("GameWorld", "softDrop moved down, currentPair=" + currentPair);
             // 공중 상태면 락딜레이 비활성화
             if (lockDelayManager.isActive()) {
                 lockDelayManager.deactivate();
@@ -438,10 +438,21 @@ public class GameWorld {
                 // 자동 낙하 중에는 락딜레이 건드리지 않음 (공중이니까)
             } else {
                 // 착지! → 착지한 뿌요만 SETTLING 시작 + 락딜레이 활성화
-                for (Puyo p : currentPair.getPuyos()) {
-                    if (p.isAlive() && !board.canMoveDown(p)) { // 개별 뿌요 착지 체크
+                if ( currentPair.getRotation() == 0 || currentPair.getRotation() == 2 ) {
+                    for (Puyo p : currentPair.getPuyos()) {
                         p.setState(Puyo.State.SETTLING);
                         animatingPuyos.add(p);
+                        LogUtil.debug("GameWorld",
+                                "handleFallingAuto: added Vertical SETTLING puyo at (" + p.getX() + "," + p.getY() + "," + p.getColor() + ") on landing");
+                    }
+                } else {
+                    for (Puyo p : currentPair.getPuyos()) {
+                        if (p.isAlive() && !board.canMoveDown(p)) { // 개별 뿌요 착지 체크
+                            p.setState(Puyo.State.SETTLING);
+                            animatingPuyos.add(p);
+                            LogUtil.debug("GameWorld",
+                                    "handleFallingAuto: added Horizontal SETTLING puyo at (" + p.getX() + "," + p.getY() + "," + p.getColor() + ") on landing");
+                        }
                     }
                 }
                 lockDelayManager.activate();
@@ -523,9 +534,6 @@ public class GameWorld {
                 }
             } else {
                 // 분리 불가: 일반 잠금 → 착지 바운스 애니메이션(PUYO_EFFECT_ANIMATION) 후 연쇄 탐색
-                LogUtil.debug("GameWorld",
-                        "SEPARATION: no separation -> startSettling -> PUYO_EFFECT_ANIMATION (settle bounce)");
-
                 for (Puyo p : currentPair.getPuyos()) {
                     if (p.isAlive() && !p.isSettling()) {
                         p.setState(Puyo.State.SETTLING);
@@ -544,6 +552,39 @@ public class GameWorld {
             gamePhase = GamePhase.PUYO_EFFECT_ANIMATION;
         }
     }
+
+    /**
+     * 통합된 이펙트 애니메이션 핸들러 (분리/부유 통합: FALLING + SETTLING 바운스)
+     * 각 업데이트 메서드가 내부에서 할 일 없음을 판단하므로 사전 체크 불필요.
+     */
+    private void handlePuyoEffectAnimation(float delta) {
+        // animatingPuyos가 비어있으면 즉시 전이 (최소한의 가드만)
+        if (animatingPuyos.isEmpty()) {
+            gamePhase = GamePhase.CHAIN_FINDING;
+            return;
+        }
+
+        // 각 업데이트 메서드가 내부에서 "할 일 없음" 판단
+        boolean stillFalling = updateFallingAnimation(delta);
+        boolean stillSettling = updateSettlingAnimation(delta);
+
+        LogUtil.debug("GameWorld", "handleFallingAnimation: stillFalling=" + stillFalling + ", stillSettling="
+                + stillSettling + ", animatingPuyos=" + animatingPuyos.size());
+
+        // 둘 다 완료되면 보드에 배치 후 CHAIN_FINDING으로
+        if (!stillFalling && !stillSettling) {
+            // 낙하/바운스 완료: 보드에 배치
+            collectAndPlaceCompletedAnimation();
+
+            // 정리
+            currentPair = null;
+            lockDelayManager.deactivate();
+
+            // 연쇄 찾기 단계로
+            gamePhase = GamePhase.CHAIN_FINDING;
+            LogUtil.debug("GameWorld", "Phase: PUYO_EFFECT_ANIMATION -> CHAIN_FINDING (falling+settling done)");
+        }
+    }    
 
     private void handleChainFinding() {
         boolean found = chainManager.findChains(board);
@@ -681,7 +722,7 @@ public class GameWorld {
         }
         fallingAnimationTimer = 0f;
 
-        // FALLING 상태만 필터링 (POPPING, SETTLING은 별도 처리)
+        // FALLING , SETTLING 상태만 필터링 (POPPING 은 별도 처리)
         List<Puyo> fallingList = new ArrayList<>();
         for (Puyo puyo : animatingPuyos) {
             if (puyo.isFalling() || puyo.isSettling()) {
@@ -798,38 +839,6 @@ public class GameWorld {
         return true;
     }
 
-    /**
-     * 통합된 이펙트 애니메이션 핸들러 (분리/부유 통합: FALLING + SETTLING 바운스)
-     * 각 업데이트 메서드가 내부에서 할 일 없음을 판단하므로 사전 체크 불필요.
-     */
-    private void handlePuyoEffectAnimation(float delta) {
-        // animatingPuyos가 비어있으면 즉시 전이 (최소한의 가드만)
-        if (animatingPuyos.isEmpty()) {
-            gamePhase = GamePhase.CHAIN_FINDING;
-            return;
-        }
-
-        // 각 업데이트 메서드가 내부에서 "할 일 없음" 판단
-        boolean stillFalling = updateFallingAnimation(delta);
-        boolean stillSettling = updateSettlingAnimation(delta);
-
-        LogUtil.debug("GameWorld", "handleFallingAnimation: stillFalling=" + stillFalling + ", stillSettling="
-                + stillSettling + ", animatingPuyos=" + animatingPuyos.size());
-
-        // 둘 다 완료되면 보드에 배치 후 CHAIN_FINDING으로
-        if (!stillFalling && !stillSettling) {
-            // 낙하/바운스 완료: 보드에 배치
-            collectAndPlaceCompletedAnimation();
-
-            // 정리
-            currentPair = null;
-            lockDelayManager.deactivate();
-
-            // 연쇄 찾기 단계로
-            gamePhase = GamePhase.CHAIN_FINDING;
-            LogUtil.debug("GameWorld", "Phase: PUYO_EFFECT_ANIMATION -> CHAIN_FINDING (falling+settling done)");
-        }
-    }
 
     /** 뿌요 위치 확정 - 착지 바운스 애니메이션 위해 animatingPuyos에 SETTLING으로 추가 */
     private void startSettling() {

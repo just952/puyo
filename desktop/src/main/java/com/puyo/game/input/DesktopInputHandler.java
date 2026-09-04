@@ -146,7 +146,7 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
         }
 
         boolean rotate = rotatePressed && !prevRotatePressed;
-        LogUtil.debug("DesktopInputHandler", "- rotatePressed: " + rotatePressed + ", prevRotatePressed: " + prevRotatePressed + ", rotate: " + rotate);
+        //LogUtil.debug("DesktopInputHandler", "- rotatePressed: " + rotatePressed + ", prevRotatePressed: " + prevRotatePressed + ", rotate: " + rotate);
         
         // 🆕 반시계방향 회전 (Z 키)
         boolean rotateCCW = rotateCounterClockwisePressed && !prevRotateCounterClockwisePressed;

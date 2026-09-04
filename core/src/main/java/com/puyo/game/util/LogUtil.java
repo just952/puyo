@@ -27,7 +27,7 @@ public class LogUtil {
      */
     public static void debug(String tag, String message) {
         if (isDebug()) {
-            Gdx.app.log(tag, message);
+            Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag,  message);
         }
     }
 
@@ -36,7 +36,7 @@ public class LogUtil {
      */
     public static void debug(String tag, String message, Throwable throwable) {
         if (isDebug()) {
-            Gdx.app.log(tag, message, throwable);
+            Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag, message, throwable);
         }
     }
 
@@ -44,20 +44,20 @@ public class LogUtil {
      * 정보 로그 출력 (항상 출력)
      */
     public static void info(String tag, String message) {
-        Gdx.app.log(tag, message);
+        Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag, message);
     }
 
     /**
      * 에러 로그 출력 (항상 출력)
      */
     public static void error(String tag, String message) {
-        Gdx.app.error(tag, message);
+        Gdx.app.error("[" + java.time.LocalDateTime.now() + "] - " + tag, message);
     }
 
     /**
      * 에러 로그 출력 (예외 포함, 항상 출력)
      */
     public static void error(String tag, String message, Throwable throwable) {
-        Gdx.app.error(tag, message, throwable);
+        Gdx.app.error("[" + java.time.LocalDateTime.now() + "] - " + tag, message, throwable);
     }
 }

@@ -90,6 +90,11 @@ public class Board {
         return true;
     }
 
+    /**
+     * 뿌요쌍은 둘 중 하나만 걸려도 아래로 이동 불가. (원작 방식)
+     * @param pair
+     * @return true if the pair can move down
+     */
     public boolean canMoveDown(PuyoPair pair) {
         for (Puyo p : pair.getPuyos()) {
             if (!isEmpty(p.getX(), p.getY(), true)) {
