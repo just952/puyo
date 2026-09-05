@@ -2,6 +2,8 @@ package com.puyo.game.util;
 
 import com.badlogic.gdx.Gdx;
 import com.puyo.game.config.ConfigManager;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 
 /**
  * 로깅 유틸리티 클래스.
@@ -27,7 +29,7 @@ public class LogUtil {
      */
     public static void debug(String tag, String message) {
         if (isDebug()) {
-            Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag,  message);
+            Gdx.app.log(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) + "] [" + tag,  message);
         }
     }
 
@@ -36,7 +38,7 @@ public class LogUtil {
      */
     public static void debug(String tag, String message, Throwable throwable) {
         if (isDebug()) {
-            Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag, message, throwable);
+            Gdx.app.log(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) + "] [" + tag, message, throwable);
         }
     }
 
@@ -44,20 +46,20 @@ public class LogUtil {
      * 정보 로그 출력 (항상 출력)
      */
     public static void info(String tag, String message) {
-        Gdx.app.log("[" + java.time.LocalDateTime.now() + "] - " + tag, message);
+        Gdx.app.log(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) + "] [" + tag, message);
     }
 
     /**
      * 에러 로그 출력 (항상 출력)
      */
     public static void error(String tag, String message) {
-        Gdx.app.error("[" + java.time.LocalDateTime.now() + "] - " + tag, message);
+        Gdx.app.error(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) + "] [" + tag, message);
     }
 
     /**
      * 에러 로그 출력 (예외 포함, 항상 출력)
      */
     public static void error(String tag, String message, Throwable throwable) {
-        Gdx.app.error("[" + java.time.LocalDateTime.now() + "] - " + tag, message, throwable);
+        Gdx.app.error(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")) + "] [" + tag, message, throwable);
     }
 }

@@ -317,7 +317,7 @@ public class FallingAnimationTest {
             Puyo p = board.getPuyoAt(4, y);
             assertNotNull("column 4 y=" + y + "에 뿌요 있어야 함", p);
             assertEquals("column 4 y=" + y + " 색상", expected[i], p.getColor());
-            assertEquals("column 4 y=" + y + " 상태는 NORMAL", Puyo.State.NORMAL, p.getState());
+            assertEquals("column 4 y=" + y + " 상태는 PLACED", Puyo.State.PLACED, p.getState());
         }
     }
     

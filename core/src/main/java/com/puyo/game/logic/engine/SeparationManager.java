@@ -81,13 +81,13 @@ public class SeparationManager {
         if (leftCanFall && !rightCanFall) {
             blockedPuyo = right;
             freePuyo = left;
-            LogUtil.debug("Separation", "Separating: right BLOCKED at (" + right.getX() + "," + right.getY()
-                    + "), left FREE at (" + left.getX() + "," + left.getY() + ")");
+            LogUtil.debug("Separation", "Separating: right BLOCKED at (" + right.getX() + "," + right.getY() + "," + right.getState()
+                    + "), left FREE at (" + left.getX() + "," + left.getY()  + "," + left.getState()+ ")");
         } else if (rightCanFall && !leftCanFall) {
             blockedPuyo = left;
             freePuyo = right;
-            LogUtil.debug("Separation", "Separating: left BLOCKED at (" + left.getX() + "," + left.getY()
-                    + "), right FREE at (" + right.getX() + "," + right.getY() + ")");
+            LogUtil.debug("Separation", "Separating: left BLOCKED at (" + left.getX() + "," + left.getY() + "," + left.getState()
+                    + "), right FREE at (" + right.getX() + "," + right.getY() + "," + right.getState() + ")");
         } else {
             // 둘 다 가능하거나 둘 다 불가능하면 분리 안 함
             LogUtil.debug("Separation", "Separating: both can fall or both cannot fall - no separation");

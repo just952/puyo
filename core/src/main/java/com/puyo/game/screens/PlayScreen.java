@@ -184,7 +184,10 @@ public class PlayScreen extends BaseScreen {
                 // 낙하 중에도 스케일 적용 (반칸 처리용)
                 scaleX = scaleY = 1.0f;
                 break;
-            default: // NORMAL
+            case PENDING:
+            case PLACED:
+            case MOVABLE:
+            default:
                 scaleX = scaleY = 1.0f;
         }
         

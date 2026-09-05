@@ -11,13 +11,15 @@ public class Puyo {
 
     // 통합 애니메이션 상태
     public enum State {
-        NORMAL,      // 보드에 고정된 일반 상태 (기본값)
-        FALLING,     // 낙하 중 (현재 쌍, 분리/부유)
-        SETTLING,    // 착지 바운스 애니메이션 중
-        POPPING      // 연쇄 팝 애니메이션 중
+        MOVABLE,    // 조작 가능 조각 (currentPair, 스폰 직후 ~ 착지 전)
+        FALLING,    // 자유 낙하 중 (분리/부유, 조작 불가)
+        SETTLING,   // 착지 바운스 애니메이션 중 (0.35초, 조작 가능)
+        PENDING,    // 바운스 완료, 락딜레이 대기 중 (조작 가능, 시각적 정지)
+        POPPING,    // 연쇄 팝 애니메이션 중 (조작 불가)
+        PLACED      // 보드에 확정 배치됨 (조작 불가)
     }
 
-    private State state = State.NORMAL;
+    private State state = State.MOVABLE;
     private float animTimer = 0f;
     private float animDuration = 0f;
     private float scaleX = 1.0f;
@@ -99,13 +101,16 @@ public class Puyo {
             case FALLING:
                 this.animDuration = FALLING_ANIMATION_INTERVAL;
                 break;
+            case PENDING:
+            case PLACED:
+            case MOVABLE:
             default:
                 this.animDuration = 0f;
         }
     }
 
     public boolean isAnimating() {
-        return state != State.NORMAL;
+        return state == State.FALLING || state == State.SETTLING || state == State.POPPING;
     }
 
     public boolean isPopping() {
@@ -120,38 +125,60 @@ public class Puyo {
         return state == State.FALLING;
     }
 
+    public boolean isPending() {
+        return state == State.PENDING;
+    }
+
+    public boolean isPlaced() {
+        return state == State.PLACED;
+    }
+
+    public boolean isMovable() {
+        return state == State.MOVABLE;
+    }
+
+    /** 락 대기 중인지 (SETTLING 또는 PENDING) */
+    public boolean isLockWaiting() {
+        return state == State.SETTLING || state == State.PENDING;
+    }
+
+    @Deprecated
     public boolean isNormal() {
-        return state == State.NORMAL;
+        return state == State.PLACED || state == State.MOVABLE;
     }
 
     /**
      * 통합 애니메이션 업데이트
      * @param delta 프레임 시간
-     * @return 애니메이션 완료 여부 (true = 완료되어 상태가 NORMAL로 돌아감)
+     * @return 상태 변경 발생 여부 (SETTLING→PENDING 전이 시 true 반환)
      */
     public boolean updateAnimation(float delta) {
-        if (state == State.NORMAL) {
-            return true;
+        if (state == State.MOVABLE || state == State.PENDING || state == State.PLACED) {
+            return false; // 애니메이션 없음
         }
 
         animTimer += delta;
         float progress = animTimer / animDuration;
 
         if (progress >= 1.0f) {
-            animTimer = animDuration;
-            scaleX = 1.0f;
-            scaleY = 1.0f;
-            state = State.NORMAL;
-            animTimer = 0f;
-            return true; // 애니메이션 완료
+            progress = 1.0f;
         }
 
         switch (state) {
             case POPPING:
                 updatePopAnimation(progress);
+                if (progress >= 1.0f) {
+                    // 팝 완료: 상태는 호출부에서 POPPING→FALLING 또는 제거 처리
+                    return true;
+                }
                 break;
             case SETTLING:
                 updateSettleAnimation(progress);
+                if (progress >= 1.0f) {
+                    // 바운스 완료 → PENDING으로 자동 전이
+                    setState(State.PENDING);
+                    return true; // 상태 변경 알림
+                }
                 break;
             case FALLING:
                 // FALLING은 GameWorld에서 별도 처리 (타이머 기반 이동)
@@ -225,6 +252,10 @@ public class Puyo {
 
     public float getAnimDuration() {
         return animDuration;
+    }
+
+    public float getAnimTimer() {
+        return animTimer;
     }
 
     // 원본 위치 보존용

@@ -5,11 +5,11 @@ import com.puyo.game.util.LogUtil;
 /**
  * 락 딜레이(Lock Delay) 상태 관리 클래스.
  * GameWorld에서 인스턴스로 사용하거나, 정적 팩토리로 생성하여 사용.
- * Tsu 규칙: 0.5초 / 최대 15회 이동·회전
+ * Tsu 규칙: 0.3초 / 최대 15회 이동·회전
  */
 public class LockDelayManager {
 
-    public static final float LOCK_DELAY_TIME = 0.5f; // 초
+    public static final float LOCK_DELAY_TIME = 0.3f; // 초
     public static final int MAX_LOCK_DELAY_MOVES = 15; // Tsu 규칙: 최대 이동/회전 횟수
 
     private boolean active = false;
