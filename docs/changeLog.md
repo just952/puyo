@@ -4,6 +4,55 @@
 
 ---
 
+## v0.1.31 (2026-09-05)
+
+### 🎮 **착지 상태 재정의 + 바운스 애니메이션 + 통합 이펙트 애니메이션**
+
+**배경**: 기존 SETTLING 상태가 단일 상태(0.5초 바운스)로만 관리되어, 락딜레이 중 조작 가능 여부 판단과 수직/수평 쌍의 착지 처리 구분 등이 원작(Tsu) 규칙과 맞지 않음. 또한 분리 낙하(FALLING_ANIMATION)와 착지 바운스(SETTLING)가 별도 페이즈로 분리되어 중복 로직 발생.
+
+**해결**:
+1. **Puyo.State 6단계로 재정의**:
+   - `MOVABLE`: 조작 가능 조각 (스폰 직후 ~ 착지 전)
+   - `FALLING`: 자유 낙하 중 (분리/부유, 조작 불가)
+   - `SETTLING`: 착지 바운스 애니메이션 중 (0.35초, 조작 가능)
+   - `PENDING`: 바운스 완료, 락딜레이 대기 중 (조작 가능, 시각적 정지)
+   - `POPPING`: 연쇄 팝 애니메이션 중 (조작 불가)
+   - `PLACED`: 보드에 확정 배치됨 (조작 불가)
+
+2. **수직/수평 쌍 착지 구분 처리 (원작 Tsu 규칙 준수)**:
+   - 수직 쌍(rotation 0/2): 착지 시 양쪽 모두 SETTLING 시작
+   - 수평 쌍(rotation 1/3): 개별 뿌요별 `canMoveDown()` 체크 후 착지한 것만 SETTLING
+
+3. **락딜레이 0.3초로 단축** (기존 0.5초 → Tsu 규칙 맞춤)
+
+4. **통합 이펙트 애니메이션 페이즈 (PUYO_EFFECT_ANIMATION)**:
+   - 기존 `SEPARATION` + `FALLING_ANIMATION` + 착지 바운스 → 단일 페이즈 통합
+   - `handlePuyoEffectAnimation(delta)`에서 `updateFallingAnimation()` + `updateSettlingAnimation()` 동시 처리
+   - 둘 다 완료 시 `collectAndPlaceCompletedAnimation()` → `CHAIN_FINDING` 전이
+
+5. **`isLockWaiting()` 헬퍼 추가**: SETTLING || PENDING 상태 통합 체크로 이동/회전 시 상태 취소 로직 단순화
+
+#### 변경 파일
+
+| 파일 | 변경 유형 | 설명 |
+|-----|---------|-----|
+| `Puyo.java` | **수정** | State enum 6단계 재정의, SETTLING 0.35초 바운스 애니메이션, PENDING 상태 추가, isLockWaiting() 헬퍼 |
+| `GameWorld.java` | **대폭 수정** | 착지 시 수직/수평 구분 SETTLING, handlePuyoEffectAnimation 통합, fallInterval 0.4f, lockDelay 0.3f |
+| `LockDelayManager.java` | **수정** | LOCK_DELAY_TIME 0.5f → 0.3f 변경 |
+| `SeparationManager.java` | **수정** | 분리 후 blockedPuyo가 lockWaiting이면 SETTLING 진입하지 않음 |
+| `PlayScreen.java` | **수정** | drawStatefulPuyos()에서 PENDING/PLACED/MOVABLE 렌더링 분기 추가 |
+| `LogUtil.java` | **수정** | 로그 포맷 변경 (밀리초 단위 타임스탬프, 대괄호 스타일) |
+| `FallingAnimationTest.java` | **수정** | 테스트 기대값 NORMAL → PLACED 변경 |
+
+#### 효과
+- ✅ **원작 Tsu 규칙 준수**: 락딜레이 0.3초, 수직/수평 착지 구분, 15회 이동 제한
+- ✅ **착지 바운스 시각화**: SETTLING 0.35초 2회 진동 애니메이션 (압축/신장 반복)
+- ✅ **락딜레이 중 조작 명확화**: SETTLING/PENDING 상태에서만 이동/회전 가능, 입력 시 MOVABLE로 복구
+- ✅ **코드 단순화**: 분리/낙하/바운스 중복 페이즈/로직 제거 (~100줄 감소)
+- ✅ **테스트 통과**: 헤드리스 60개 테스트 + 데스크톱 실행 검증 완료
+
+---
+
 ## v0.1.30 (2026-08-31)
 
 ### 🔧 **입력 시스템 버그 수정 + 반시계방향 회전 지원**

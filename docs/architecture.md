@@ -993,11 +993,13 @@ if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
 | 구분            | 내용                                                                         |
 | --------------- | ---------------------------------------------------------------------------- |
 | **게임 루프**   | `PuyoGame.render()` → `Screen.render()` → `gameWorld.update(delta, inputProvider)` + 그리기 |
-| **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.5s`로 낙하 제어 (반칸 토글로 1초/1칸) |
+| **타임스텝**    | 고정 아님 (delta 누적), `fallInterval=0.4s`로 낙하 제어 (반칸 토글로 1초/1칸) |
 | **입력 처리**   | `InputProvider` 인터페이스만 의존, `InputCommand` 레코드로 전달, GameWorld 내부에서 `handleFallingInput`로 처리, **페이즈 기반 허용 제어** |
 | **상태 관리**   | `GameWorld`가 보드, 현재/다음 쌍, 점수, 연쇄 등 전체 상태 보유, **GamePhase 11단계** |
-| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.05s) |
-| **락 딜레이**   | 바닥에 닿으면 0.5초/15회 이동 제한 후 강제 잠금 (Tsu 규칙), **stateful Manager** |
+| **분리 로직**   | 가로 쌍(rotation 1,3)에서 한쪽만 막히면 분리 → 단일 뿌요 자동 낙하 (0.025s) |
+| **락 딜레이**   | 바닥에 닿으면 0.3초/15회 이동 제한 후 강제 잠금 (Tsu 규칙), **stateful Manager** |
+| **뿌요 상태 머신** | `Puyo.State` 6단계 (MOVABLE/FALLING/SETTLING/PENDING/POPPING/PLACED), **SETTLING 0.35초 바운스**, 수직/수평 착지 구분 (v0.1.31~) |
+| **통합 이펙트 애니메이션** | 분리/부유 낙하 + 착지 바운스 → `PUYO_EFFECT_ANIMATION` 단일 페이즈, `handlePuyoEffectAnimation` (v0.1.31~) |
 | **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복 |
 | **반칸 낙하**   | `Puyo.inMiddle` 토글로 모든 낙하 경로 자동 부드러운 이동 (v0.1.24~) |
 | **홀드 시스템** | `PuyoPair.resetRotation()` + `heldPair` 슬롯, 한 조각당 1회 제한 (v0.1.28~) |
