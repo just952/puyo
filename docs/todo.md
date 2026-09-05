@@ -43,6 +43,7 @@
 | **P1-25** | **입력 아키텍처 리팩토링 (v0.1.28)**           | **InputProvider 인터페이스 + InputCommand 레코드, Command 패턴, core 플랫폼 독립성, GameWorld 내부 입력 처리, Desktop/Android 구현체 분리, IME 텍스트 입력 지원** | **높음** | **2일** | **완료 (2026-08-29)** |
 | **P1-26** | **착지 상태 재정의 + 바운스 애니메이션 (v0.1.31)** | **Puyo.State 6단계(MOVABLE/FALLING/SETTLING/PENDING/POPPING/PLACED), SETTLING 0.35초 바운스, 수직/수평 착지 구분, 락딜레이 0.3초** | **높음** | **1일** | **완료 (2026-09-05)** |
 | **P1-27** | **통합 이펙트 애니메이션 (v0.1.31)**             | **SEPARATION/FALLING + SETTLING 바운스 → PUYO_EFFECT_ANIMATION 단일 페이즈, handlePuyoEffectAnimation, 중복 로직 제거** | **높음** | **1일** | **완료 (2026-09-05)** |
+| **P1-28** | **홀드 시스템 제거 (원작 고증)**                | **heldPair/holdUsed 필드, hold() 메서드, resetRotation(), InputCommand.holdPressed 제거** | **중간** | **0.5일** | **완료 (2026-09-05)** |
 
 ---
 
@@ -209,6 +210,7 @@
 | V0131-1 | **착지 상태 재정의 + 바운스 애니메이션**                                     | 2026-09-05 | Puyo.State 6단계, SETTLING 0.35초 바운스, 수직/수평 착지 구분, 락딜레이 0.3초 |
 | V0131-2 | **통합 이펙트 애니메이션 (PUYO_EFFECT_ANIMATION)**                           | 2026-09-05 | handlePuyoEffectAnimation으로 FALLING/SETTLING 동시 처리, 중복 페이즈/로직 제거 |
 | V0131-3 | **LogUtil 로그 포맷 개선**                                                    | 2026-09-05 | 밀리초 타임스탬프, 대괄호 스타일 통일 |
+| V0131-4 | **홀드 시스템 제거 (뿌요뿌요 2 원작 고증)**                                  | 2026-09-05 | heldPair/holdUsed/hold()/resetRotation()/InputCommand.holdPressed 제거 |
 
 ---
 

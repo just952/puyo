@@ -23,8 +23,6 @@ public class GameWorld {
 
     private PuyoPair currentPair;
     private PuyoPair nextPair;
-    private PuyoPair heldPair; // 홀드된 조각
-    private boolean holdUsed = false; // 현재 조각에서 홀드 사용 여부 (한 조각당 1회 제한)
     private boolean gameOver = false;
     private int score = 0;
     private float fallTimer = 0f;
@@ -82,7 +80,6 @@ public class GameWorld {
         pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.TOTAL_HEIGHT);
         lockDelayManager.deactivate();
         justSpawned = true; // 새 조각 스폰 알림 (DAS 리셋용, 한 프레임 후 자동 해제)
-        holdUsed = false; // 새 조각 스폰 시 홀드 사용 가능하도록 리셋
     }
 
     /** 다음 쌍을 스폰 (미리보기용) */
@@ -255,44 +252,7 @@ public class GameWorld {
         }
     }
 
-    /** 홀드: 현재 조각을 홀드 슬롯과 교체 (한 조각당 1회 제한) */
-    public void hold() {
-        if (currentPair == null)
-            return;
-
-        // FALLING_AUTO, LOCK_DELAY에서만 홀드 허용
-        if (gamePhase != GamePhase.FALLING_AUTO && gamePhase != GamePhase.LOCK_DELAY) {
-            return;
-        }
-
-        // 이미 홀드 사용했으면 무시
-        if (holdUsed) {
-            return;
-        }
-
-        if (heldPair == null) {
-            // 홀드 슬롯이 비어있으면 현재 조각을 홀드로 이동하고 다음 조각 스폰
-            heldPair = currentPair;
-            heldPair.resetRotation(); // 회전 상태 초기화
-            pairGenerator.positionAtSpawn(heldPair, Board.WIDTH, Board.TOTAL_HEIGHT);
-            spawnNewPair(); // nextPair가 currentPair가 되고 새 nextPair 생성
-            holdUsed = true;
-            LogUtil.debug("GameWorld", "Hold: stored current pair, spawned next");
-        } else {
-            // 홀드 슬롯에 조각이 있으면 현재 조각과 교체
-            PuyoPair temp = currentPair;
-            currentPair = heldPair;
-            heldPair = temp;
-            heldPair.resetRotation(); // 회전 상태 초기화
-            pairGenerator.positionAtSpawn(currentPair, Board.WIDTH, Board.TOTAL_HEIGHT);
-            holdUsed = true;
-            LogUtil.debug("GameWorld", "Hold: swapped with held pair");
-        }
-
-        // 락딜레이 리셋
-        lockDelayManager.deactivate();
-        fallTimer = 0f;
-    }
+    
 
     /** 소프트 드롭 / 락딜레이 중 이동 기록용 */
     public void recordLockDelayMove() {
@@ -402,10 +362,6 @@ public class GameWorld {
         // 하드 드롭
         if (cmd.hardDropPressed())
             hardDrop();
-
-        // 홀드
-        if (cmd.holdPressed())
-            hold();
     }
 
     // ==========================================
@@ -934,8 +890,6 @@ public class GameWorld {
         board.clear();
         currentPair = null;
         nextPair = null;
-        heldPair = null;
-        holdUsed = false;
         gameOver = false;
         score = 0;
         fallTimer = 0f;

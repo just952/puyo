@@ -19,7 +19,6 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
     private boolean rotateCounterClockwisePressed = false; // 🆕 반시계방향 (Z 키)
     private boolean dropPressed = false;
     private boolean hardDropPressed = false;
-    private boolean holdPressed = false;
     private boolean restartPressed = false;
 
     // 이전 프레임 키 상태 (엣지 감지용)
@@ -29,7 +28,6 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
     private boolean prevRotateCounterClockwisePressed = false; // 🆕 반시계방향 prev
     private boolean prevDropPressed = false;
     private boolean prevHardDropPressed = false;
-    private boolean prevHoldPressed = false;
     private boolean prevRestartPressed = false;
 
     // DAS/ARR 설정 (초 단위, ConfigManager에서 로드)
@@ -85,7 +83,6 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
         prevRotateCounterClockwisePressed = rotateCounterClockwisePressed; // 🆕
         prevDropPressed = dropPressed;
         prevHardDropPressed = hardDropPressed;
-        prevHoldPressed = holdPressed;
         prevRestartPressed = restartPressed;
 
         updateDasArr(delta);
@@ -153,10 +150,9 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
         
         boolean drop = dropPressed && softDropRepeatTriggered;
         boolean hardDrop = hardDropPressed && !prevHardDropPressed;
-        boolean hold = holdPressed && !prevHoldPressed;
         boolean restart = restartPressed && !prevRestartPressed;
 
-        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, hold, restart);
+        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, restart);
     }
 
     @Override
@@ -242,11 +238,6 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
             case Input.Keys.SPACE:
                 hardDropPressed = true;
                 return true;
-            case Input.Keys.SHIFT_LEFT:
-            case Input.Keys.SHIFT_RIGHT:
-            case Input.Keys.C:
-                holdPressed = true;
-                return true;
             case Input.Keys.ENTER:
             case Input.Keys.ESCAPE:
                 restartPressed = true;
@@ -287,11 +278,6 @@ public class DesktopInputHandler implements InputProvider, InputProcessor {
                 return true;
             case Input.Keys.SPACE:
                 hardDropPressed = false;
-                return true;
-            case Input.Keys.SHIFT_LEFT:
-            case Input.Keys.SHIFT_RIGHT:
-            case Input.Keys.C:
-                holdPressed = false;
                 return true;
             case Input.Keys.ENTER:
             case Input.Keys.ESCAPE:

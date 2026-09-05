@@ -46,12 +46,11 @@ public class AndroidInputHandler implements InputProvider, InputProcessor, Dispo
         boolean drop = touchController.isDropPressed();
         boolean hardDrop = touchController.isHardDropPressed();
         
-        // 홀드/재시작은 터치에서 별도 처리 필요시 추가
-        // 현재 TouchController에는 hold/restart 없으므로 false
-        boolean hold = false;
+        // 재시작은 터치에서 별도 처리 필요시 추가
+        // 현재 TouchController에는 restart 없으므로 false
         boolean restart = false;
 
-        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, hold, restart);
+        pendingCommand = new InputCommand(moveDirection, rotate, rotateCCW, drop, hardDrop, restart);
     }
 
     @Override

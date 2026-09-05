@@ -19,7 +19,6 @@
 |                     | **회전 시스템 (벽 킥 포함)**                                          | **완료** | PuyoPair 회전 + setPosition, GameWorld 벽 킥 처리                    |
 |                     | **스폰 위치 통일**                                                    | **완료** | createAndPositionPair() 공통 메서드로 상단 중앙 스폰 보장            |
 |                     | **반칸 단위 부드러운 낙하 (Half-cell Falling)**                       | **완료** | Puyo.inMiddle 토글 방식, 모든 낙하 경로 자동 적용 (2026-08-22)       |
-|                     | **홀드 시스템 (Hold)**                                                | **완료** | heldPair 슬롯 + resetRotation(), 한 조각당 1회 제한 (2026-08-29)     |
 |                     | **반시계방향 회전 (Counter-Clockwise Rotation)**                      | **완료** | Z키/롱프레스, 벽킥 포함, 락딜레이 연동 (2026-08-31)                  |
 |                     | **착지 상태 재정의 + 바운스 애니메이션 (SETTLING/PENDING)**             | **완료** | 6단계 상태(MOVABLE/FALLING/SETTLING/PENDING/POPPING/PLACED), 0.35초 바운스, 수직/수평 쌍 구분 처리 (2026-09-05) |
 |                     | **분리/부유 낙하 + 착지 바운스 통합 애니메이션 (PUYO_EFFECT_ANIMATION)**| **완료** | handlePuyoEffectAnimation으로 단일 페이즈에서 처리, 중복 로직 제거 (2026-09-05) |

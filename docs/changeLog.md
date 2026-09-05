@@ -4,6 +4,27 @@
 
 ---
 
+## v0.1.32 (2026-09-05)
+
+### 🗑️ **홀드 시스템 제거 (원작 뿌요뿌요 2 고증)**
+
+**배경**: 홀드(Hold) 기능은 뿌요뿌요 테트리스/모던 테트리스에만 있는 시스템으로, 원작 뿌요뿌요 2(통)에는 존재하지 않음. 원작 고증을 위해 완전 제거.
+
+**제거 내용**:
+1. `GameWorld.java`: `heldPair`, `holdUsed` 필드 제거, `hold()` 메서드 제거, `spawnNewPair()`/`restartGame()`에서 관련 코드 제거
+2. `PuyoPair.java`: `resetRotation()` 메서드 제거 (홀드용으로만 사용됨)
+3. `InputCommand.java`: `holdPressed` 필드 제거 (6개 파라미터로 축소)
+4. `DesktopInputHandler.java`: `holdPressed`/`prevHoldPressed` 상태 변수 제거, 키 매핑(C/Shift) 제거, `buildCommand()`에서 홀드 명령 구성 제거
+5. `AndroidInputHandler.java`: `buildCommand()`에서 홀드 false 하드코딩 제거
+
+**효과**:
+- ✅ **원작 고증**: 뿌요뿌요 2(통) 규칙 준수 (홀드 없음)
+- ✅ **코드 단순화**: ~50줄 감소, 상태 관리 간소화
+- ✅ **입력 파이프라인 정리**: InputCommand 7→6개 필드로 축소
+- ✅ **모든 플랫폼 컴파일/테스트 통과**
+
+---
+
 ## v0.1.31 (2026-09-05)
 
 ### 🎮 **착지 상태 재정의 + 바운스 애니메이션 + 통합 이펙트 애니메이션**

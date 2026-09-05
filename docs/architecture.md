@@ -57,7 +57,7 @@ puyo/
 │   │   │       ├── Board.java            # 6x12 보드, 중력, 부유 뿌요 탐색
 │   │   │       ├── Puyo.java             # 단일 뿌요 (위치, 색상, 생존, **통합 애니메이션 상태 NORMAL/FALLING/SETTLING/POPPING**, inMiddle 반칸 상태 v0.1.24~)
 │   │   │       ├── PuyoColor.java        # 뿌요 색상 열거형
-│   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치, resetRotation() v0.1.28~)
+│   │   │       ├── PuyoPair.java         # 뿌요 쌍 (회전, 이동, 위치)
 │   │   │       └── StageData.java        # 스테이지 데이터 (상대, 배경, 난이도)
 │   │   ├── menus/
 │   │   │   ├── MenuAction.java           # 메뉴 액션 열거형
@@ -1002,7 +1002,6 @@ if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
 | **통합 이펙트 애니메이션** | 분리/부유 낙하 + 착지 바운스 → `PUYO_EFFECT_ANIMATION` 단일 페이즈, `handlePuyoEffectAnimation` (v0.1.31~) |
 | **연쇄 처리**   | `lockPiece()` → 매칭 찾기 → 제거 → 중력 적용 → 반복 |
 | **반칸 낙하**   | `Puyo.inMiddle` 토글로 모든 낙하 경로 자동 부드러운 이동 (v0.1.24~) |
-| **홀드 시스템** | `PuyoPair.resetRotation()` + `heldPair` 슬롯, 한 조각당 1회 제한 (v0.1.28~) |
 | **렌더링**      | `SpriteBatch` + 아틀라스, `FitViewport`로 가상 해상도(1600×960) 유지 |
 | **더블 버퍼링** | LibGDX 자동 처리 (`glClear` → 그리기 → 스왑) |
 | **Screen 전환** | `Game.setScreen()` → hide/dispose → show/initViewport → 다음 프레임부터 적용 |

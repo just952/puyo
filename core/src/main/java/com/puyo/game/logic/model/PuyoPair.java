@@ -163,12 +163,6 @@ public class PuyoPair {
         setPosition(left.getX(), left.getY());
     }
 
-    /** 회전 상태를 초기화 (홀드 시 사용) */
-    public void resetRotation() {
-        rotation = 0;
-        setPosition(left.getX(), left.getY());
-    }
-
     public String toString() {
         return "PuyoPair [left" + left + " /  right" + right + " / rotation=" + rotation + "]";
     }
